@@ -123,6 +123,13 @@ def inicializar_datos():
             except Exception:
                 db.rollback()
 
+        # ── Migración: campo activo en productos ─────────────────────────────────
+        try:
+            db.execute(text("ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         # ── Migración: códigos únicos en productos, clientes y proveedores ─────
         for sql in [
             "ALTER TABLE productos ADD COLUMN codigo TEXT",

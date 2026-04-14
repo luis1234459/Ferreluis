@@ -29,6 +29,7 @@ class ProductoSchema(BaseModel):
     es_producto_compuesto:   bool            = False
     descuento_compuesto_pct: float           = 0.0
     codigo:                  Optional[str]   = None
+    activo:                  bool            = True
 
     class Config:
         from_attributes = True
@@ -309,9 +310,12 @@ def eliminar_oferta(
 # ============================================================================
 
 @router.get("/")
-def listar_productos(db: Session = Depends(get_db)):
+def listar_productos(incluir_inactivos: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Producto)
+    if not incluir_inactivos:
+        q = q.filter(Producto.activo == True)
     bcv, binance = _tasas_actuales(db)
-    return [_enriquecer(p, bcv, binance) for p in db.query(Producto).all()]
+    return [_enriquecer(p, bcv, binance) for p in q.all()]
 
 
 @router.get("/buscar")
@@ -387,6 +391,23 @@ def actualizar_codigo_producto(
         if existe:
             raise HTTPException(status_code=400, detail="Ese código ya está en uso")
     p.codigo = nuevo_codigo
+    db.commit()
+    db.refresh(p)
+    bcv, binance = _tasas_actuales(db)
+    return _enriquecer(p, bcv, binance)
+
+
+@router.put("/{producto_id}/estado")
+def cambiar_estado_producto(
+    producto_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    p.activo = bool(datos.get("activo", True))
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)

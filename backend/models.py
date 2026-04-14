@@ -60,6 +60,7 @@ class Producto(Base):
     descuento_compuesto_pct = Column(Float,   default=0)       # % dto solo admin
     comision_pct            = Column(Float,   default=0.0)     # % comisión al vendedor por este producto
     codigo                  = Column(String,  nullable=True, unique=True, index=True)
+    activo                  = Column(Boolean, default=True)
 
     # Precios calculados (NO se guardan, se computan al vuelo):
     #   precio_base_usd        = costo_usd * (1 + margen)

@@ -48,6 +48,11 @@
               <option value="clave">Solo productos clave</option>
               <option value="compuesto">Solo productos compuestos</option>
             </select>
+            <button v-if="esAdmin"
+              :class="['btn-toggle-inactivos', mostrarInactivos ? 'activo' : '']"
+              @click="toggleInactivos">
+              {{ mostrarInactivos ? '👁 Ocultando inactivos' : '👁 Mostrar inactivos' }}
+            </button>
           </div>
 
           <!-- Tabla -->
@@ -86,6 +91,7 @@
                     <span class="prod-nombre">{{ p.nombre }}</span>
                     <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
                     <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
+                    <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
                   </td>
                   <td class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</td>
                   <td class="txt-muted">{{ p.categoria || '—' }}</td>
@@ -102,6 +108,8 @@
                     <button class="btn-editar"    @click="editar(p)">Editar</button>
                     <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
                     <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
+                    <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
+                    <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
                     <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
                   </td>
                 </tr>
@@ -739,6 +747,9 @@ export default {
       // Edición inline de código
       codigoEditando: null,
       codigoTemp:     '',
+
+      // Visibilidad de inactivos (solo admin)
+      mostrarInactivos: false,
     }
   },
 
@@ -818,7 +829,9 @@ export default {
       this.factor      = r.data.factor || 1
     },
     async cargarProductos() {
-      const res = await axios.get('/productos/')
+      const params = {}
+      if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
+      const res = await axios.get('/productos/', { params })
       this.productos = res.data
     },
     async cargarDepartamentos() {
@@ -929,6 +942,22 @@ export default {
       this.mostrarForm = false
       this.editando    = false
       this.error       = ''
+    },
+
+    // ── Estado activo/inactivo ────────────────────────────────────────────────
+    async toggleInactivos() {
+      this.mostrarInactivos = !this.mostrarInactivos
+      await this.cargarProductos()
+    },
+    async cambiarEstado(producto, estado) {
+      const accion = estado ? 'activar' : 'desactivar'
+      if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${producto.nombre}"?`)) return
+      try {
+        await axios.put(`/productos/${producto.id}/estado`, { activo: estado })
+        await this.cargarProductos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al cambiar estado')
+      }
     },
 
     // ── Edición inline de código ─────────────────────────────────────────────
@@ -1308,6 +1337,13 @@ export default {
 .btn-comp     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .fila-stock-bajo td { background: #DC262608; }
+
+/* ── Toggle inactivos y estado ── */
+.btn-toggle-inactivos { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.btn-toggle-inactivos.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-desactivar { background: #DC26261A; color: #DC2626; border: 1px solid #DC2626; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+.btn-activar    { background: #16A34A1A; color: #16A34A; border: 1px solid #16A34A; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+.badge-inactivo { background: #DC26261A; color: #DC2626; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; text-transform: uppercase; margin-left: 0.25rem; }
 
 /* ── Código inline ── */
 .celda-codigo { min-width: 90px; }
