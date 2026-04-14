@@ -99,6 +99,7 @@ def _serializar_cliente(c: Cliente, db: Session, niveles: list) -> dict:
         "activo":           c.activo,
         "notas":            c.notas,
         "es_cliente_generico": c.es_cliente_generico,
+        "codigo":           c.codigo,
         "total_compras":    stats["total_compras"],
         "monto_acumulado_usd": stats["monto_acumulado_usd"],
         "nivel_fidelidad":  nivel,
@@ -272,6 +273,10 @@ def crear_cliente(datos: dict, db: Session = Depends(get_db)):
     db.add(c)
     db.commit()
     db.refresh(c)
+    if not c.codigo:
+        c.codigo = f"CLI-{c.id:04d}"
+        db.commit()
+        db.refresh(c)
     niveles = db.query(NivelFidelidad).order_by(NivelFidelidad.orden).all()
     return _serializar_cliente(c, db, niveles)
 

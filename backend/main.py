@@ -123,6 +123,18 @@ def inicializar_datos():
             except Exception:
                 db.rollback()
 
+        # ── Migración: códigos únicos en productos, clientes y proveedores ─────
+        for sql in [
+            "ALTER TABLE productos ADD COLUMN codigo TEXT",
+            "ALTER TABLE clientes ADD COLUMN codigo TEXT",
+            "ALTER TABLE proveedores ADD COLUMN codigo TEXT",
+        ]:
+            try:
+                db.execute(text(sql))
+                db.commit()
+            except Exception:
+                db.rollback()
+
         # ── Seed: crear "Consumidor Final" si no existe ──────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True

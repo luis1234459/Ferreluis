@@ -19,6 +19,7 @@
           <table>
             <thead>
               <tr>
+                <th>Código</th>
                 <th>Nombre</th>
                 <th>Teléfono</th>
                 <th>Nivel</th>
@@ -30,6 +31,7 @@
             </thead>
             <tbody>
               <tr v-for="c in clientes" :key="c.id">
+                <td><span class="codigo-cli">{{ c.codigo || '—' }}</span></td>
                 <td>{{ c.nombre }}</td>
                 <td>{{ c.telefono }}</td>
                 <td>
@@ -49,7 +51,7 @@
                 </td>
               </tr>
               <tr v-if="clientes.length === 0">
-                <td colspan="7" class="sin-datos">No hay clientes registrados</td>
+                <td colspan="8" class="sin-datos">No hay clientes registrados</td>
               </tr>
             </tbody>
           </table>
@@ -99,6 +101,10 @@
               <div class="field full">
                 <label>Notas</label>
                 <input v-model="form.notas" placeholder="Observaciones internas..." />
+              </div>
+              <div class="field" v-if="editando && form.codigo">
+                <label>Código</label>
+                <input :value="form.codigo" readonly style="background:#F5F5F0;color:#888;cursor:default" />
               </div>
             </div>
             <div class="form-botones">
@@ -348,6 +354,8 @@ export default {
 
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
 .btn-cancelar { background: transparent; color: #1A1A1A; border: 1px solid #DDDDDD; padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; }
+
+.codigo-cli { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; }
 
 /* Overlay / Dialog */
 .dialog-grande { max-width: 720px; }

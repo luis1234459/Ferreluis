@@ -136,6 +136,10 @@ def crear_proveedor(datos: dict, db: Session = Depends(get_db), _: None = Depend
     db.add(p)
     db.commit()
     db.refresh(p)
+    if not p.codigo:
+        p.codigo = f"PRV-{p.id:04d}"
+        db.commit()
+        db.refresh(p)
     return p
 
 

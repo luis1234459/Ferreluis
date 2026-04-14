@@ -55,6 +55,7 @@
             <table>
               <thead>
                 <tr>
+                  <th>Código</th>
                   <th>Nombre</th>
                   <th>Depto.</th>
                   <th>Categoría</th>
@@ -71,6 +72,16 @@
               <tbody>
                 <tr v-for="p in productosFiltrados" :key="p.id"
                   :class="{ 'fila-stock-bajo': p.stock < 5 }">
+                  <td class="celda-codigo">
+                    <span v-if="codigoEditando !== p.id" class="codigo-tag" @click="iniciarEditCodigo(p)" title="Clic para editar código">
+                      {{ p.codigo || '—' }}
+                    </span>
+                    <span v-else class="codigo-edit-wrap">
+                      <input v-model="codigoTemp" class="input-codigo" @keyup.enter="guardarCodigo(p)" @keyup.escape="codigoEditando = null" placeholder="Ej: HRR-001" />
+                      <button class="btn-ok-codigo" @click="guardarCodigo(p)">✓</button>
+                      <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
+                    </span>
+                  </td>
                   <td>
                     <span class="prod-nombre">{{ p.nombre }}</span>
                     <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
@@ -95,7 +106,7 @@
                   </td>
                 </tr>
                 <tr v-if="productosFiltrados.length === 0">
-                  <td colspan="11" class="sin-datos">No hay productos registrados</td>
+                  <td colspan="12" class="sin-datos">No hay productos registrados</td>
                 </tr>
               </tbody>
             </table>
@@ -178,6 +189,10 @@
               <div class="field field-wide">
                 <label>Nombre *</label>
                 <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" />
+              </div>
+              <div class="field">
+                <label>Código</label>
+                <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" />
               </div>
               <div class="field">
                 <label>Departamento</label>
@@ -720,6 +735,10 @@ export default {
       formArea:    { nombre: '' },
       formPasillo: { area_id: '', numero: null },
       formEstante: { pasillo_id: '', numero: null },
+
+      // Edición inline de código
+      codigoEditando: null,
+      codigoTemp:     '',
     }
   },
 
@@ -842,7 +861,7 @@ export default {
       this.editando    = false
       this.error       = ''
       this.form = {
-        id: null, nombre: '', categoria: '',
+        id: null, nombre: '', categoria: '', codigo: '',
         departamento_id: null, proveedor_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
@@ -882,6 +901,7 @@ export default {
           es_producto_clave:       Boolean(this.form.es_producto_clave),
           es_producto_compuesto:   Boolean(this.form.es_producto_compuesto),
           descuento_compuesto_pct: Number(this.form.descuento_compuesto_pct || 0),
+          codigo:                  this.form.codigo          || null,
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)
@@ -909,6 +929,23 @@ export default {
       this.mostrarForm = false
       this.editando    = false
       this.error       = ''
+    },
+
+    // ── Edición inline de código ─────────────────────────────────────────────
+    iniciarEditCodigo(p) {
+      if (!this.esAdmin) return
+      this.codigoEditando = p.id
+      this.codigoTemp     = p.codigo || ''
+    },
+    async guardarCodigo(p) {
+      try {
+        await axios.put(`/productos/${p.id}/codigo`, { codigo: this.codigoTemp || null })
+        p.codigo = this.codigoTemp || null
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar código')
+      } finally {
+        this.codigoEditando = null
+      }
     },
 
     // ── CRUD Variantes ────────────────────────────────────────────────────────
@@ -1271,6 +1308,15 @@ export default {
 .btn-comp     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .fila-stock-bajo td { background: #DC262608; }
+
+/* ── Código inline ── */
+.celda-codigo { min-width: 90px; }
+.codigo-tag { font-size: 0.8rem; font-weight: 700; color: #1A1A1A; background: #FFCC0033; padding: 0.15rem 0.45rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.codigo-tag:hover { background: var(--amarillo); }
+.codigo-edit-wrap { display: flex; align-items: center; gap: 0.25rem; }
+.input-codigo { width: 90px; padding: 0.2rem 0.4rem; font-size: 0.8rem; border: 1px solid var(--amarillo); border-radius: 4px; }
+.btn-ok-codigo     { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
+.btn-cancel-codigo { background: #888; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
 
 /* ── Modal form producto ── */
 .modal-form { max-width: 660px; }

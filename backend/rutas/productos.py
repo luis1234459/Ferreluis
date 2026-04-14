@@ -28,6 +28,7 @@ class ProductoSchema(BaseModel):
     es_producto_clave:       bool            = False
     es_producto_compuesto:   bool            = False
     descuento_compuesto_pct: float           = 0.0
+    codigo:                  Optional[str]   = None
 
     class Config:
         from_attributes = True
@@ -313,12 +314,25 @@ def listar_productos(db: Session = Depends(get_db)):
     return [_enriquecer(p, bcv, binance) for p in db.query(Producto).all()]
 
 
+@router.get("/buscar")
+def buscar_por_codigo(codigo: str, db: Session = Depends(get_db)):
+    p = db.query(Producto).filter(Producto.codigo == codigo).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    bcv, binance = _tasas_actuales(db)
+    return _enriquecer(p, bcv, binance)
+
+
 @router.post("/")
 def crear_producto(
     producto: ProductoSchema,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
+    if producto.codigo:
+        existe = db.query(Producto).filter(Producto.codigo == producto.codigo).first()
+        if existe:
+            raise HTTPException(status_code=400, detail="Ya existe un producto con ese código")
     nuevo = Producto(**producto.dict())
     db.add(nuevo)
     db.commit()
@@ -348,6 +362,31 @@ def actualizar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     for key, value in datos.dict().items():
         setattr(p, key, value)
+    db.commit()
+    db.refresh(p)
+    bcv, binance = _tasas_actuales(db)
+    return _enriquecer(p, bcv, binance)
+
+
+@router.put("/{producto_id}/codigo")
+def actualizar_codigo_producto(
+    producto_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    nuevo_codigo = datos.get("codigo", "").strip() or None
+    if nuevo_codigo:
+        existe = db.query(Producto).filter(
+            Producto.codigo == nuevo_codigo,
+            Producto.id != producto_id,
+        ).first()
+        if existe:
+            raise HTTPException(status_code=400, detail="Ese código ya está en uso")
+    p.codigo = nuevo_codigo
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)

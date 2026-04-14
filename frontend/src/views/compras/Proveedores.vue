@@ -13,10 +13,11 @@
         <div class="tabla-container">
           <table>
             <thead>
-              <tr><th>Nombre</th><th>RIF</th><th>Teléfono</th><th>Contacto</th><th>Email</th><th>Crédito</th><th>Acciones</th></tr>
+              <tr><th>Código</th><th>Nombre</th><th>RIF</th><th>Teléfono</th><th>Contacto</th><th>Email</th><th>Crédito</th><th>Acciones</th></tr>
             </thead>
             <tbody>
               <tr v-for="p in proveedores" :key="p.id">
+                <td><span class="codigo-prv">{{ p.codigo || '—' }}</span></td>
                 <td style="font-weight:600">{{ p.nombre }}</td>
                 <td>{{ p.rif || '—' }}</td>
                 <td>{{ p.telefono || '—' }}</td>
@@ -30,7 +31,7 @@
                 </td>
               </tr>
               <tr v-if="proveedores.length === 0">
-                <td colspan="7" class="sin-datos">No hay proveedores registrados</td>
+                <td colspan="8" class="sin-datos">No hay proveedores registrados</td>
               </tr>
             </tbody>
           </table>
@@ -257,4 +258,6 @@ export default {
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+
+.codigo-prv { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; }
 </style>

@@ -59,6 +59,7 @@ class Producto(Base):
     es_producto_compuesto   = Column(Boolean, default=False)
     descuento_compuesto_pct = Column(Float,   default=0)       # % dto solo admin
     comision_pct            = Column(Float,   default=0.0)     # % comisión al vendedor por este producto
+    codigo                  = Column(String,  nullable=True, unique=True, index=True)
 
     # Precios calculados (NO se guardan, se computan al vuelo):
     #   precio_base_usd        = costo_usd * (1 + margen)
@@ -274,6 +275,7 @@ class Proveedor(Base):
     fecha_registro   = Column(DateTime, default=datetime.now)
     dias_credito       = Column(Integer,  default=0)   # días de crédito que otorga
     credito_disponible = Column(Float,    default=0)   # crédito a favor por devoluciones
+    codigo             = Column(String,   nullable=True, unique=True, index=True)
 
 
 class CatalogoProveedor(Base):
@@ -419,6 +421,7 @@ class Cliente(Base):
     notas               = Column(String,   nullable=True)
     es_cliente_generico = Column(Boolean,  default=False)  # True = "Consumidor Final"
     credito_disponible  = Column(Float,    default=0)
+    codigo              = Column(String,   nullable=True, unique=True, index=True)
 
     __table_args__ = (
         Index('ix_cliente_nombre_busq',    'nombre'),

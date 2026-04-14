@@ -124,7 +124,8 @@
               <tbody>
                 <tr v-for="p in productosFiltrados" :key="p.id">
                   <td>
-                    {{ p.nombre }}
+                    <span class="prod-nombre-v">{{ p.nombre }}</span>
+                    <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
                     <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
                   </td>
                   <td class="txt-dim">${{ precioBase(p).toFixed(2) }}</td>
@@ -152,7 +153,10 @@
 
               <div v-for="(item, i) in carrito" :key="i" class="item">
                 <div class="item-header">
-                  <span class="item-nombre">{{ item.nombre }}</span>
+                  <span class="item-nombre">
+                    {{ item.nombre }}
+                    <span v-if="item.codigo" class="cod-tag-v" style="font-size:0.7rem">{{ item.codigo }}</span>
+                  </span>
                   <button class="btn-quitar" @click="quitar(i)">×</button>
                 </div>
                 <div class="item-controles">
@@ -602,9 +606,15 @@ export default {
     },
     productosFiltrados() {
       const q = this.busqueda.toLowerCase()
+      if (!q) return this.productos
+      const exactCodigo = this.productos.filter(p =>
+        p.codigo && p.codigo.toLowerCase() === q
+      )
+      if (exactCodigo.length) return exactCodigo
       return this.productos.filter(p =>
         p.nombre.toLowerCase().includes(q) ||
-        (p.categoria && p.categoria.toLowerCase().includes(q))
+        (p.categoria && p.categoria.toLowerCase().includes(q)) ||
+        (p.codigo && p.codigo.toLowerCase().includes(q))
       )
     },
     subtotalUSD() {
@@ -1194,6 +1204,10 @@ export default {
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-sec { padding: 0.55rem 1.2rem; background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
 .btn-sec:hover { background: var(--borde-suave); }
+
+/* ── Código tag en ventas ── */
+.prod-nombre-v { display: block; font-weight: 600; }
+.cod-tag-v { font-size: 0.72rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
 
 /* ── Ubicaciones popup ── */
 .btn-ubicar-v { background: transparent; border: none; cursor: pointer; font-size: 0.85rem; padding: 0 0.15rem; opacity: 0.6; }
