@@ -211,3 +211,53 @@ input:focus, select:focus, textarea:focus {
 /* ─── Grids de formularios ─── */
 .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .field.full, .field-wide { grid-column: 1 / -1; }
+
+/* ─── Botón hamburguesa — solo móvil ─── */
+.btn-menu-movil {
+  display: none;
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 200;
+  background: var(--amarillo);
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ─── Overlay oscuro detrás del sidebar en móvil ─── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 150;
+}
+
+@media (max-width: 768px) {
+  .btn-menu-movil { display: block; }
+
+  .sidebar {
+    position: fixed;
+    left: -240px;
+    top: 0;
+    height: 100vh;
+    z-index: 160;
+    transition: left 0.25s ease;
+    width: 220px;
+  }
+
+  .sidebar.abierto {
+    left: 0;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  .contenido {
+    width: 100%;
+  }
+}

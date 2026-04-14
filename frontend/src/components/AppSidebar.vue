@@ -1,5 +1,7 @@
 <template>
-  <aside class="sidebar">
+  <button class="btn-menu-movil" @click="abrirMenu">☰</button>
+  <div class="sidebar-overlay" :class="{ visible: menuAbierto }" @click="cerrarMenu"></div>
+  <aside class="sidebar" :class="{ abierto: menuAbierto }">
     <div class="logo"><h2>Ferreutil</h2></div>
     <nav>
 
@@ -21,6 +23,7 @@
             v-for="item in itemsVisibles(g)"
             :key="item.ruta"
             :to="item.ruta"
+            @click="cerrarMenu"
           >{{ item.label }}</router-link>
         </div>
       </div>
@@ -144,7 +147,7 @@ export default {
         ? true
         : (saved[g.key] !== undefined ? saved[g.key] : false)
     }
-    return { usuario, abiertos }
+    return { usuario, abiertos, menuAbierto: false }
   },
   computed: {
     esAdmin() {
@@ -156,6 +159,7 @@ export default {
   },
   watch: {
     $route(to) {
+      this.menuAbierto = false
       for (const g of GRUPOS) {
         const tieneActiva = g.rutas.some(r => to.path === r || to.path.startsWith(r + '/'))
         if (tieneActiva && !this.abiertos[g.key]) {
@@ -188,6 +192,8 @@ export default {
     _guardar() {
       localStorage.setItem('sidebar_grupos', JSON.stringify({ ...this.abiertos }))
     },
+    abrirMenu()  { this.menuAbierto = true },
+    cerrarMenu() { this.menuAbierto = false },
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
