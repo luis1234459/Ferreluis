@@ -1,0 +1,361 @@
+<template>
+  <div class="layout">
+    <AppSidebar />
+
+    <main class="contenido">
+      <div class="top-bar">
+        <h1>Órdenes de compra</h1>
+        <button class="btn-nuevo" @click="abrirNueva">+ Nueva orden</button>
+      </div>
+
+      <div class="contenido-inner">
+        <!-- Filtros -->
+        <div class="filtros">
+          <select v-model="filtroEstado" @change="cargar">
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="aprobada">Aprobada</option>
+            <option value="recibida_parcial">Recibida parcial</option>
+            <option value="cerrada">Cerrada</option>
+            <option value="anulada">Anulada</option>
+          </select>
+          <select v-model="filtroProveedor" @change="cargar">
+            <option value="">Todos los proveedores</option>
+            <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+          </select>
+        </div>
+
+        <!-- Tabla de órdenes -->
+        <div class="tabla-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Nro.</th>
+                <th>Proveedor</th>
+                <th>Fecha</th>
+                <th>Esperada</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="o in ordenes" :key="o.id">
+                <td style="font-weight:700">{{ o.numero }}</td>
+                <td>{{ o.proveedor_nombre }}</td>
+                <td>{{ formatFecha(o.fecha_creacion) }}</td>
+                <td>{{ o.fecha_esperada ? formatFecha(o.fecha_esperada) : '—' }}</td>
+                <td class="txt-verde">${{ o.total.toFixed(2) }}</td>
+                <td><span :class="'badge badge-' + o.estado">{{ labelEstado(o.estado) }}</span></td>
+                <td class="acciones">
+                  <button class="btn-ver" @click="verDetalle(o)">Ver</button>
+                  <button v-if="o.estado === 'borrador'" class="btn-editar" @click="editarOrden(o)">Editar</button>
+                  <button v-if="o.estado === 'borrador' && esAdmin" class="btn-aprobar" @click="aprobar(o.id)">Aprobar</button>
+                  <button v-if="['borrador','aprobada'].includes(o.estado)" class="btn-anular" @click="anular(o.id)">Anular</button>
+                </td>
+              </tr>
+              <tr v-if="ordenes.length === 0">
+                <td colspan="7" class="sin-datos">No hay órdenes</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Modal detalle -->
+        <div class="overlay" v-if="ordenDetalle" @click.self="ordenDetalle = null">
+          <div class="modal">
+            <div class="modal-header">
+              <h2>{{ ordenDetalle.numero }}</h2>
+              <span :class="'badge badge-' + ordenDetalle.estado">{{ labelEstado(ordenDetalle.estado) }}</span>
+              <button class="btn-cerrar-modal" @click="ordenDetalle = null">✕</button>
+            </div>
+            <p class="detalle-meta">
+              Proveedor: <strong>{{ ordenDetalle.proveedor_nombre }}</strong> ·
+              Creado por: <strong>{{ ordenDetalle.creado_por }}</strong>
+            </p>
+            <table class="tabla-detalle">
+              <thead><tr><th>Producto</th><th>Cant.</th><th>P. unitario</th><th>Subtotal</th></tr></thead>
+              <tbody>
+                <tr v-for="d in ordenDetalle.detalles" :key="d.id" :class="{ 'nuevo-prod': d.es_producto_nuevo }">
+                  <td>{{ d.nombre_producto }} <span v-if="d.es_producto_nuevo" class="tag-nuevo">NUEVO</span></td>
+                  <td>{{ d.cantidad_pedida }}</td>
+                  <td>${{ d.precio_unitario_usd.toFixed(2) }}</td>
+                  <td>${{ d.subtotal.toFixed(2) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="modal-totales">
+              <span>Subtotal: <strong>${{ ordenDetalle.subtotal.toFixed(2) }}</strong></span>
+              <span v-if="ordenDetalle.descuento > 0">Desc.: <strong>-${{ ordenDetalle.descuento.toFixed(2) }}</strong></span>
+              <span class="total-grande">Total: <strong>${{ ordenDetalle.total.toFixed(2) }}</strong></span>
+            </div>
+            <p v-if="ordenDetalle.observacion" class="obs">{{ ordenDetalle.observacion }}</p>
+          </div>
+        </div>
+
+        <!-- Modal nueva/editar orden -->
+        <div class="overlay" v-if="mostrarForm" @click.self="cerrarForm">
+          <div class="modal modal-form">
+            <div class="modal-header">
+              <h2>{{ editandoId ? 'Editar orden' : 'Nueva orden de compra' }}</h2>
+              <button class="btn-cerrar-modal" @click="cerrarForm">✕</button>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label>Proveedor</label>
+                <select v-model="form.proveedor_id">
+                  <option value="">— Selecciona —</option>
+                  <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Fecha esperada</label>
+                <input type="date" v-model="form.fecha_esperada" />
+              </div>
+              <div class="field field-wide">
+                <label>Observación</label>
+                <input v-model="form.observacion" placeholder="Notas u observaciones" />
+              </div>
+            </div>
+
+            <h3 class="subtitulo">Productos</h3>
+            <div v-for="(linea, i) in form.detalles" :key="i" class="linea-producto">
+              <div class="linea-grid">
+                <div class="field">
+                  <label>Producto</label>
+                  <select v-model="linea.producto_id" @change="llenarDesdeInventario(linea)">
+                    <option value="">— Nuevo producto —</option>
+                    <option v-for="p in productosInventario" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Nombre</label>
+                  <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea.producto_id" />
+                </div>
+                <div class="field">
+                  <label>Cantidad</label>
+                  <input v-model.number="linea.cantidad_pedida" type="number" min="1" />
+                </div>
+                <div class="field">
+                  <label>Precio USD</label>
+                  <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" />
+                </div>
+                <div class="field field-subtotal">
+                  <label>Subtotal</label>
+                  <span>${{ subtotalLinea(linea).toFixed(2) }}</span>
+                </div>
+              </div>
+              <button class="btn-quitar-linea" @click="quitarLinea(i)">✕</button>
+            </div>
+            <button class="btn-agregar-linea" @click="agregarLinea">+ Agregar producto</button>
+
+            <div class="form-footer">
+              <div class="totales-form">
+                <span>Total: <strong class="txt-verde">${{ totalForm.toFixed(2) }}</strong></span>
+              </div>
+              <div class="form-botones">
+                <button class="btn-cancelar" @click="cerrarForm">Cancelar</button>
+                <button class="btn-guardar" @click="guardar" :disabled="guardando">
+                  {{ guardando ? 'Guardando...' : (editandoId ? 'Actualizar' : 'Crear orden') }}
+                </button>
+              </div>
+            </div>
+            <p class="msg-error" v-if="error">{{ error }}</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script>
+import AppSidebar from '../../components/AppSidebar.vue'
+import axios from 'axios'
+
+export default {
+  components: { AppSidebar },
+  name: 'OrdenesCompra',
+  data() {
+    return {
+      usuario:            JSON.parse(localStorage.getItem('usuario') || '{}'),
+      ordenes:            [],
+      proveedores:        [],
+      productosInventario:[],
+      filtroEstado:       '',
+      filtroProveedor:    '',
+      ordenDetalle:       null,
+      mostrarForm:        false,
+      editandoId:         null,
+      guardando:          false,
+      error:              '',
+      form: {
+        proveedor_id:   '',
+        fecha_esperada: '',
+        observacion:    '',
+        detalles:       [],
+      },
+    }
+  },
+  computed: {
+    esAdmin() { return this.usuario.rol === 'admin' },
+    tienePermiso() {
+      return (modulo) => {
+        if (this.usuario.rol === 'admin') return true
+        const p = this.usuario.permisos
+        if (p == null) return true
+        return Array.isArray(p) ? p.includes(modulo) : true
+      }
+    },
+    totalForm() {
+      return this.form.detalles.reduce((s, l) => s + this.subtotalLinea(l), 0)
+    },
+  },
+  async mounted() {
+    await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario()])
+  },
+  methods: {
+    async cargar() {
+      const params = {}
+      if (this.filtroEstado)    params.estado       = this.filtroEstado
+      if (this.filtroProveedor) params.proveedor_id = this.filtroProveedor
+      const res = await axios.get('/compras/ordenes/', { params })
+      this.ordenes = res.data
+    },
+    async cargarProveedores() {
+      const res = await axios.get('/compras/proveedores/')
+      this.proveedores = res.data
+    },
+    async cargarInventario() {
+      const res = await axios.get('/productos/')
+      this.productosInventario = res.data
+    },
+    abrirNueva() {
+      this.editandoId = null
+      this.form = { proveedor_id: '', fecha_esperada: '', observacion: '', detalles: [] }
+      this.agregarLinea()
+      this.mostrarForm = true
+    },
+    editarOrden(o) {
+      this.editandoId = o.id
+      this.form = {
+        proveedor_id:   o.proveedor_id,
+        fecha_esperada: o.fecha_esperada ? o.fecha_esperada.split('T')[0] : '',
+        observacion:    o.observacion || '',
+        detalles: o.detalles.map(d => ({
+          producto_id:        d.producto_id || '',
+          nombre_producto:    d.nombre_producto,
+          cantidad_pedida:    d.cantidad_pedida,
+          precio_unitario_usd:d.precio_unitario_usd,
+          es_producto_nuevo:  d.es_producto_nuevo,
+        })),
+      }
+      this.mostrarForm = true
+    },
+    cerrarForm() { this.mostrarForm = false; this.error = '' },
+    agregarLinea() {
+      this.form.detalles.push({ producto_id: '', nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false })
+    },
+    quitarLinea(i) { this.form.detalles.splice(i, 1) },
+    llenarDesdeInventario(linea) {
+      const prod = this.productosInventario.find(p => p.id === linea.producto_id)
+      if (prod) {
+        linea.nombre_producto    = prod.nombre
+        linea.precio_unitario_usd= prod.costo_usd || 0
+        linea.es_producto_nuevo  = false
+      } else {
+        linea.es_producto_nuevo = !linea.producto_id
+      }
+    },
+    subtotalLinea(l) {
+      return (Number(l.cantidad_pedida) || 0) * (Number(l.precio_unitario_usd) || 0)
+    },
+    async guardar() {
+      if (!this.form.proveedor_id) { this.error = 'Selecciona un proveedor'; return }
+      if (!this.form.detalles.length) { this.error = 'Agrega al menos un producto'; return }
+      this.guardando = true
+      this.error = ''
+      try {
+        const payload = {
+          ...this.form,
+          creado_por: this.usuario.usuario || '',
+          detalles: this.form.detalles.map(l => ({
+            ...l,
+            producto_id: l.producto_id || null,
+            es_producto_nuevo: !l.producto_id,
+          })),
+        }
+        if (this.editandoId) {
+          await axios.put(`/compras/ordenes/${this.editandoId}`, payload)
+        } else {
+          await axios.post('/compras/ordenes/', payload)
+        }
+        await this.cargar()
+        this.cerrarForm()
+      } catch (e) {
+        this.error = e?.response?.data?.detail || 'Error al guardar'
+      } finally {
+        this.guardando = false
+      }
+    },
+    async aprobar(id) {
+      if (!confirm('¿Aprobar esta orden?')) return
+      try {
+        await axios.post(`/compras/ordenes/${id}/aprobar`, { aprobado_por: this.usuario.usuario })
+        await this.cargar()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al aprobar')
+      }
+    },
+    async anular(id) {
+      if (!confirm('¿Anular esta orden?')) return
+      try {
+        await axios.post(`/compras/ordenes/${id}/anular`)
+        await this.cargar()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al anular')
+      }
+    },
+    verDetalle(o) { this.ordenDetalle = o },
+    labelEstado(e) {
+      return { borrador:'Borrador', aprobada:'Aprobada', recibida_parcial:'Parcial', cerrada:'Cerrada', anulada:'Anulada' }[e] || e
+    },
+    formatFecha(iso) { return iso ? new Date(iso).toLocaleDateString('es-VE') : '—' },
+    salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
+  },
+}
+</script>
+
+<style scoped>
+.acciones { display: flex; gap: 0.35rem; }
+.btn-ver    { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.btn-editar { background: var(--info); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.btn-aprobar{ background: var(--success); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.btn-anular { background: var(--danger); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+
+.detalle-meta { color: var(--texto-sec); font-size: 0.9rem; margin: -0.5rem 0 1rem; }
+.detalle-meta strong { color: var(--texto-principal); }
+.tabla-detalle { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+.nuevo-prod td { color: #996600; }
+.tag-nuevo { background: #FFCC0022; color: #996600; border-radius: 4px; font-size: 0.72rem; padding: 0.1rem 0.4rem; margin-left: 0.4rem; }
+.modal-totales { display: flex; gap: 1.5rem; justify-content: flex-end; flex-wrap: wrap; }
+.modal-totales span { color: var(--texto-sec); font-size: 0.9rem; }
+.modal-totales strong { color: var(--texto-principal); }
+.total-grande strong { color: #16A34A; font-size: 1.1rem; }
+.obs { color: var(--texto-sec); font-size: 0.88rem; font-style: italic; margin-top: 0.75rem; }
+
+.subtitulo { color: var(--texto-principal); font-size: 0.9rem; margin: 1.25rem 0 0.75rem; border-top: 1px solid var(--borde); padding-top: 1rem; font-weight: 700; }
+.linea-producto { background: var(--fondo-tabla-alt); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative; border: 1px solid var(--borde); }
+.linea-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 1.2fr 1fr; gap: 0.5rem; align-items: end; }
+.field-subtotal span { color: #16A34A; font-size: 1rem; font-weight: 600; padding-top: 0.3rem; display: block; }
+.btn-quitar-linea { position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
+.btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; font-size: 0.88rem; width: 100%; }
+.btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; }
+
+.form-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--borde); }
+.totales-form { color: var(--texto-sec); }
+.totales-form strong { font-size: 1.1rem; }
+.btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+</style>

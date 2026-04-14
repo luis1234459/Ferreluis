@@ -1,0 +1,4 @@
+/* main.css — reset mínimo, el tema viene de theme.css */
+#app {
+  min-height: 100vh;
+}

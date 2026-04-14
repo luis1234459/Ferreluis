@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+passlib[bcrypt]
+psycopg2-binary
+httpx
+beautifulsoup4
+anthropic
+python-multipart
+
+openpyxl
+reportlab
