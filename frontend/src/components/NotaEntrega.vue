@@ -95,13 +95,23 @@ export default {
     productos:       { type: Array,   required: true },  // [{nombre, cantidad, precio_unitario}]
     totalBs:         { type: Number,  required: true },
     tasaBcv:         { type: Number,  required: true },
+    pasoInicial:     { type: String,  default: 'preguntar' },
   },
   data() {
     return {
-      paso:           'preguntar',   // preguntar | opciones | telefono
+      paso:           this.pasoInicial === 'whatsapp' || this.pasoInicial === 'imprimir'
+                        ? 'opciones'
+                        : 'preguntar',
       telefonoManual: '',
       errorTel:       '',
       guardando:      false,
+    }
+  },
+  mounted() {
+    if (this.pasoInicial === 'whatsapp') {
+      this.iniciarWhatsapp()
+    } else if (this.pasoInicial === 'imprimir') {
+      this.imprimir()
     }
   },
   computed: {

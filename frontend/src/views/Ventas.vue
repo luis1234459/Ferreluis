@@ -301,10 +301,14 @@
                 <input v-model="observacion" placeholder="Opcional..." />
               </div>
 
-              <button class="btn-cobrar" @click="cobrar"
-                :disabled="!pagoCompleto || cargando">
-                {{ cargando ? 'Registrando...' : '✔ Registrar venta' }}
-              </button>
+              <div class="btn-cobrar-grupo">
+                <button class="btn-cobrar-accion" @click="cobrar('solo')"
+                  :disabled="!pagoCompleto || cargando">✓</button>
+                <button class="btn-cobrar-accion" @click="cobrar('whatsapp')"
+                  :disabled="!pagoCompleto || cargando">✓ 💬</button>
+                <button class="btn-cobrar-accion" @click="cobrar('imprimir')"
+                  :disabled="!pagoCompleto || cargando">✓ 🖨️</button>
+              </div>
 
               <div v-if="exitoso" class="venta-exito-row">
                 <p class="msg-exito">¡Venta #{{ ultimaVentaId }} registrada!</p>
@@ -522,6 +526,7 @@
       :productos="notaEntrega.productos"
       :total-bs="notaEntrega.totalBs"
       :tasa-bcv="notaEntrega.tasaBcv"
+      :paso-inicial="notaEntrega.pasoInicial || 'preguntar'"
       @cerrar="notaEntrega = null"
     />
 
@@ -943,7 +948,7 @@ export default {
     },
 
     // ── Confirmar venta ───────────────────────────────────────────────────────
-    async cobrar() {
+    async cobrar(accion = 'solo') {
       this.error = ''
       if (!this.pagoCompleto)        { this.error = 'El cobro no cubre el total'; return }
       if (this.requiereAutorizacion && !this.autorizacionClave)
@@ -977,11 +982,16 @@ export default {
         this.ultimaVentaId = res.data.venta_id
         this.exitoso       = true
 
-        // Capturar datos para nota de entrega ANTES de limpiar
-        const carritoParaNota      = [...this.carrito]
-        const clienteParaNota      = this.clienteSeleccionado
-        const tasaBcvParaNota      = this.tasaBcv || 1
-        const totalBsParaNota      = this.subtotalUSD * tasaBcvParaNota
+        // Snapshot para nota de entrega
+        const snapshotProductos = this.carrito.map(item => ({
+          nombre:          item.nombre,
+          cantidad:        Number(item.cantidad),
+          precio_unitario: Number(item.precio_unitario),
+        }))
+        const snapshotCliente   = this.clienteSeleccionado
+        const snapshotTasaBcv   = this.tasaBcv
+        const snapshotTotalBs   = this.subtotalUSD * (this.tasaBcv || 1)
+        const snapshotVentaId   = res.data.venta_id
 
         // Limpiar estado de la venta
         this.carrito           = []
@@ -995,15 +1005,17 @@ export default {
         setTimeout(() => { this.exitoso = false }, 5000)
         await this.cargarProductos()
 
-        // Abrir modal nota de entrega
-        this.notaEntrega = {
-          ventaId:          res.data.venta_id,
-          clienteId:        clienteParaNota?.id         || null,
-          clienteNombre:    clienteParaNota?.nombre      || 'Consumidor Final',
-          clienteTelefono:  clienteParaNota?.telefono    || '',
-          productos:        carritoParaNota,
-          totalBs:          totalBsParaNota,
-          tasaBcv:          tasaBcvParaNota,
+        if (accion !== 'solo') {
+          this.notaEntrega = {
+            ventaId:         snapshotVentaId,
+            clienteId:       snapshotCliente ? snapshotCliente.id    : null,
+            clienteNombre:   snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final',
+            clienteTelefono: snapshotCliente ? (snapshotCliente.telefono || '') : '',
+            productos:       snapshotProductos,
+            totalBs:         Number(snapshotTotalBs),
+            tasaBcv:         Number(snapshotTasaBcv),
+            pasoInicial:     accion === 'whatsapp' ? 'whatsapp' : 'imprimir',
+          }
         }
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al registrar la venta'
@@ -1179,8 +1191,10 @@ export default {
 .field label { color: var(--texto-sec); font-size: 0.85rem; display: block; margin-bottom: 0.25rem; font-weight: 600; }
 .field input { width: 100%; padding: 0.5rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; box-sizing: border-box; }
 
-.btn-cobrar { width: 100%; padding: 0.85rem; background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; margin-top: 0.5rem; font-weight: 700; }
-.btn-cobrar:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-cobrar-grupo { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.btn-cobrar-accion { flex: 1; padding: 0.85rem; background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
+.btn-cobrar-accion:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-cobrar-accion:not(:disabled):hover { background: #333; }
 .venta-exito-row { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap; }
 .msg-exito { color: #16A34A; font-weight: 600; margin: 0; }
 .btn-pdf { background: var(--success); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
