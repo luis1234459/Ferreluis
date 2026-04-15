@@ -516,26 +516,43 @@
 
     </main>
 
-    <!-- Nota de entrega -->
-    <NotaEntrega
-      v-if="notaEntrega"
-      :venta-id="notaEntrega.ventaId"
-      :cliente-id="notaEntrega.clienteId"
-      :cliente-nombre="notaEntrega.clienteNombre"
-      :cliente-telefono="notaEntrega.clienteTelefono"
-      :productos="notaEntrega.productos"
-      :total-bs="notaEntrega.totalBs"
-      :tasa-bcv="notaEntrega.tasaBcv"
-      :paso-inicial="notaEntrega.pasoInicial || 'preguntar'"
-      @cerrar="notaEntrega = null"
-    />
+    <!-- Nota de entrega para impresión -->
+    <div id="nota-print" v-if="notaImpresion">
+      <div class="np-encabezado">
+        <p class="np-empresa">FERRETERÍA FERRE-UTIL</p>
+        <p class="np-subtitulo">Nota de Entrega</p>
+      </div>
+      <div class="np-datos">
+        <p><strong>Cliente:</strong> {{ notaImpresion.clienteNombre }}</p>
+        <p><strong>Fecha:</strong> {{ notaImpresion.fecha }}</p>
+        <p><strong>Tasa BCV:</strong> Bs. {{ Number(notaImpresion.tasaBcv).toFixed(2) }} / USD</p>
+      </div>
+      <table class="np-tabla">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th class="np-th-num">Cant.</th>
+            <th class="np-th-num">P.Unit. Bs</th>
+            <th class="np-th-num">Subtotal Bs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(p, i) in notaImpresion.productos" :key="i">
+            <td>{{ p.nombre }}</td>
+            <td class="np-td-num">{{ p.cantidad }}</td>
+            <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv)).toFixed(2) }}</td>
+            <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv) * p.cantidad).toFixed(2) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="np-total">TOTAL: Bs {{ Number(notaImpresion.totalBs).toFixed(2) }}</div>
+    </div>
 
   </div>
 </template>
 
 <script>
-import AppSidebar  from '../components/AppSidebar.vue'
-import NotaEntrega  from '../components/NotaEntrega.vue'
+import AppSidebar from '../components/AppSidebar.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
 
@@ -553,7 +570,7 @@ const LABELS = {
 const TOLERANCIA = 0.01
 
 export default {
-  components: { AppSidebar, NotaEntrega },
+  components: { AppSidebar },
   name: 'Ventas',
   data() {
     return {
@@ -617,8 +634,8 @@ export default {
       ubicaciones:    [],
       ubicPopCargando: false,
 
-      // Nota de entrega
-      notaEntrega: null,   // null | { ventaId, clienteId, clienteNombre, clienteTelefono, productos, totalBs, tasaBcv }
+      // Nota de entrega para impresión
+      notaImpresion: null,
     }
   },
   computed: {
@@ -982,41 +999,64 @@ export default {
         this.ultimaVentaId = res.data.venta_id
         this.exitoso       = true
 
-        // Snapshot para nota de entrega
+        // Snapshot ANTES de limpiar
         const snapshotProductos = this.carrito.map(item => ({
           nombre:          item.nombre,
           cantidad:        Number(item.cantidad),
           precio_unitario: Number(item.precio_unitario),
         }))
-        const snapshotCliente   = this.clienteSeleccionado
-        const snapshotTasaBcv   = this.tasaBcv
-        const snapshotTotalBs   = this.subtotalUSD * (this.tasaBcv || 1)
-        const snapshotVentaId   = res.data.venta_id
+        const snapshotCliente  = this.clienteSeleccionado
+        const snapshotTasaBcv  = this.tasaBcv
+        const snapshotTotalBs  = this.subtotalUSD * (this.tasaBcv || 1)
+        const snapshotVentaId  = res.data.venta_id
 
         // Limpiar estado de la venta
-        this.carrito           = []
-        this.pagos             = []
-        this.descuentoGlobal   = 0
-        this.autorizacionClave = ''
-        this.observacion       = ''
+        this.carrito             = []
+        this.pagos               = []
+        this.descuentoGlobal     = 0
+        this.autorizacionClave   = ''
+        this.observacion         = ''
         this.clienteSeleccionado = null
-        this.nuevoMonto        = ''
+        this.nuevoMonto          = ''
 
         setTimeout(() => { this.exitoso = false }, 5000)
         await this.cargarProductos()
 
-        if (accion !== 'solo') {
-          this.notaEntrega = {
-            ventaId:         snapshotVentaId,
-            clienteId:       snapshotCliente ? snapshotCliente.id    : null,
-            clienteNombre:   snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final',
-            clienteTelefono: snapshotCliente ? (snapshotCliente.telefono || '') : '',
-            productos:       snapshotProductos,
-            totalBs:         Number(snapshotTotalBs),
-            tasaBcv:         Number(snapshotTasaBcv),
-            pasoInicial:     accion === 'whatsapp' ? 'whatsapp' : 'imprimir',
+        // ── Acciones post-venta ───────────────────────────────────────────────
+        if (accion === 'whatsapp') {
+          const nombre  = snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final'
+          const fecha   = new Date().toLocaleDateString('es-VE')
+          const mensaje = encodeURIComponent(
+            `Nota de entrega FERRETERÍA FERRE-UTIL — Cliente: ${nombre} — Total: Bs ${Number(snapshotTotalBs).toFixed(2)} — Fecha: ${fecha}`
+          )
+          let num = snapshotCliente ? String(snapshotCliente.telefono || '').replace(/\D/g, '') : ''
+          if (!num) {
+            const ingresado = prompt('Cliente sin teléfono registrado.\nIngresa el número (ej: 584121234567):')
+            if (ingresado) {
+              num = String(ingresado).replace(/\D/g, '')
+              if (snapshotCliente?.id) {
+                try { await axios.put(`/clientes/${snapshotCliente.id}`, { telefono: num }) } catch {}
+              }
+            }
           }
+          if (num) {
+            window.open(`https://wa.me/${num}?text=${mensaje}`, '_blank')
+          }
+
+        } else if (accion === 'imprimir') {
+          this.notaImpresion = {
+            ventaId:     snapshotVentaId,
+            clienteNombre: snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final',
+            fecha:       new Date().toLocaleDateString('es-VE'),
+            productos:   snapshotProductos,
+            totalBs:     Number(snapshotTotalBs),
+            tasaBcv:     Number(snapshotTasaBcv),
+          }
+          await this.$nextTick()
+          window.print()
+          this.notaImpresion = null
         }
+
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al registrar la venta'
       } finally {
@@ -1195,6 +1235,34 @@ export default {
 .btn-cobrar-accion { flex: 1; padding: 0.85rem; background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
 .btn-cobrar-accion:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-cobrar-accion:not(:disabled):hover { background: #333; }
+
+/* ── Nota de entrega (solo visible al imprimir) ── */
+#nota-print { display: none; font-family: Arial, sans-serif; padding: 20px; background: #fff; color: #000; width: 520px; }
+.np-encabezado { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+.np-empresa    { font-size: 1.3rem; font-weight: 900; margin: 0; letter-spacing: 0.05em; }
+.np-subtitulo  { font-size: 0.9rem; margin: 4px 0 0; color: #444; }
+.np-datos      { margin-bottom: 14px; font-size: 0.88rem; line-height: 1.7; }
+.np-datos p    { margin: 0; }
+.np-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 14px; }
+.np-tabla th { background: #1A1A1A; color: #FFCC00; padding: 6px 8px; text-align: left; }
+.np-th-num    { text-align: right !important; }
+.np-tabla td  { padding: 5px 8px; border-bottom: 1px solid #ddd; }
+.np-td-num    { text-align: right; }
+.np-tabla tbody tr:nth-child(even) { background: #F5F5F0; }
+.np-total { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
+
+@media print {
+  body > * { display: none !important; }
+  #app      { display: none !important; }
+  #nota-print {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    padding: 20px !important;
+    z-index: 99999 !important;
+  }
+}
 .venta-exito-row { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap; }
 .msg-exito { color: #16A34A; font-weight: 600; margin: 0; }
 .btn-pdf { background: var(--success); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
