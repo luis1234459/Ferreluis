@@ -109,7 +109,7 @@
                   <!-- Nombre -->
                   <td>
                     <template v-if="modoEdicion">
-                      <input class="celda-input" v-model="borradorEdicion[p.id].nombre"
+                      <input class="celda-input celda-nombre" v-model="borradorEdicion[p.id].nombre"
                         @input="marcarModificado(p.id)" />
                     </template>
                     <template v-else>
@@ -1536,8 +1536,10 @@ export default {
   box-sizing: border-box;
 }
 .celda-input:focus { outline: none; border-color: #FFCC00; box-shadow: 0 0 0 2px rgba(255,204,0,0.2); }
-.celda-num  { max-width: 80px; text-align: right; }
-.celda-desc { min-width: 160px; }
+.celda-num    { max-width: 80px; text-align: right; }
+.celda-nombre { min-width: 200px; }
+.celda-desc   { min-width: 220px; text-transform: lowercase; }
+.celda-desc::first-line { text-transform: capitalize; }
 .celda-check { width: 16px; height: 16px; accent-color: #1A1A1A; cursor: pointer; }
 
 /* ── Toast ── */
