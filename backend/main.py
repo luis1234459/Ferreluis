@@ -58,96 +58,90 @@ app.include_router(ubicaciones.router)
 @app.on_event("startup")
 def inicializar_datos():
     """
-    Migración segura para SQLite y seed del cliente genérico 'Consumidor Final'.
+    Migraciones seguras compatibles con SQLite (desarrollo) y PostgreSQL (Railway).
     Se ejecuta cada vez que arranca el servidor; es idempotente.
     """
-    db = SessionLocal()
+    db  = SessionLocal()
+    url = str(engine.url)
+    es_postgres = url.startswith("postgresql")
+
+    def migrar(sqls_sqlite: list[str], sqls_pg: list[str] | None = None):
+        """Ejecuta cada sentencia ignorando errores (columna ya existe, etc.)."""
+        sqls = sqls_pg if (es_postgres and sqls_pg is not None) else sqls_sqlite
+        for sql in sqls:
+            try:
+                db.execute(text(sql))
+                db.commit()
+            except Exception:
+                db.rollback()
+
     try:
         from sqlalchemy import text
 
-        # ── Migración: agregar columna es_cliente_generico si no existe ──────
-        try:
-            db.execute(text(
-                "ALTER TABLE clientes ADD COLUMN es_cliente_generico BOOLEAN DEFAULT 0"
-            ))
-            db.commit()
-        except Exception:
-            # La columna ya existe — ignorar
-            db.rollback()
+        # ── clientes ─────────────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE clientes ADD COLUMN es_cliente_generico BOOLEAN DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN credito_disponible FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN codigo TEXT"],
+            ["ALTER TABLE clientes ADD COLUMN IF NOT EXISTS es_cliente_generico BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS credito_disponible FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS codigo TEXT"],
+        )
 
-        # ── Migración: columnas nuevas en productos ───────────────────────────
-        nuevas_columnas_productos = [
-            ("departamento_id",         "INTEGER"),
-            ("proveedor_id",            "INTEGER"),
-            ("es_producto_clave",       "BOOLEAN DEFAULT 0"),
-            ("es_producto_compuesto",   "BOOLEAN DEFAULT 0"),
-            ("descuento_compuesto_pct", "FLOAT DEFAULT 0"),
-            ("comision_pct",            "FLOAT DEFAULT 0"),
-        ]
-        for col, tipo in nuevas_columnas_productos:
-            try:
-                db.execute(text(f"ALTER TABLE productos ADD COLUMN {col} {tipo}"))
-                db.commit()
-            except Exception:
-                db.rollback()
+        # ── usuarios ─────────────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE usuarios ADD COLUMN permisos TEXT DEFAULT NULL"],
+            ["ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos TEXT DEFAULT NULL"],
+        )
 
-        # ── Migración: columna permisos en usuarios ───────────────────────────
-        try:
-            db.execute(text("ALTER TABLE usuarios ADD COLUMN permisos TEXT DEFAULT NULL"))
-            db.commit()
-        except Exception:
-            db.rollback()
+        # ── productos ────────────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN departamento_id INTEGER",
+             "ALTER TABLE productos ADD COLUMN proveedor_id INTEGER",
+             "ALTER TABLE productos ADD COLUMN es_producto_clave BOOLEAN DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN es_producto_compuesto BOOLEAN DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN descuento_compuesto_pct FLOAT DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN comision_pct FLOAT DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1",
+             "ALTER TABLE productos ADD COLUMN codigo TEXT"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS departamento_id INTEGER",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS proveedor_id INTEGER",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_producto_clave BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_producto_compuesto BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS descuento_compuesto_pct FLOAT DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS comision_pct FLOAT DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo TEXT"],
+        )
 
-        # ── Migración: crédito de proveedores y tracking de pago ─────────────
-        for sql in [
-            "ALTER TABLE proveedores ADD COLUMN dias_credito INTEGER DEFAULT 0",
-            "ALTER TABLE recepciones_compra ADD COLUMN fecha_vencimiento_pago DATE",
-            "ALTER TABLE recepciones_compra ADD COLUMN monto_factura FLOAT",
-            "ALTER TABLE recepciones_compra ADD COLUMN estado_pago TEXT DEFAULT 'pendiente'",
-            "ALTER TABLE recepciones_compra ADD COLUMN fecha_pago_real DATETIME",
-            "ALTER TABLE recepciones_compra ADD COLUMN numero_factura TEXT",
-        ]:
-            try:
-                db.execute(text(sql))
-                db.commit()
-            except Exception:
-                db.rollback()
+        # ── proveedores ──────────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE proveedores ADD COLUMN dias_credito INTEGER DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN credito_disponible FLOAT DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN codigo TEXT"],
+            ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS dias_credito INTEGER DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS credito_disponible FLOAT DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS codigo TEXT"],
+        )
 
-        # ── Migración: crédito disponible en clientes y proveedores ──────────
-        for sql in [
-            "ALTER TABLE clientes ADD COLUMN credito_disponible FLOAT DEFAULT 0",
-            "ALTER TABLE proveedores ADD COLUMN credito_disponible FLOAT DEFAULT 0",
-        ]:
-            try:
-                db.execute(text(sql))
-                db.commit()
-            except Exception:
-                db.rollback()
+        # ── recepciones_compra ───────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE recepciones_compra ADD COLUMN fecha_vencimiento_pago DATE",
+             "ALTER TABLE recepciones_compra ADD COLUMN monto_factura FLOAT",
+             "ALTER TABLE recepciones_compra ADD COLUMN estado_pago TEXT DEFAULT 'pendiente'",
+             "ALTER TABLE recepciones_compra ADD COLUMN fecha_pago_real DATETIME",
+             "ALTER TABLE recepciones_compra ADD COLUMN numero_factura TEXT"],
+            ["ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS fecha_vencimiento_pago DATE",
+             "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS monto_factura FLOAT",
+             "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS estado_pago TEXT DEFAULT 'pendiente'",
+             "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS fecha_pago_real TIMESTAMP",
+             "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS numero_factura TEXT"],
+        )
 
-        # ── Migración: campo activo en productos ─────────────────────────────────
-        try:
-            db.execute(text("ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1"))
-            db.commit()
-        except Exception:
-            db.rollback()
-
-        # ── Migración: códigos únicos en productos, clientes y proveedores ─────
-        for sql in [
-            "ALTER TABLE productos ADD COLUMN codigo TEXT",
-            "ALTER TABLE clientes ADD COLUMN codigo TEXT",
-            "ALTER TABLE proveedores ADD COLUMN codigo TEXT",
-        ]:
-            try:
-                db.execute(text(sql))
-                db.commit()
-            except Exception:
-                db.rollback()
-
-        # ── Seed: crear "Consumidor Final" si no existe ──────────────────────
+        # ── Seed: "Consumidor Final" ──────────────────────────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True
         ).first()
-
         if not consumidor:
             db.add(models.Cliente(
                 nombre              = "Consumidor Final",
