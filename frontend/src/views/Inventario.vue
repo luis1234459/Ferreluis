@@ -109,7 +109,8 @@
                   <!-- Nombre -->
                   <td>
                     <template v-if="modoEdicion">
-                      <input class="celda-input celda-nombre" v-model="borradorEdicion[p.id].nombre"
+                      <input class="celda-input celda-nombre" style="min-width:200px; width:200px"
+                        v-model="borradorEdicion[p.id].nombre"
                         @input="marcarModificado(p.id)" />
                     </template>
                     <template v-else>
@@ -174,7 +175,7 @@
                   <td>
                     <template v-if="modoEdicion">
                       <input class="celda-input celda-desc" v-model="borradorEdicion[p.id].descripcion"
-                        @input="marcarModificado(p.id)" placeholder="Descripción..." />
+                        @input="onDescInput(p.id, $event)" placeholder="Descripción..." />
                     </template>
                     <template v-else>
                       <div class="acciones">
@@ -1050,6 +1051,13 @@ export default {
     },
     marcarModificado(id) {
       this.filasModificadas = new Set([...this.filasModificadas, id])
+    },
+    onDescInput(id, event) {
+      const v = event.target.value
+      this.borradorEdicion[id].descripcion = v
+        ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase()
+        : ''
+      this.marcarModificado(id)
     },
     async guardarEdicionMasiva() {
       if (this.filasModificadas.size === 0) {
