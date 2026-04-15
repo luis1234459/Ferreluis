@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Producto, TasaCambio, Departamento, VarianteProducto, ComponenteProducto, Oferta
@@ -468,6 +468,32 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     return _enriquecer(p, bcv, binance)
 
 
+@router.put("/edicion-masiva")
+def edicion_masiva(
+    items: list[dict] = Body(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo"}
+    actualizados = 0
+    errores      = []
+    for item in items:
+        pid = item.get("id")
+        if not pid:
+            errores.append({"id": None, "motivo": "Falta id"})
+            continue
+        p = db.query(Producto).filter(Producto.id == pid).first()
+        if not p:
+            errores.append({"id": pid, "motivo": "Producto no encontrado"})
+            continue
+        for campo, valor in item.items():
+            if campo in CAMPOS:
+                setattr(p, campo, valor)
+        actualizados += 1
+    db.commit()
+    return {"actualizados": actualizados, "errores": errores}
+
+
 @router.put("/{producto_id}")
 def actualizar_producto(
     producto_id: int,
@@ -509,32 +535,6 @@ def actualizar_codigo_producto(
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
     return _enriquecer(p, bcv, binance)
-
-
-@router.put("/edicion-masiva")
-def edicion_masiva(
-    items: list[dict],
-    db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
-):
-    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo"}
-    actualizados = 0
-    errores      = []
-    for item in items:
-        pid = item.get("id")
-        if not pid:
-            errores.append({"id": None, "motivo": "Falta id"})
-            continue
-        p = db.query(Producto).filter(Producto.id == pid).first()
-        if not p:
-            errores.append({"id": pid, "motivo": "Producto no encontrado"})
-            continue
-        for campo, valor in item.items():
-            if campo in CAMPOS:
-                setattr(p, campo, valor)
-        actualizados += 1
-    db.commit()
-    return {"actualizados": actualizados, "errores": errores}
 
 
 @router.put("/{producto_id}/estado")
