@@ -7,25 +7,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones
 from database import engine, SessionLocal
 from database import Base
-from config import ENVIRONMENT, FRONTEND_URL
+from config import ENVIRONMENT
 import models
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sistema Ferretería", version="1.0.0")
 
-_origins = (
-    [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ]
-    if ENVIRONMENT == "development"
-    else [FRONTEND_URL]
-)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://ferreutil.up.railway.app",
+    "https://aware-heart-production-aed1.up.railway.app",
+]
+
+if FRONTEND_URL and FRONTEND_URL not in _origins:
+    _origins.append(FRONTEND_URL)
 
 app.add_middleware(
     CORSMiddleware,
