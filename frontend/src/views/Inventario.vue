@@ -88,7 +88,7 @@
                   <th>Bs</th>
                   <th>Stock</th>
                   <th>{{ modoEdicion ? 'Activo' : 'Ubic.' }}</th>
-                  <th>{{ modoEdicion ? 'Descripción' : 'Acciones' }}</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -109,12 +109,12 @@
                   <!-- Nombre -->
                   <td>
                     <template v-if="modoEdicion">
-                      <input class="celda-input celda-nombre" style="min-width:200px; width:200px"
+                      <input class="celda-input celda-nombre" style="min-width:280px; width:280px"
                         v-model="borradorEdicion[p.id].nombre"
                         @input="marcarModificado(p.id)" />
                     </template>
                     <template v-else>
-                      <span class="prod-nombre">{{ p.nombre }}</span>
+                      <span class="prod-nombre" style="min-width:280px; display:inline-block">{{ p.nombre }}</span>
                       <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
                       <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
                       <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
@@ -171,26 +171,20 @@
                     </template>
                   </td>
 
-                  <!-- Descripción / Acciones -->
+                  <!-- Acciones -->
                   <td>
-                    <template v-if="modoEdicion">
-                      <input class="celda-input celda-desc" v-model="borradorEdicion[p.id].descripcion"
-                        @input="onDescInput(p.id, $event)" placeholder="Descripción..." />
-                    </template>
-                    <template v-else>
-                      <div class="acciones">
-                        <button class="btn-editar"    @click="editar(p)">Editar</button>
-                        <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
-                        <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
-                        <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
-                        <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
-                        <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
-                      </div>
-                    </template>
+                    <div class="acciones">
+                      <button class="btn-editar"    @click="editar(p)">Editar</button>
+                      <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
+                      <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
+                      <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
+                      <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
+                      <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
+                    </div>
                   </td>
                 </tr>
                 <tr v-if="productosFiltrados.length === 0">
-                  <td colspan="12" class="sin-datos">No hay productos registrados</td>
+                  <td colspan="11" class="sin-datos">No hay productos registrados</td>
                 </tr>
               </tbody>
             </table>
