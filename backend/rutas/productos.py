@@ -387,12 +387,19 @@ def eliminar_oferta(
 # ============================================================================
 
 @router.get("/")
-def listar_productos(incluir_inactivos: bool = False, db: Session = Depends(get_db)):
+def listar_productos(
+    incluir_inactivos: bool = False,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
     q = db.query(Producto)
     if not incluir_inactivos:
         q = q.filter(Producto.activo == True)
+    total = q.count()
     bcv, binance = _tasas_actuales(db)
-    return [_enriquecer(p, bcv, binance) for p in q.all()]
+    productos = [_enriquecer(p, bcv, binance) for p in q.offset(skip).limit(limit).all()]
+    return {"total": total, "productos": productos}
 
 
 @router.post("/importar-masivo")

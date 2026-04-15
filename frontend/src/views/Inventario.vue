@@ -192,6 +192,20 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- Barra de paginación -->
+            <div class="pagina-bar" v-if="totalProductos > 0">
+              <span class="pagina-info">
+                Mostrando {{ (paginaActual - 1) * 100 + 1 }}–{{ Math.min(paginaActual * 100, totalProductos) }} de {{ totalProductos }} productos
+              </span>
+              <div class="pagina-btns">
+                <button class="pagina-btn" :disabled="paginaActual === 1"
+                  @click="cambiarPagina(paginaActual - 1)">← Anterior</button>
+                <span class="pagina-num">Página {{ paginaActual }} de {{ Math.ceil(totalProductos / 100) }}</span>
+                <button class="pagina-btn" :disabled="paginaActual * 100 >= totalProductos"
+                  @click="cambiarPagina(paginaActual + 1)">Siguiente →</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -802,6 +816,10 @@ export default {
       filtroCategoria:    '',
       filtroTipo:         '',
 
+      // Paginación
+      paginaActual:    1,
+      totalProductos:  0,
+
       // Categorías
       categorias:       [],
       editandoCatId:    null,
@@ -952,6 +970,13 @@ export default {
     },
   },
 
+  watch: {
+    busqueda()           { this.paginaActual = 1; this.cargarProductos() },
+    filtroDepartamento() { this.paginaActual = 1; this.cargarProductos() },
+    filtroCategoria()    { this.paginaActual = 1; this.cargarProductos() },
+    filtroTipo()         { this.paginaActual = 1; this.cargarProductos() },
+  },
+
   async mounted() {
     await Promise.all([
       this.cargarProductos(),
@@ -971,10 +996,11 @@ export default {
       this.factor      = r.data.factor || 1
     },
     async cargarProductos() {
-      const params = {}
+      const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       const res = await axios.get('/productos/', { params })
-      this.productos = res.data
+      this.productos      = res.data.productos
+      this.totalProductos = res.data.total
     },
     async cargarDepartamentos() {
       const res = await axios.get('/productos/departamentos')
@@ -1162,9 +1188,17 @@ export default {
       setTimeout(() => { this.toastMasivo = '' }, 3000)
     },
 
+    // ── Paginación ────────────────────────────────────────────────────────────
+    async cambiarPagina(nueva) {
+      this.paginaActual = nueva
+      await this.cargarProductos()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    },
+
     // ── Estado activo/inactivo ────────────────────────────────────────────────
     async toggleInactivos() {
       this.mostrarInactivos = !this.mostrarInactivos
+      this.paginaActual = 1
       await this.cargarProductos()
     },
     async cambiarEstado(producto, estado) {
@@ -1649,6 +1683,15 @@ export default {
 .celda-desc   { min-width: 220px; text-transform: lowercase; }
 .celda-desc::first-line { text-transform: capitalize; }
 .celda-check { width: 16px; height: 16px; accent-color: #1A1A1A; cursor: pointer; }
+
+/* ── Paginación ── */
+.pagina-bar  { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.5rem; flex-wrap: wrap; gap: 0.5rem; border-top: 1px solid var(--borde); margin-top: 0.25rem; }
+.pagina-info { font-size: 0.85rem; color: var(--texto-sec); }
+.pagina-btns { display: flex; align-items: center; gap: 0.5rem; }
+.pagina-btn  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.45rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; }
+.pagina-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.pagina-btn:not(:disabled):hover { background: #333; }
+.pagina-num  { font-size: 0.85rem; color: var(--texto-sec); padding: 0 0.25rem; }
 
 /* ── Toast ── */
 .toast-masivo {
