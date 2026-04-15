@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Producto, TasaCambio, Departamento, VarianteProducto, ComponenteProducto, Oferta
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
@@ -41,6 +41,14 @@ class DepartamentoSchema(BaseModel):
     nombre:      str
     descripcion: Optional[str] = None
     activo:      bool          = True
+
+    class Config:
+        from_attributes = True
+
+
+class CategoriaSchema(BaseModel):
+    nombre:          str
+    departamento_id: int
 
     class Config:
         from_attributes = True
@@ -176,6 +184,73 @@ def eliminar_departamento(
     db.delete(dep)
     db.commit()
     return {"mensaje": "Departamento eliminado"}
+
+
+# ============================================================================
+# Endpoints: Categorías  (registrados antes que /{producto_id})
+# ============================================================================
+
+@router.get("/categorias")
+def listar_categorias(
+    departamento_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Categoria)
+    if departamento_id is not None:
+        q = q.filter(Categoria.departamento_id == departamento_id)
+    return q.order_by(Categoria.nombre).all()
+
+
+@router.post("/categorias")
+def crear_categoria(
+    datos: CategoriaSchema,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    nueva = Categoria(**datos.dict())
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
+
+
+@router.put("/categorias/{categoria_id}")
+def actualizar_categoria(
+    categoria_id: int,
+    datos: CategoriaSchema,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    cat = db.query(Categoria).filter(Categoria.id == categoria_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    for key, value in datos.dict().items():
+        setattr(cat, key, value)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+@router.delete("/categorias/{categoria_id}")
+def eliminar_categoria(
+    categoria_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    cat = db.query(Categoria).filter(Categoria.id == categoria_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    tiene_productos = db.query(Producto).filter(
+        Producto.categoria_id == categoria_id
+    ).first()
+    if tiene_productos:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede eliminar: hay productos asignados a esta categoría"
+        )
+    db.delete(cat)
+    db.commit()
+    return {"mensaje": "Categoría eliminada"}
 
 
 # ============================================================================

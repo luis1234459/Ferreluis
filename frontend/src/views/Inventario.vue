@@ -56,9 +56,13 @@
           <!-- Filtros -->
           <div class="filtros">
             <input v-model="busqueda" placeholder="Buscar producto..." class="buscador" />
-            <select v-model="filtroDepartamento">
+            <select v-model="filtroDepartamento" @change="filtroCategoria = ''">
               <option value="">Todos los departamentos</option>
               <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+            </select>
+            <select v-model="filtroCategoria">
+              <option value="">Todas las categorías</option>
+              <option v-for="c in categoriasFiltradas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
             <select v-model="filtroTipo">
               <option value="">Todos los tipos</option>
@@ -114,7 +118,7 @@
                         @input="marcarModificado(p.id)" />
                     </template>
                     <template v-else>
-                      <span class="prod-nombre" style="min-width:280px; display:inline-block">{{ p.nombre }}</span>
+                      <span class="prod-nombre" style="min-width:280px; display:inline-block">{{ formatNombre(p.nombre) }}</span>
                       <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
                       <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
                       <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
@@ -582,6 +586,51 @@
                 + Agregar
               </button>
             </div>
+
+            <!-- ── Sección Categorías ── -->
+            <h3 style="margin: 1.5rem 0 0.75rem; font-size: 0.95rem; color: var(--texto-principal);">Categorías</h3>
+
+            <div v-for="c in categorias" :key="c.id" class="depto-row">
+              <template v-if="editandoCatId !== c.id">
+                <span class="depto-nombre">{{ c.nombre }}
+                  <span style="color:var(--texto-sec); font-size:0.8rem; font-weight:400;">
+                    — {{ nombreDepartamento(c.departamento_id) }}
+                  </span>
+                </span>
+                <div class="depto-acciones">
+                  <button class="btn-editar"   @click="editarCat(c)">Editar</button>
+                  <button class="btn-eliminar" @click="eliminarCat(c.id)">✕</button>
+                </div>
+              </template>
+              <template v-else>
+                <input v-model="formCat.nombre" class="depto-input" style="max-width:160px"
+                  @keydown.enter="guardarCat" placeholder="Nombre..." />
+                <select v-model="formCat.departamento_id" class="depto-input" style="max-width:140px">
+                  <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                </select>
+                <div class="depto-acciones">
+                  <button class="btn-guardar-sm"  @click="guardarCat">✓</button>
+                  <button class="btn-cancelar-sm" @click="editandoCatId = null">✕</button>
+                </div>
+              </template>
+            </div>
+
+            <p v-if="categorias.length === 0" class="sin-datos" style="padding: 0.75rem 0">
+              Sin categorías registradas
+            </p>
+
+            <div class="depto-nuevo">
+              <input v-model="nuevaCatNombre" placeholder="Nueva categoría..."
+                class="depto-input-nuevo" @keydown.enter="crearCat" />
+              <select v-model="nuevaCatDeptoId" class="depto-input-nuevo" style="max-width:160px">
+                <option value="">Departamento...</option>
+                <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+              </select>
+              <button class="btn-guardar-sm" @click="crearCat"
+                :disabled="!nuevaCatNombre.trim() || !nuevaCatDeptoId">
+                + Agregar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -750,7 +799,15 @@ export default {
       // Filtros
       busqueda:           '',
       filtroDepartamento: '',
+      filtroCategoria:    '',
       filtroTipo:         '',
+
+      // Categorías
+      categorias:       [],
+      editandoCatId:    null,
+      formCat:          { nombre: '', departamento_id: null },
+      nuevaCatNombre:   '',
+      nuevaCatDeptoId:  '',
 
       // Tab
       tabActivo: 'productos',
@@ -841,17 +898,24 @@ export default {
       }
     },
 
+    categoriasFiltradas() {
+      if (!this.filtroDepartamento) return this.categorias
+      return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
+    },
+
     productosFiltrados() {
       return this.productos.filter(p => {
-        const q           = this.busqueda.toLowerCase()
-        const matchTexto  = p.nombre.toLowerCase().includes(q) ||
-                            (p.categoria && p.categoria.toLowerCase().includes(q))
-        const matchDepto  = !this.filtroDepartamento ||
-                            p.departamento_id === this.filtroDepartamento
-        const matchTipo   = !this.filtroTipo ||
-                            (this.filtroTipo === 'clave'     && p.es_producto_clave)     ||
-                            (this.filtroTipo === 'compuesto' && p.es_producto_compuesto)
-        return matchTexto && matchDepto && matchTipo
+        const q             = this.busqueda.toLowerCase()
+        const matchTexto    = p.nombre.toLowerCase().includes(q) ||
+                              (p.categoria && p.categoria.toLowerCase().includes(q))
+        const matchDepto    = !this.filtroDepartamento ||
+                              p.departamento_id === this.filtroDepartamento
+        const matchCategoria = !this.filtroCategoria ||
+                              p.categoria_id === this.filtroCategoria
+        const matchTipo     = !this.filtroTipo ||
+                              (this.filtroTipo === 'clave'     && p.es_producto_clave)     ||
+                              (this.filtroTipo === 'compuesto' && p.es_producto_compuesto)
+        return matchTexto && matchDepto && matchCategoria && matchTipo
       })
     },
 
@@ -894,6 +958,7 @@ export default {
       this.cargarTasa(),
       this.cargarDepartamentos(),
       this.cargarProveedores(),
+      this.cargarCategorias(),
     ])
   },
 
@@ -914,6 +979,14 @@ export default {
     async cargarDepartamentos() {
       const res = await axios.get('/productos/departamentos')
       this.departamentos = res.data
+    },
+    async cargarCategorias() {
+      const res = await axios.get('/productos/categorias')
+      this.categorias = res.data
+    },
+    formatNombre(nombre) {
+      if (!nombre) return ''
+      return nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase()
     },
     async cargarProveedores() {
       try {
@@ -1291,6 +1364,37 @@ export default {
       if (!confirm('¿Eliminar esta oferta?')) return
       await axios.delete(`/productos/ofertas/${id}`)
       await this.cargarOfertas()
+    },
+
+    // ── CRUD Categorías ──────────────────────────────────────────────────────
+    editarCat(c) {
+      this.editandoCatId = c.id
+      this.formCat = { nombre: c.nombre, departamento_id: c.departamento_id }
+    },
+    async guardarCat() {
+      if (!this.formCat.nombre.trim()) return
+      await axios.put(`/productos/categorias/${this.editandoCatId}`, this.formCat)
+      await this.cargarCategorias()
+      this.editandoCatId = null
+    },
+    async crearCat() {
+      if (!this.nuevaCatNombre.trim() || !this.nuevaCatDeptoId) return
+      await axios.post('/productos/categorias', {
+        nombre: this.nuevaCatNombre,
+        departamento_id: Number(this.nuevaCatDeptoId),
+      })
+      await this.cargarCategorias()
+      this.nuevaCatNombre  = ''
+      this.nuevaCatDeptoId = ''
+    },
+    async eliminarCat(id) {
+      if (!confirm('¿Eliminar esta categoría?')) return
+      try {
+        await axios.delete(`/productos/categorias/${id}`)
+        await this.cargarCategorias()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al eliminar')
+      }
     },
 
     // ── CRUD Departamentos ────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Date, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Date, Index, ForeignKey
 from datetime import datetime
 from sqlalchemy.sql import func
 from database import Base
@@ -40,6 +40,14 @@ class Departamento(Base):
     activo      = Column(Boolean, default=True)
 
 
+class Categoria(Base):
+    __tablename__ = "categorias"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    nombre          = Column(String, nullable=False)
+    departamento_id = Column(Integer, ForeignKey("departamentos.id"), nullable=False)
+
+
 class Producto(Base):
     __tablename__ = "productos"
 
@@ -54,6 +62,7 @@ class Producto(Base):
 
     # ── Nuevos campos ────────────────────────────────────────────────────────
     departamento_id         = Column(Integer, nullable=True)   # FK → Departamento
+    categoria_id            = Column(Integer, nullable=True)   # FK → Categoria
     proveedor_id            = Column(Integer, nullable=True)   # FK → Proveedor
     es_producto_clave       = Column(Boolean, default=False)   # producto Pareto
     es_producto_compuesto   = Column(Boolean, default=False)
