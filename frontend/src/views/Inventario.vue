@@ -1085,7 +1085,7 @@ export default {
         this.cancelarModoEdicion()
         this.mostrarToast(`✓ ${res.data.actualizados} producto${res.data.actualizados !== 1 ? 's' : ''} guardado${res.data.actualizados !== 1 ? 's' : ''}`)
       } catch (e) {
-        alert(e?.response?.data?.detail || 'Error al guardar cambios')
+        alert(e?.response?.data?.detail || e?.message || 'Error al guardar cambios')
       } finally {
         this.guardandoMasivo = false
       }
