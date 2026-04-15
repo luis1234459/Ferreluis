@@ -1066,7 +1066,9 @@ export default {
             stock:       Number(b.stock),
             costo_usd:   Number(b.costo_usd),
             margen:      Number(b.margen_pct) / 100,
-            descripcion: b.descripcion || null,
+            descripcion: b.descripcion
+              ? b.descripcion.charAt(0).toUpperCase() + b.descripcion.slice(1).toLowerCase()
+              : null,
             activo:      b.activo,
           }
         })
