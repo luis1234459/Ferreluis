@@ -8,9 +8,25 @@
         <div class="top-acciones">
           <button class="btn-deptos" @click="mostrarDeptos = true">Departamentos</button>
           <router-link to="/inventario/importar" class="btn-importar">↑ Importar Excel</router-link>
+          <template v-if="esAdmin">
+            <template v-if="!modoEdicion">
+              <button class="btn-modo-edicion" @click="activarModoEdicion">✏ Modo Edición</button>
+            </template>
+            <template v-else>
+              <button class="btn-guardar-masivo" :disabled="guardandoMasivo" @click="guardarEdicionMasiva">
+                {{ guardandoMasivo ? 'Guardando...' : '✓ Guardar Cambios' }}
+              </button>
+              <button class="btn-cancelar-edicion" @click="cancelarModoEdicion">✕ Cancelar</button>
+            </template>
+          </template>
           <button class="btn-nuevo" @click="abrirNuevoProducto">+ Nuevo producto</button>
         </div>
       </div>
+
+      <!-- Toast edición masiva -->
+      <transition name="toast-fade">
+        <div v-if="toastMasivo" class="toast-masivo">{{ toastMasivo }}</div>
+      </transition>
 
       <div class="contenido-inner">
 
@@ -71,13 +87,14 @@
                   <th>P. Ref.</th>
                   <th>Bs</th>
                   <th>Stock</th>
-                  <th>Ubic.</th>
-                  <th>Acciones</th>
+                  <th>{{ modoEdicion ? 'Activo' : 'Ubic.' }}</th>
+                  <th>{{ modoEdicion ? 'Descripción' : 'Acciones' }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="p in productosFiltrados" :key="p.id"
-                  :class="{ 'fila-stock-bajo': p.stock < 5 }">
+                  :class="{ 'fila-stock-bajo': !modoEdicion && p.stock < 5, 'fila-modificada': modoEdicion && filasModificadas.has(p.id) }">
+                  <!-- Código (no editable en modo masivo) -->
                   <td class="celda-codigo">
                     <span v-if="codigoEditando !== p.id" class="codigo-tag" @click="iniciarEditCodigo(p)" title="Clic para editar código">
                       {{ p.codigo || '—' }}
@@ -88,30 +105,87 @@
                       <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
                     </span>
                   </td>
+
+                  <!-- Nombre -->
                   <td>
-                    <span class="prod-nombre">{{ p.nombre }}</span>
-                    <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
-                    <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
-                    <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
+                    <template v-if="modoEdicion">
+                      <input class="celda-input" v-model="borradorEdicion[p.id].nombre"
+                        @input="marcarModificado(p.id)" />
+                    </template>
+                    <template v-else>
+                      <span class="prod-nombre">{{ p.nombre }}</span>
+                      <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
+                      <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
+                      <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
+                    </template>
                   </td>
+
+                  <!-- Depto / Categoría — solo lectura en ambos modos -->
                   <td class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</td>
                   <td class="txt-muted">{{ p.categoria || '—' }}</td>
-                  <td>${{ Number(p.costo_usd).toFixed(2) }}</td>
-                  <td>{{ (Number(p.margen) * 100).toFixed(0) }}%</td>
+
+                  <!-- Costo USD -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <input class="celda-input celda-num" type="number" min="0" step="0.01"
+                        v-model.number="borradorEdicion[p.id].costo_usd"
+                        @input="marcarModificado(p.id)" />
+                    </template>
+                    <template v-else>${{ Number(p.costo_usd).toFixed(2) }}</template>
+                  </td>
+
+                  <!-- Margen -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <input class="celda-input celda-num" type="number" min="0" max="999" step="1"
+                        v-model.number="borradorEdicion[p.id].margen_pct"
+                        @input="marcarModificado(p.id)" placeholder="%" />
+                    </template>
+                    <template v-else>{{ (Number(p.margen) * 100).toFixed(0) }}%</template>
+                  </td>
+
+                  <!-- Precios calculados — siempre solo lectura -->
                   <td>${{ Number(p.precio_base_usd).toFixed(2) }}</td>
                   <td class="txt-usd">${{ Number(p.precio_referencial_usd).toFixed(2) }}</td>
                   <td style="color:#996600;font-weight:600">Bs. {{ Number(p.precio_bs).toFixed(2) }}</td>
-                  <td :class="{ 'txt-rojo': p.stock < 5 }">{{ p.stock }}</td>
-                  <td>
-                    <button class="btn-ubicar" @click="abrirUbicaciones(p)" title="Ubicaciones físicas">📍</button>
+
+                  <!-- Stock -->
+                  <td :class="{ 'txt-rojo': !modoEdicion && p.stock < 5 }">
+                    <template v-if="modoEdicion">
+                      <input class="celda-input celda-num" type="number" min="0"
+                        v-model.number="borradorEdicion[p.id].stock"
+                        @input="marcarModificado(p.id)" />
+                    </template>
+                    <template v-else>{{ p.stock }}</template>
                   </td>
-                  <td class="acciones">
-                    <button class="btn-editar"    @click="editar(p)">Editar</button>
-                    <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
-                    <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
-                    <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
-                    <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
-                    <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
+
+                  <!-- Ubicación / Activo -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <input type="checkbox" v-model="borradorEdicion[p.id].activo"
+                        @change="marcarModificado(p.id)" class="celda-check" title="Activo" />
+                    </template>
+                    <template v-else>
+                      <button class="btn-ubicar" @click="abrirUbicaciones(p)" title="Ubicaciones físicas">📍</button>
+                    </template>
+                  </td>
+
+                  <!-- Descripción / Acciones -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <input class="celda-input celda-desc" v-model="borradorEdicion[p.id].descripcion"
+                        @input="marcarModificado(p.id)" placeholder="Descripción..." />
+                    </template>
+                    <template v-else>
+                      <div class="acciones">
+                        <button class="btn-editar"    @click="editar(p)">Editar</button>
+                        <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
+                        <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
+                        <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
+                        <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
+                        <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
+                      </div>
+                    </template>
                   </td>
                 </tr>
                 <tr v-if="productosFiltrados.length === 0">
@@ -751,6 +825,13 @@ export default {
 
       // Visibilidad de inactivos (solo admin)
       mostrarInactivos: false,
+
+      // Modo edición masiva
+      modoEdicion:      false,
+      borradorEdicion:  {},   // { [id]: { nombre, stock, costo_usd, margen_pct, descripcion, activo } }
+      filasModificadas: new Set(),
+      guardandoMasivo:  false,
+      toastMasivo:      '',
     }
   },
 
@@ -943,6 +1024,65 @@ export default {
       this.mostrarForm = false
       this.editando    = false
       this.error       = ''
+    },
+
+    // ── Edición masiva ───────────────────────────────────────────────────────
+    activarModoEdicion() {
+      const borrador = {}
+      for (const p of this.productos) {
+        borrador[p.id] = {
+          nombre:      p.nombre,
+          stock:       p.stock,
+          costo_usd:   Number(p.costo_usd),
+          margen_pct:  Math.round(Number(p.margen) * 100),
+          descripcion: p.descripcion || '',
+          activo:      p.activo !== false,
+        }
+      }
+      this.borradorEdicion  = borrador
+      this.filasModificadas = new Set()
+      this.modoEdicion      = true
+    },
+    cancelarModoEdicion() {
+      this.modoEdicion      = false
+      this.borradorEdicion  = {}
+      this.filasModificadas = new Set()
+    },
+    marcarModificado(id) {
+      this.filasModificadas = new Set([...this.filasModificadas, id])
+    },
+    async guardarEdicionMasiva() {
+      if (this.filasModificadas.size === 0) {
+        this.cancelarModoEdicion()
+        return
+      }
+      this.guardandoMasivo = true
+      try {
+        const items = [...this.filasModificadas].map(id => {
+          const b = this.borradorEdicion[id]
+          return {
+            id,
+            nombre:      b.nombre,
+            stock:       Number(b.stock),
+            costo_usd:   Number(b.costo_usd),
+            margen:      Number(b.margen_pct) / 100,
+            descripcion: b.descripcion || null,
+            activo:      b.activo,
+          }
+        })
+        const res = await axios.put('/productos/edicion-masiva', items)
+        await this.cargarProductos()
+        this.cancelarModoEdicion()
+        this.mostrarToast(`✓ ${res.data.actualizados} producto${res.data.actualizados !== 1 ? 's' : ''} guardado${res.data.actualizados !== 1 ? 's' : ''}`)
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar cambios')
+      } finally {
+        this.guardandoMasivo = false
+      }
+    },
+    mostrarToast(msg) {
+      this.toastMasivo = msg
+      setTimeout(() => { this.toastMasivo = '' }, 3000)
     },
 
     // ── Estado activo/inactivo ────────────────────────────────────────────────
@@ -1377,6 +1517,39 @@ export default {
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; }
+
+/* ── Modo edición masiva ── */
+.btn-modo-edicion    { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; }
+.btn-modo-edicion:hover { background: #333; }
+.btn-guardar-masivo  { background: #16A34A; color: white; border: none; padding: 0.5rem 1.1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 700; }
+.btn-guardar-masivo:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-guardar-masivo:not(:disabled):hover { background: #15803D; }
+.btn-cancelar-edicion { background: #DC2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; }
+.btn-cancelar-edicion:hover { background: #B91C1C; }
+
+.fila-modificada td { background: #FFFDE7 !important; }
+
+.celda-input {
+  width: 100%; min-width: 80px; padding: 0.25rem 0.4rem;
+  border: 1px solid #E5E5E5; border-radius: 4px;
+  font-size: 0.85rem; background: #FFFFFF; color: var(--texto-principal);
+  box-sizing: border-box;
+}
+.celda-input:focus { outline: none; border-color: #FFCC00; box-shadow: 0 0 0 2px rgba(255,204,0,0.2); }
+.celda-num  { max-width: 80px; text-align: right; }
+.celda-desc { min-width: 160px; }
+.celda-check { width: 16px; height: 16px; accent-color: #1A1A1A; cursor: pointer; }
+
+/* ── Toast ── */
+.toast-masivo {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  background: #16A34A; color: white; padding: 0.7rem 1.75rem;
+  border-radius: 8px; font-weight: 700; font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 9999;
+  pointer-events: none;
+}
+.toast-fade-enter-active, .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
+.toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 
 /* ── Modal variantes / componentes ── */
 .modal-variantes { max-width: 680px; }
