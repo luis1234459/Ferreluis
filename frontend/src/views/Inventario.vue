@@ -7,6 +7,7 @@
         <h1>Inventario</h1>
         <div class="top-acciones">
           <button class="btn-deptos" @click="mostrarDeptos = true">Departamentos</button>
+          <router-link to="/inventario/importar" class="btn-importar">↑ Importar Excel</router-link>
           <button class="btn-nuevo" @click="abrirNuevoProducto">+ Nuevo producto</button>
         </div>
       </div>
@@ -1301,6 +1302,8 @@ export default {
 .top-acciones { display: flex; gap: 0.6rem; align-items: center; }
 .btn-deptos   { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; }
 .btn-deptos:hover { border-color: var(--amarillo); }
+.btn-importar { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.88rem; text-decoration: none; }
+.btn-importar:hover { border-color: var(--amarillo); color: var(--texto-principal); }
 
 /* ── Tasas bar ── */
 .tasas-bar {

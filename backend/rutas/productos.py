@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Producto, TasaCambio, Departamento, VarianteProducto, ComponenteProducto, Oferta
@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 from rutas.usuarios import require_admin
+import io
+import pandas as pd
 
 router = APIRouter(prefix="/productos", tags=["productos"])
 
@@ -316,6 +318,118 @@ def listar_productos(incluir_inactivos: bool = False, db: Session = Depends(get_
         q = q.filter(Producto.activo == True)
     bcv, binance = _tasas_actuales(db)
     return [_enriquecer(p, bcv, binance) for p in q.all()]
+
+
+@router.post("/importar-masivo")
+async def importar_masivo(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    contenido = await archivo.read()
+    nombre = archivo.filename or ""
+
+    # Leer archivo según extensión
+    try:
+        if nombre.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(contenido))
+        elif nombre.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(io.BytesIO(contenido))
+        else:
+            raise HTTPException(status_code=400, detail="Formato no soportado. Use .xlsx o .csv")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al leer el archivo: {e}")
+
+    # Normalizar nombres de columnas (minúsculas, sin espacios extra)
+    df.columns = [str(c).strip().lower() for c in df.columns]
+
+    COLUMNAS = ["nombre", "categoria", "departamento", "proveedor",
+                "costo_usd", "margen_pct", "stock", "es_producto_clave", "descripcion"]
+    for col in ["nombre"]:
+        if col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Columna obligatoria ausente: '{col}'")
+
+    # Precargar departamentos y productos existentes
+    departamentos = {d.nombre.lower(): d.id for d in db.query(Departamento).all()}
+    nombres_existentes = {
+        p.nombre.lower() for p in db.query(Producto.nombre).all()
+    }
+
+    importados = 0
+    omitidos   = 0
+    errores    = []
+
+    for idx, row in df.iterrows():
+        fila = idx + 2  # fila real en Excel (1 = encabezado)
+
+        nombre_prod = str(row.get("nombre", "")).strip()
+        if not nombre_prod:
+            omitidos += 1
+            errores.append({"fila": fila, "nombre": "(vacío)", "motivo": "Nombre vacío"})
+            continue
+
+        # Duplicado
+        if nombre_prod.lower() in nombres_existentes:
+            omitidos += 1
+            errores.append({"fila": fila, "nombre": nombre_prod, "motivo": "Ya existe en inventario"})
+            continue
+
+        # Departamento
+        depto_nombre = str(row.get("departamento", "")).strip()
+        departamento_id = None
+        if depto_nombre and depto_nombre.lower() != "nan":
+            departamento_id = departamentos.get(depto_nombre.lower())
+            if departamento_id is None:
+                omitidos += 1
+                errores.append({"fila": fila, "nombre": nombre_prod,
+                                "motivo": f"Departamento '{depto_nombre}' no encontrado"})
+                continue
+
+        # Valores numéricos con fallback seguro
+        def _float(val, default=0.0):
+            try:
+                v = float(val)
+                return v if not pd.isna(v) else default
+            except Exception:
+                return default
+
+        def _int(val, default=0):
+            try:
+                v = int(float(val))
+                return v
+            except Exception:
+                return default
+
+        def _bool(val):
+            if isinstance(val, bool): return val
+            return str(val).strip().lower() in ("1", "true", "si", "sí", "yes", "x")
+
+        costo_usd   = _float(row.get("costo_usd",   0))
+        margen_pct  = _float(row.get("margen_pct",  30))
+        stock       = _int  (row.get("stock",        0))
+        es_clave    = _bool (row.get("es_producto_clave", False))
+        descripcion = str(row.get("descripcion", "")).strip()
+        categoria   = str(row.get("categoria",   "")).strip()
+        if categoria.lower() == "nan": categoria = None
+        if descripcion.lower() == "nan": descripcion = None
+
+        nuevo = Producto(
+            nombre                = nombre_prod,
+            descripcion           = descripcion,
+            categoria             = categoria or None,
+            departamento_id       = departamento_id,
+            costo_usd             = costo_usd,
+            margen                = margen_pct / 100.0,
+            stock                 = stock,
+            es_producto_clave     = es_clave,
+            activo                = True,
+        )
+        db.add(nuevo)
+        nombres_existentes.add(nombre_prod.lower())
+        importados += 1
+
+    db.commit()
+    return {"importados": importados, "omitidos": omitidos, "errores": errores}
 
 
 @router.get("/buscar")

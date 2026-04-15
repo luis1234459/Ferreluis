@@ -9,4 +9,5 @@ anthropic
 python-multipart
 
 openpyxl
+pandas
 reportlab

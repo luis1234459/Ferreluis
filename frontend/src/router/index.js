@@ -21,8 +21,9 @@ import Vendedores     from '../views/Vendedores.vue'
 import MiComision     from '../views/MiComision.vue'
 import Ajustes        from '../views/Ajustes.vue'
 import Usuarios       from '../views/Usuarios.vue'
-import Presupuestos   from '../views/Presupuestos.vue'
-import Devoluciones   from '../views/Devoluciones.vue'
+import Presupuestos        from '../views/Presupuestos.vue'
+import Devoluciones        from '../views/Devoluciones.vue'
+import ImportarInventario  from '../views/ImportarInventario.vue'
 
 const routes = [
   { path: '/',          redirect: '/login' },
@@ -47,6 +48,7 @@ const routes = [
 
   // Rutas solo admin (no delegables)
   { path: '/inventario',           name: 'Inventario',          component: Inventario,          meta: { soloAdmin: true } },
+  { path: '/inventario/importar',  name: 'ImportarInventario',  component: ImportarInventario,  meta: { soloAdmin: true } },
   { path: '/ajustes',              name: 'Ajustes',             component: Ajustes,             meta: { soloAdmin: true } },
   { path: '/vendedores',           name: 'Vendedores',          component: Vendedores,          meta: { soloAdmin: true } },
   { path: '/bancos/cuentas',       name: 'CuentasBancarias',    component: CuentasBancarias,    meta: { soloAdmin: true } },
