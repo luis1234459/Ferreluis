@@ -511,11 +511,26 @@
       </div>
 
     </main>
+
+    <!-- Nota de entrega -->
+    <NotaEntrega
+      v-if="notaEntrega"
+      :venta-id="notaEntrega.ventaId"
+      :cliente-id="notaEntrega.clienteId"
+      :cliente-nombre="notaEntrega.clienteNombre"
+      :cliente-telefono="notaEntrega.clienteTelefono"
+      :productos="notaEntrega.productos"
+      :total-bs="notaEntrega.totalBs"
+      :tasa-bcv="notaEntrega.tasaBcv"
+      @cerrar="notaEntrega = null"
+    />
+
   </div>
 </template>
 
 <script>
-import AppSidebar from '../components/AppSidebar.vue'
+import AppSidebar  from '../components/AppSidebar.vue'
+import NotaEntrega  from '../components/NotaEntrega.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
 
@@ -533,7 +548,7 @@ const LABELS = {
 const TOLERANCIA = 0.01
 
 export default {
-  components: { AppSidebar },
+  components: { AppSidebar, NotaEntrega },
   name: 'Ventas',
   data() {
     return {
@@ -596,6 +611,9 @@ export default {
       ubicPop:        null,
       ubicaciones:    [],
       ubicPopCargando: false,
+
+      // Nota de entrega
+      notaEntrega: null,   // null | { ventaId, clienteId, clienteNombre, clienteTelefono, productos, totalBs, tasaBcv }
     }
   },
   computed: {
@@ -959,6 +977,12 @@ export default {
         this.ultimaVentaId = res.data.venta_id
         this.exitoso       = true
 
+        // Capturar datos para nota de entrega ANTES de limpiar
+        const carritoParaNota      = [...this.carrito]
+        const clienteParaNota      = this.clienteSeleccionado
+        const tasaBcvParaNota      = this.tasaBcv || 1
+        const totalBsParaNota      = this.subtotalUSD * tasaBcvParaNota
+
         // Limpiar estado de la venta
         this.carrito           = []
         this.pagos             = []
@@ -970,6 +994,17 @@ export default {
 
         setTimeout(() => { this.exitoso = false }, 5000)
         await this.cargarProductos()
+
+        // Abrir modal nota de entrega
+        this.notaEntrega = {
+          ventaId:          res.data.venta_id,
+          clienteId:        clienteParaNota?.id         || null,
+          clienteNombre:    clienteParaNota?.nombre      || 'Consumidor Final',
+          clienteTelefono:  clienteParaNota?.telefono    || '',
+          productos:        carritoParaNota,
+          totalBs:          totalBsParaNota,
+          tasaBcv:          tasaBcvParaNota,
+        }
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al registrar la venta'
       } finally {
