@@ -168,10 +168,11 @@ def inicializar_datos():
 
         # ── Seed: Claves de Autorización ──────────────────────────────────────
         for accion, desc in [
-            ("descuento",   "Descuento en venta / precio base"),
-            ("stock",       "Venta sin stock"),
-            ("devolucion",  "Devolución de productos"),
-            ("precio_base", "Precio base (sin protección cambiaria)"),
+            ("descuento",        "Descuento en venta / precio base"),
+            ("stock",            "Venta sin stock"),
+            ("devolucion",       "Devolución de productos"),
+            ("precio_base",      "Precio base (sin protección cambiaria)"),
+            ("credito_excedido", "Aprobar venta con crédito excedido"),
         ]:
             existe = db.query(models.ClaveAutorizacion).filter(
                 models.ClaveAutorizacion.accion == accion
