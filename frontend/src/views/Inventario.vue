@@ -923,17 +923,12 @@ export default {
 
     productosFiltrados() {
       return this.productos.filter(p => {
-        const q             = this.busqueda.toLowerCase()
-        const matchTexto    = p.nombre.toLowerCase().includes(q) ||
-                              (p.categoria && p.categoria.toLowerCase().includes(q))
-        const matchDepto    = !this.filtroDepartamento ||
-                              p.departamento_id === this.filtroDepartamento
         const matchCategoria = !this.filtroCategoria ||
                               p.categoria_id === this.filtroCategoria
         const matchTipo     = !this.filtroTipo ||
                               (this.filtroTipo === 'clave'     && p.es_producto_clave)     ||
                               (this.filtroTipo === 'compuesto' && p.es_producto_compuesto)
-        return matchTexto && matchDepto && matchCategoria && matchTipo
+        return matchCategoria && matchTipo
       })
     },
 
@@ -971,7 +966,13 @@ export default {
   },
 
   watch: {
-    busqueda()           { this.paginaActual = 1; this.cargarProductos() },
+    busqueda() {
+      clearTimeout(this._busquedaTimer)
+      this._busquedaTimer = setTimeout(() => {
+        this.paginaActual = 1
+        this.cargarProductos()
+      }, 400)
+    },
     filtroDepartamento() { this.paginaActual = 1; this.cargarProductos() },
     filtroCategoria()    { this.paginaActual = 1; this.cargarProductos() },
     filtroTipo()         { this.paginaActual = 1; this.cargarProductos() },
@@ -998,6 +999,8 @@ export default {
     async cargarProductos() {
       const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
+      if (this.busqueda)           params.busqueda        = this.busqueda
+      if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       const res = await axios.get('/productos/', { params })
       this.productos      = res.data.productos
       this.totalProductos = res.data.total

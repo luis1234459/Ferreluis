@@ -391,11 +391,17 @@ def listar_productos(
     incluir_inactivos: bool = False,
     skip: int = 0,
     limit: int = 100,
+    busqueda: str = "",
+    departamento_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Producto)
     if not incluir_inactivos:
         q = q.filter(Producto.activo == True)
+    if busqueda:
+        q = q.filter(Producto.nombre.ilike(f"%{busqueda}%"))
+    if departamento_id is not None:
+        q = q.filter(Producto.departamento_id == departamento_id)
     total = q.count()
     bcv, binance = _tasas_actuales(db)
     productos = [_enriquecer(p, bcv, binance) for p in q.offset(skip).limit(limit).all()]
