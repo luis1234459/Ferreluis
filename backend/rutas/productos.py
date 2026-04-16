@@ -121,21 +121,25 @@ def _tasas_actuales(db: Session):
     return bcv, binance
 
 
-def _generar_codigo(nombre: str, db: Session) -> str:
-    """Genera un código único: 3 letras del nombre + número secuencial (ej: PAL-001)."""
-    prefijo = re.sub(r'[^A-Z]', '', nombre.upper())[:3].ljust(3, 'X')
-    patron  = f"{prefijo}-%"
-    usados  = {
-        p.codigo for p in
-        db.query(Producto.codigo).filter(Producto.codigo.like(patron)).all()
-        if p.codigo
-    }
-    n = 1
-    while True:
-        candidato = f"{prefijo}-{n:03d}"
-        if candidato not in usados:
-            return candidato
-        n += 1
+def generar_codigo(nombre: str, db: Session) -> str:
+    letras = re.sub(r'[^A-Za-z]', '', nombre).upper()[:3]
+    if len(letras) < 3:
+        letras = letras.ljust(3, 'X')
+    prefijo = letras + '-'
+
+    existentes = db.query(Producto.codigo).filter(
+        Producto.codigo.like(f"{prefijo}%")
+    ).all()
+
+    numeros = []
+    for (cod,) in existentes:
+        if cod:
+            match = re.search(r'(\d+)$', cod)
+            if match:
+                numeros.append(int(match.group(1)))
+
+    siguiente = max(numeros) + 1 if numeros else 1
+    return f"{prefijo}{siguiente:03d}"
 
 
 # ============================================================================
@@ -561,7 +565,7 @@ def crear_producto(
             raise HTTPException(status_code=400, detail="Ya existe un producto con ese código")
     datos = producto.dict()
     if not datos.get("codigo"):
-        datos["codigo"] = _generar_codigo(producto.nombre, db)
+        datos["codigo"] = generar_codigo(producto.nombre, db)
     nuevo = Producto(**datos)
     db.add(nuevo)
     db.commit()
@@ -580,7 +584,8 @@ def generar_codigos_masivo(
     ).all()
     actualizados = 0
     for p in sin_codigo:
-        p.codigo = _generar_codigo(p.nombre, db)
+        p.codigo = generar_codigo(p.nombre, db)
+        db.flush()   # visible para la siguiente llamada a generar_codigo()
         actualizados += 1
     db.commit()
     return {"actualizados": actualizados}
