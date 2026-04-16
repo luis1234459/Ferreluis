@@ -14,7 +14,7 @@
           <input
             v-model="busqueda"
             @input="buscar"
-            placeholder="Buscar cliente por nombre o teléfono..."
+            placeholder="Teléfono o nombre del cliente..."
             class="buscador"
           />
           <div v-if="resultados.length > 0" class="dropdown">
@@ -22,8 +22,8 @@
               v-for="c in resultados" :key="c.id"
               class="opcion" @click="seleccionarCliente(c)"
             >
-              <span class="opcion-nombre">{{ c.nombre }}</span>
-              <span class="opcion-tel">{{ c.telefono }}</span>
+              <span class="opcion-tel">📱 {{ c.telefono }}</span>
+              <span class="opcion-nombre">— {{ c.nombre }}</span>
               <span v-if="c.tiene_credito" class="opcion-badge">
                 Saldo: ${{ (c.saldo_credito || 0).toFixed(2) }}
               </span>

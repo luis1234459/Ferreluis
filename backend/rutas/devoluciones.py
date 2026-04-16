@@ -84,20 +84,58 @@ def _cuenta_para_metodo(db: Session, metodo_pago: str) -> Optional[int]:
 
 @router.get("/buscar-ventas")
 def buscar_ventas(
-    telefono:     Optional[str] = None,
-    fecha_inicio: Optional[str] = None,
-    fecha_fin:    Optional[str] = None,
+    telefono:              Optional[str] = None,
+    cliente_id:            Optional[int] = None,
+    fecha_inicio:          Optional[str] = None,
+    fecha_fin:             Optional[str] = None,
+    solo_consumidor_final: bool          = False,
     db: Session = Depends(get_db),
 ):
     """
     Devuelve ventas con sus productos.
-    Requiere: telefono  ó  fecha_inicio (+ fecha_fin opcional).
+    Modos:
+    - cliente_id + fechas: ventas de ese cliente en el período
+    - solo_consumidor_final + fechas: ventas de CF en el período
+    - telefono: búsqueda exacta por teléfono (legado)
+    - solo fechas: todas las ventas en el período
     """
-    if not telefono and not fecha_inicio:
+    if not any([telefono, cliente_id, fecha_inicio, solo_consumidor_final]):
         raise HTTPException(status_code=400,
-                            detail="Proporciona telefono o fecha_inicio")
+                            detail="Proporciona cliente_id, fecha_inicio o solo_consumidor_final")
 
-    if telefono:
+    def _parse_fechas():
+        try:
+            fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+            ff = (
+                datetime.strptime(fecha_fin, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+                if fecha_fin
+                else fi.replace(hour=23, minute=59, second=59)
+            )
+            return fi, ff
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400,
+                                detail="Formato de fecha inválido — usa YYYY-MM-DD")
+
+    if cliente_id or solo_consumidor_final:
+        if solo_consumidor_final:
+            cliente = db.query(Cliente).filter(Cliente.es_cliente_generico == True).first()
+        else:
+            cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+
+        if not cliente:
+            return []
+        vinculos  = db.query(VentaCliente).filter(VentaCliente.cliente_id == cliente.id).all()
+        venta_ids = [v.venta_id for v in vinculos]
+        if not venta_ids:
+            return []
+
+        query = db.query(Venta).filter(Venta.id.in_(venta_ids))
+        if fecha_inicio:
+            fi, ff = _parse_fechas()
+            query = query.filter(Venta.fecha >= fi, Venta.fecha <= ff)
+        ventas = query.order_by(Venta.fecha.desc()).limit(50).all()
+
+    elif telefono:
         cliente = db.query(Cliente).filter(Cliente.telefono == telefono).first()
         if not cliente:
             return []
@@ -112,17 +150,9 @@ def buscar_ventas(
             .limit(50)
             .all()
         )
+
     else:
-        try:
-            fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-            ff = (
-                datetime.strptime(fecha_fin, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-                if fecha_fin
-                else fi.replace(hour=23, minute=59, second=59)
-            )
-        except ValueError:
-            raise HTTPException(status_code=400,
-                                detail="Formato de fecha inválido — usa YYYY-MM-DD")
+        fi, ff = _parse_fechas()
         ventas = (
             db.query(Venta)
             .filter(Venta.fecha >= fi, Venta.fecha <= ff)

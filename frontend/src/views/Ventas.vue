@@ -78,7 +78,7 @@
               <input
                 v-model="clienteBusqueda"
                 @input="buscarCliente"
-                placeholder="Buscar por nombre o teléfono..."
+                placeholder="Teléfono o nombre del cliente..."
                 class="input-cliente"
               />
               <div v-if="clienteResultados.length > 0" class="cliente-dropdown">
@@ -87,8 +87,8 @@
                   class="cliente-opcion"
                   @click="seleccionarCliente(c)"
                 >
-                  <span class="opcion-nombre">{{ c.nombre }}</span>
-                  <span class="opcion-tel">{{ c.telefono }}</span>
+                  <span class="opcion-tel">📱 {{ c.telefono }}</span>
+                  <span class="opcion-nombre">— {{ c.nombre }}</span>
                   <span v-if="c.nivel_fidelidad" class="opcion-nivel"
                     :style="{ color: c.nivel_fidelidad.color }">
                     {{ c.nivel_fidelidad.nombre }}

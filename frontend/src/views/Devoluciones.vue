@@ -22,36 +22,53 @@
         <!-- ═══════════════════════════════ TAB CLIENTES ═══════════════════════════════ -->
         <div v-if="tab === 'cliente'">
 
-          <!-- PASO 1: Búsqueda -->
           <div class="card-form">
             <h3 class="seccion-titulo">Buscar ventas</h3>
 
-            <div class="busq-tabs">
-              <button
-                :class="['busq-tab', busqTipo === 'telefono' ? 'busq-tab-activo' : '']"
-                @click="busqTipo = 'telefono'; ventasEncontradas = []; busqRealizada = false"
-              >Por teléfono</button>
-              <button
-                :class="['busq-tab', busqTipo === 'fecha' ? 'busq-tab-activo' : '']"
-                @click="busqTipo = 'fecha'; ventasEncontradas = []; busqRealizada = false"
-              >Por fecha</button>
-            </div>
-
-            <!-- Por teléfono -->
-            <div v-if="busqTipo === 'telefono'" class="busq-row mt-75">
-              <input
-                v-model="busqTelefono"
-                type="tel"
-                placeholder="Teléfono del cliente..."
-                @keydown.enter="buscarVentas"
-              />
-              <button class="btn-buscar" @click="buscarVentas" :disabled="buscando">
-                {{ buscando ? 'Buscando...' : 'Buscar' }}
+            <!-- PASO 1: Selección de cliente -->
+            <div v-if="!clienteDevolucion && !modoSinCliente">
+              <div class="busq-cliente-wrap">
+                <input
+                  v-model="busqClienteTexto"
+                  @input="buscarClienteDevolucion"
+                  placeholder="Teléfono o nombre del cliente..."
+                  class="input-busq-cliente"
+                  autocomplete="off"
+                />
+                <div v-if="busqClienteResultados.length" class="dropdown-cli">
+                  <div
+                    v-for="c in busqClienteResultados"
+                    :key="c.id"
+                    class="cli-opcion"
+                    @click="seleccionarClienteDevolucion(c)"
+                  >
+                    <span class="cli-tel">📱 {{ c.telefono }}</span>
+                    <span class="cli-nombre">— {{ c.nombre }}</span>
+                  </div>
+                </div>
+              </div>
+              <button class="link-sin-cliente" @click="modoSinCliente = true">
+                Buscar sin teléfono (Consumidor Final)
               </button>
             </div>
 
-            <!-- Por fecha -->
-            <div v-if="busqTipo === 'fecha'" class="busq-fecha-panel mt-75">
+            <!-- Cliente seleccionado o modo CF -->
+            <div v-if="clienteDevolucion || modoSinCliente" class="cliente-elegido">
+              <span v-if="clienteDevolucion" class="elegido-info">
+                <span class="elegido-check">✓</span>
+                <span class="elegido-tel">📱 {{ clienteDevolucion.telefono }}</span>
+                <span class="elegido-nombre">— {{ clienteDevolucion.nombre }}</span>
+              </span>
+              <span v-else class="elegido-info elegido-cf">
+                <span class="elegido-check">✓</span>
+                <span class="elegido-nombre">Consumidor Final</span>
+              </span>
+              <button class="btn-cambiar-cli" @click="limpiarClienteDevolucion">Cambiar</button>
+            </div>
+
+            <!-- PASO 2: Período (aparece al tener cliente o modo CF) -->
+            <div v-if="clienteDevolucion || modoSinCliente" class="periodo-wrap">
+              <p class="periodo-label">Selecciona el período:</p>
               <div class="fecha-botones">
                 <button
                   :class="['btn-fecha', busqFecha === 'hoy' ? 'btn-fecha-activo' : '']"
@@ -64,20 +81,21 @@
                 <button
                   :class="['btn-fecha', busqFecha === 'rango' ? 'btn-fecha-activo' : '']"
                   @click="busqFecha = 'rango'"
-                >Rango</button>
+                >Rango de fechas</button>
               </div>
               <div v-if="busqFecha === 'rango'" class="fecha-rango">
                 <input type="date" v-model="busqFechaInicio" />
                 <span class="fecha-sep">—</span>
                 <input type="date" v-model="busqFechaFin" />
                 <button class="btn-buscar" @click="buscarVentas" :disabled="buscando">
-                  {{ buscando ? '...' : 'Buscar' }}
+                  {{ buscando ? '...' : 'Buscar ventas' }}
                 </button>
               </div>
+              <div v-if="buscando" class="buscando-msg">Buscando...</div>
             </div>
           </div>
 
-          <!-- PASO 2: Resultados -->
+          <!-- Resultados -->
           <div v-if="ventasEncontradas.length > 0">
             <p class="resultados-meta">{{ ventasEncontradas.length }} venta(s) encontrada(s)</p>
 
@@ -108,7 +126,7 @@
           </div>
 
           <div v-else-if="busqRealizada && !buscando" class="sin-resultados">
-            Sin ventas encontradas para esa búsqueda
+            Sin ventas en ese período
           </div>
 
         </div>
@@ -220,14 +238,12 @@
           <button class="modal-cerrar" @click="cerrarModal">✕</button>
         </div>
 
-        <!-- Info producto -->
         <div class="modal-prod-info">
           <strong>{{ modalProducto?.nombre }}</strong>
           <span class="txt-muted">Venta #{{ modalProducto?.venta_id }} · {{ modalProducto?.cliente_nombre }}</span>
           <span class="txt-muted">Precio unitario: ${{ Number(modalProducto?.precio_unitario || 0).toFixed(2) }}</span>
         </div>
 
-        <!-- Cantidad -->
         <div class="modal-field">
           <label>Cantidad a devolver</label>
           <div class="cant-row">
@@ -242,7 +258,6 @@
           </div>
         </div>
 
-        <!-- Opciones resolución -->
         <div class="modal-label-sec">Tipo de resolución</div>
         <div class="modal-opciones">
           <div
@@ -278,7 +293,7 @@
           </div>
         </div>
 
-        <!-- Opción A: Reembolso -->
+        <!-- Reembolso -->
         <div v-if="modalTipo === 'reembolso'" class="modal-sub">
           <div class="modal-field">
             <label>Método de devolución</label>
@@ -290,12 +305,12 @@
               <option value="transferencia">Transferencia</option>
             </select>
           </div>
-          <div class="monto-preview">
+          <div class="monto-preview-modal">
             Monto a devolver: <strong>${{ montoDevolucion.toFixed(2) }}</strong>
           </div>
         </div>
 
-        <!-- Opción B: Cambio -->
+        <!-- Cambio -->
         <div v-if="modalTipo === 'cambio'" class="modal-sub">
           <div class="modal-field">
             <label>Buscar nuevo producto</label>
@@ -364,7 +379,7 @@
           </div>
         </div>
 
-        <!-- Opción C: Crédito -->
+        <!-- Crédito -->
         <div v-if="modalTipo === 'credito'" class="modal-sub">
           <div class="credito-info-box">
             <span class="opcion-icono">🏦</span>
@@ -375,13 +390,11 @@
           </div>
         </div>
 
-        <!-- Observación -->
         <div class="modal-field">
           <label>Observación (opcional)</label>
           <input v-model="modalObservacion" placeholder="Motivo u observaciones..." />
         </div>
 
-        <!-- Footer -->
         <div class="modal-footer">
           <button class="btn-cancelar" @click="cerrarModal">Cancelar</button>
           <button
@@ -426,16 +439,21 @@ export default {
         observacion:     '',
       },
 
-      // ─── Cliente tab — búsqueda ────────────────────────────────────────────
-      busqTipo:        'telefono',
-      busqTelefono:    '',
+      // ─── Cliente tab — paso 1: selección cliente ──────────────────────────
+      busqClienteTexto:      '',
+      busqClienteResultados: [],
+      busqClienteTimer:      null,
+      clienteDevolucion:     null,
+      modoSinCliente:        false,
+
+      // ─── Cliente tab — paso 2: período ────────────────────────────────────
       busqFecha:       'hoy',
       busqFechaInicio: '',
       busqFechaFin:    '',
       buscando:        false,
       busqRealizada:   false,
 
-      // ─── Cliente tab — resultados ──────────────────────────────────────────
+      // ─── Resultados ───────────────────────────────────────────────────────
       ventasEncontradas: [],
       ventasExpandidas:  {},
 
@@ -556,7 +574,43 @@ export default {
       }
     },
 
-    // ─── Cliente — búsqueda ──────────────────────────────────────────────────
+    // ─── Cliente — paso 1: búsqueda de cliente ───────────────────────────────
+
+    buscarClienteDevolucion() {
+      clearTimeout(this.busqClienteTimer)
+      const q = this.busqClienteTexto.trim()
+      if (q.length < 3) { this.busqClienteResultados = []; return }
+      this.busqClienteTimer = setTimeout(async () => {
+        try {
+          const res = await axios.get('/clientes/buscar-rapido', { params: { q } })
+          this.busqClienteResultados = res.data
+        } catch (_) { this.busqClienteResultados = [] }
+      }, 200)
+    },
+
+    seleccionarClienteDevolucion(c) {
+      this.clienteDevolucion     = c
+      this.busqClienteTexto      = ''
+      this.busqClienteResultados = []
+      this.modoSinCliente        = false
+      // Reset results
+      this.ventasEncontradas     = []
+      this.ventasExpandidas      = {}
+      this.busqRealizada         = false
+      this.busqFecha             = 'hoy'
+    },
+
+    limpiarClienteDevolucion() {
+      this.clienteDevolucion     = null
+      this.modoSinCliente        = false
+      this.busqClienteTexto      = ''
+      this.busqClienteResultados = []
+      this.ventasEncontradas     = []
+      this.ventasExpandidas      = {}
+      this.busqRealizada         = false
+    },
+
+    // ─── Cliente — paso 2: búsqueda de ventas ────────────────────────────────
 
     async buscarVentas() {
       this.buscando          = true
@@ -566,23 +620,30 @@ export default {
       this.error             = ''
       try {
         const params = {}
-        if (this.busqTipo === 'telefono') {
-          params.telefono = this.busqTelefono.trim()
+
+        // Identificar el cliente
+        if (this.clienteDevolucion) {
+          params.cliente_id = this.clienteDevolucion.id
         } else {
-          const hoy  = new Date()
-          const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1)
-          const fmt  = d => d.toISOString().split('T')[0]
-          if (this.busqFecha === 'hoy') {
-            params.fecha_inicio = fmt(hoy)
-            params.fecha_fin    = fmt(hoy)
-          } else if (this.busqFecha === 'ayer') {
-            params.fecha_inicio = fmt(ayer)
-            params.fecha_fin    = fmt(ayer)
-          } else {
-            params.fecha_inicio = this.busqFechaInicio
-            params.fecha_fin    = this.busqFechaFin
-          }
+          params.solo_consumidor_final = true
         }
+
+        // Fechas
+        const hoy  = new Date()
+        const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1)
+        const fmt  = d => d.toISOString().split('T')[0]
+
+        if (this.busqFecha === 'hoy') {
+          params.fecha_inicio = fmt(hoy)
+          params.fecha_fin    = fmt(hoy)
+        } else if (this.busqFecha === 'ayer') {
+          params.fecha_inicio = fmt(ayer)
+          params.fecha_fin    = fmt(ayer)
+        } else if (this.busqFecha === 'rango') {
+          params.fecha_inicio = this.busqFechaInicio
+          params.fecha_fin    = this.busqFechaFin
+        }
+
         const res = await axios.get('/devoluciones/buscar-ventas', { params })
         this.ventasEncontradas = res.data
         if (res.data.length === 1) {
@@ -722,33 +783,48 @@ export default {
 /* Card form */
 .card-form    { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
 
-/* Sub-tabs búsqueda */
-.busq-tabs        { display: flex; gap: 0; border-bottom: 1px solid var(--borde); }
-.busq-tab         { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.83rem; color: var(--texto-muted); margin-bottom: -1px; transition: all 0.15s; }
-.busq-tab-activo  { color: #1A1A1A; border-bottom-color: #FFCC00; font-weight: 700; }
+/* Búsqueda de cliente (paso 1) */
+.busq-cliente-wrap   { position: relative; margin-bottom: 0.5rem; }
+.input-busq-cliente  { width: 100%; padding: 0.55rem 0.85rem; border: 1px solid var(--borde); border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+.input-busq-cliente:focus { outline: none; border-color: #FFCC00; }
 
-.mt-75 { margin-top: 0.75rem; }
-.mt-50 { margin-top: 0.5rem; }
+.dropdown-cli      { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); z-index: 50; }
+.cli-opcion        { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.85rem; cursor: pointer; font-size: 0.88rem; border-bottom: 1px solid var(--borde-suave); }
+.cli-opcion:hover  { background: #FAFAF7; }
+.cli-opcion:last-child { border-bottom: none; }
+.cli-tel           { color: #1A1A1A; font-weight: 600; }
+.cli-nombre        { color: var(--texto-sec); }
 
-/* Búsqueda por teléfono */
-.busq-row       { display: flex; gap: 0.5rem; }
-.busq-row input { flex: 1; padding: 0.45rem 0.75rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.88rem; }
-.btn-buscar     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 700; }
-.btn-buscar:disabled { opacity: 0.5; cursor: not-allowed; }
+.link-sin-cliente  { background: none; border: none; color: var(--texto-muted); font-size: 0.8rem; cursor: pointer; padding: 0; text-decoration: underline; }
+.link-sin-cliente:hover { color: #1A1A1A; }
 
-/* Búsqueda por fecha */
-.busq-fecha-panel { display: flex; flex-direction: column; gap: 0.65rem; }
-.fecha-botones    { display: flex; gap: 0.5rem; }
-.btn-fecha        { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.85rem; color: var(--texto-sec); transition: all 0.15s; }
+/* Cliente elegido */
+.cliente-elegido   { display: flex; align-items: center; justify-content: space-between; background: #F0FDF4; border: 1px solid #16A34A33; border-radius: 8px; padding: 0.55rem 0.85rem; margin-bottom: 1rem; }
+.elegido-info      { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; }
+.elegido-check     { color: #16A34A; font-weight: 700; }
+.elegido-tel       { color: #1A1A1A; font-weight: 600; }
+.elegido-nombre    { color: var(--texto-sec); }
+.elegido-cf .elegido-nombre { color: #1A1A1A; font-weight: 600; }
+.btn-cambiar-cli   { background: transparent; border: 1px solid var(--borde); color: var(--texto-sec); padding: 0.25rem 0.65rem; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+.btn-cambiar-cli:hover { border-color: #1A1A1A; color: #1A1A1A; }
+
+/* Período (paso 2) */
+.periodo-wrap   { margin-top: 0.25rem; }
+.periodo-label  { font-size: 0.82rem; font-weight: 600; color: var(--texto-sec); margin: 0 0 0.5rem; }
+.fecha-botones  { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.btn-fecha      { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.85rem; color: var(--texto-sec); transition: all 0.15s; }
 .btn-fecha:hover  { border-color: #1A1A1A; }
 .btn-fecha-activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; font-weight: 700; }
-.fecha-rango      { display: flex; align-items: center; gap: 0.5rem; }
+.fecha-rango    { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .fecha-rango input { padding: 0.4rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; }
-.fecha-sep        { color: var(--texto-muted); }
+.fecha-sep      { color: var(--texto-muted); }
+.btn-buscar     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 700; }
+.btn-buscar:disabled { opacity: 0.5; cursor: not-allowed; }
+.buscando-msg   { font-size: 0.82rem; color: var(--texto-muted); margin-top: 0.4rem; }
 
 /* Resultados */
-.resultados-meta  { font-size: 0.82rem; color: var(--texto-muted); margin-bottom: 0.75rem; }
-.sin-resultados   { text-align: center; padding: 2rem; color: var(--texto-muted); font-size: 0.9rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 10px; }
+.resultados-meta { font-size: 0.82rem; color: var(--texto-muted); margin-bottom: 0.75rem; }
+.sin-resultados  { text-align: center; padding: 2rem; color: var(--texto-muted); font-size: 0.9rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 10px; }
 
 /* Tarjetas de venta */
 .venta-card    { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 10px; margin-bottom: 0.75rem; overflow: hidden; }
@@ -762,7 +838,6 @@ export default {
 .venta-total   { font-weight: 700; font-size: 0.9rem; color: #16A34A; }
 .venta-flecha  { font-size: 0.65rem; color: var(--texto-muted); }
 
-/* Productos de la venta */
 .venta-productos { border-top: 1px solid var(--borde); padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .prod-row        { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.5rem; border-radius: 6px; background: #FAFAF7; }
 .prod-row-info   { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; flex: 1; }
@@ -772,29 +847,26 @@ export default {
 .btn-devolver    { background: #DC2626; color: #FFFFFF; border: none; padding: 0.3rem 0.7rem; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .btn-devolver:hover { background: #B91C1C; }
 
-/* Modal overlay */
+/* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
 .modal-box     { background: #FFFFFF; border-radius: 14px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
 
-/* Modal header */
 .modal-header  { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--borde); }
 .modal-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: #1A1A1A; }
 .modal-cerrar  { background: transparent; border: none; font-size: 1rem; cursor: pointer; color: var(--texto-muted); padding: 0.2rem 0.4rem; border-radius: 4px; }
 .modal-cerrar:hover { background: #F3F4F6; color: #1A1A1A; }
 
-/* Modal producto info */
 .modal-prod-info { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.85rem 1.25rem; background: #FAFAF7; border-bottom: 1px solid var(--borde); }
 .modal-prod-info strong { font-size: 0.95rem; color: #1A1A1A; }
 
-/* Modal fields */
 .modal-field       { padding: 0.6rem 1.25rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .modal-field label { font-size: 0.8rem; font-weight: 600; color: var(--texto-sec); }
 .modal-field input, .modal-field select { padding: 0.4rem 0.7rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.88rem; }
 .modal-label-sec   { padding: 0.4rem 1.25rem 0; font-size: 0.8rem; font-weight: 600; color: var(--texto-sec); }
 .cant-row          { display: flex; align-items: center; gap: 0.5rem; }
 .inp-cant          { width: 80px; }
+.mt-50             { margin-top: 0.5rem; }
 
-/* Opciones resolución */
 .modal-opciones   { display: flex; gap: 0.6rem; padding: 0.5rem 1.25rem 0.75rem; }
 .opcion-card      { flex: 1; display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; border: 2px solid var(--borde); border-radius: 10px; cursor: pointer; transition: all 0.15s; background: #FAFAF7; }
 .opcion-card:hover { border-color: #1A1A1A; }
@@ -803,13 +875,10 @@ export default {
 .opcion-titulo    { font-size: 0.82rem; font-weight: 700; color: #1A1A1A; }
 .opcion-desc      { font-size: 0.73rem; color: var(--texto-muted); }
 
-/* Modal sub-sections */
 .modal-sub { border-top: 1px solid var(--borde); padding-top: 0.25rem; padding-bottom: 0.5rem; }
 
-/* Monto preview */
-.monto-preview { margin: 0 1.25rem 0.5rem; background: #FFCC0022; border: 1px solid #FFCC00; border-radius: 6px; padding: 0.45rem 0.85rem; font-size: 0.88rem; color: #1A1A1A; }
+.monto-preview-modal { margin: 0 1.25rem 0.5rem; background: #FFCC0022; border: 1px solid #FFCC00; border-radius: 6px; padding: 0.45rem 0.85rem; font-size: 0.88rem; color: #1A1A1A; }
 
-/* Cambio — búsqueda producto */
 .busq-prod-wrap { position: relative; }
 .busq-prod-wrap input { width: 100%; padding: 0.4rem 0.7rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.88rem; box-sizing: border-box; }
 .dropdown-prod  { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); z-index: 200; max-height: 200px; overflow-y: auto; }
@@ -819,20 +888,16 @@ export default {
 .drop-nombre    { font-weight: 500; }
 .drop-precio    { font-size: 0.8rem; }
 
-/* Producto nuevo seleccionado */
 .prod-nuevo-info { display: flex; gap: 0.75rem; align-items: center; margin: 0.25rem 1.25rem 0.5rem; padding: 0.5rem 0.75rem; background: #FAFAF7; border: 1px solid var(--borde); border-radius: 7px; font-size: 0.85rem; flex-wrap: wrap; }
 .prod-nv-nombre  { font-weight: 600; color: #1A1A1A; }
 
-/* Diferencia */
 .diferencia-box { margin: 0.25rem 1.25rem 0.5rem; padding: 0.6rem 0.85rem; border-radius: 7px; font-size: 0.87rem; }
 .dif-cobrar     { background: #DCFCE7; border: 1px solid #16A34A33; }
 .dif-devolver   { background: #FEE2E2; border: 1px solid #DC262633; }
 .dif-igual      { background: #F3F4F6; border: 1px solid var(--borde); color: var(--texto-muted); }
 
-/* Crédito info */
 .credito-info-box { display: flex; align-items: center; gap: 0.75rem; margin: 0.5rem 1.25rem; padding: 0.75rem 1rem; background: #F0FDF4; border: 1px solid #16A34A33; border-radius: 8px; font-size: 0.88rem; }
 
-/* Modal footer */
 .modal-footer  { display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.85rem 1.25rem; border-top: 1px solid var(--borde); }
 .btn-cancelar  { background: #F3F4F6; color: #1A1A1A; border: 1px solid var(--borde); padding: 0.45rem 1rem; border-radius: 7px; cursor: pointer; font-size: 0.87rem; font-weight: 600; }
 .btn-cancelar:hover { background: #E5E7EB; }
@@ -848,7 +913,7 @@ export default {
 .txt-rojo   { color: #DC2626; }
 .txt-muted  { color: var(--texto-muted); font-size: 0.82rem; }
 
-/* Proveedor tab — legacy styles */
+/* Proveedor tab */
 .monto-preview { background: #FFCC0022; border: 1px solid #FFCC00; border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.88rem; color: #1A1A1A; margin: 0.75rem 0; }
 .alerta-pendientes { background: #FFCC0022; border-left: 4px solid #FFCC00; padding: 0.6rem 1rem; border-radius: 4px; font-size: 0.88rem; margin-bottom: 1rem; }
 .badge-tipo          { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }

@@ -11,7 +11,7 @@
       <div class="contenido-inner">
         <!-- Filtros -->
         <div class="filtros">
-          <input v-model="busqueda" placeholder="Buscar por nombre o teléfono..." class="buscador" @input="cargarClientes" />
+          <input v-model="busqueda" placeholder="Teléfono o nombre del cliente..." class="buscador" @input="cargarClientes" />
         </div>
 
         <!-- Tabla -->
