@@ -647,15 +647,11 @@ export default {
     productosFiltrados() {
       const q = this.busqueda.toLowerCase()
       if (!q) return this.productos
+      // Priorizar coincidencia exacta de código (útil para lectores de barras)
       const exactCodigo = this.productos.filter(p =>
         p.codigo && p.codigo.toLowerCase() === q
       )
-      if (exactCodigo.length) return exactCodigo
-      return this.productos.filter(p =>
-        p.nombre.toLowerCase().includes(q) ||
-        (p.categoria && p.categoria.toLowerCase().includes(q)) ||
-        (p.codigo && p.codigo.toLowerCase().includes(q))
-      )
+      return exactCodigo.length ? exactCodigo : this.productos
     },
     subtotalUSD() {
       return this.carrito.reduce(
@@ -704,6 +700,12 @@ export default {
     },
     cuentasDelMetodo()     { return this.cuentasPorMetodo[this.nuevoMetodo] || [] },
   },
+  watch: {
+    busqueda() {
+      clearTimeout(this._busquedaTimer)
+      this._busquedaTimer = setTimeout(() => this.cargarProductos(), 400)
+    },
+  },
   async mounted() {
     await Promise.all([
       this.cargarProductos(),
@@ -714,7 +716,9 @@ export default {
   methods: {
     // ── Carga inicial ─────────────────────────────────────────────────────────
     async cargarProductos() {
-      const r = await axios.get('/productos/')
+      const params = { limit: 100 }
+      if (this.busqueda) params.busqueda = this.busqueda
+      const r = await axios.get('/productos/', { params })
       this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
     },
     async cargarCuentasPorMetodo() {
