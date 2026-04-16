@@ -1199,7 +1199,7 @@ export default {
       if (!confirm('¿Generar códigos automáticos para todos los productos sin código?')) return
       this.generandoCodigos = true
       try {
-        const res = await axios.post('/productos/generar-codigos-masivo')
+        const res = await axios.post('/productos/resetear-codigos')
         await this.cargarProductos()
         this.mostrarToast(`✓ ${res.data.actualizados} productos actualizados con código`)
       } catch (e) {

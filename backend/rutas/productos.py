@@ -619,6 +619,43 @@ def generar_codigos_masivo(
     return {"actualizados": actualizados}
 
 
+@router.post("/resetear-codigos")
+def resetear_codigos(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    # Paso 1: borrar todos los códigos existentes
+    todos = db.query(Producto).all()
+    for p in todos:
+        p.codigo = None
+    db.flush()
+
+    # Paso 2: asignar códigos nuevos con set local para evitar duplicados
+    asignados_ahora: set[str] = set()
+    actualizados = 0
+
+    for p in todos:
+        letras  = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X')
+        prefijo = letras + '-'
+
+        # Solo los del set local (BD ya está en None para todos)
+        numeros = []
+        for cod in asignados_ahora:
+            if cod.startswith(prefijo):
+                m = re.search(r'(\d+)$', cod)
+                if m:
+                    numeros.append(int(m.group(1)))
+
+        siguiente = max(numeros) + 1 if numeros else 1
+        nuevo_cod = f"{prefijo}{siguiente:03d}"
+        p.codigo  = nuevo_cod
+        asignados_ahora.add(nuevo_cod)
+        actualizados += 1
+
+    db.commit()
+    return {"actualizados": actualizados}
+
+
 @router.get("/{producto_id}")
 def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     p = db.query(Producto).filter(Producto.id == producto_id).first()
