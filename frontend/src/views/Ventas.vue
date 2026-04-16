@@ -114,7 +114,17 @@
 
           <!-- ── Catálogo ── -->
           <div class="catalogo">
-            <input v-model="busqueda" placeholder="Buscar producto..." class="buscador" />
+            <input
+              v-model="busqueda"
+              ref="inputBuscador"
+              placeholder="Buscar producto..."
+              class="buscador"
+              autocomplete="off"
+              @keydown.down.prevent="moverAbajo"
+              @keydown.up.prevent="moverArriba"
+              @keydown.enter.prevent="seleccionarResaltado"
+              @keydown.escape="cerrarDropdown"
+            />
             <table>
               <thead>
                 <tr>
@@ -126,8 +136,15 @@
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
-                <tr v-for="p in productosFiltrados" :key="p.id">
+              <tbody ref="tbodyCatalogo">
+                <tr
+                  v-for="(p, index) in productosFiltrados" :key="p.id"
+                  :class="{ 'fila-resaltada': index === indiceResaltado }"
+                  @mouseenter="indiceResaltado = index"
+                  @mouseleave="indiceResaltado = -1"
+                  @click="agregar(p); $refs.inputBuscador.focus()"
+                  style="cursor:pointer"
+                >
                   <td>
                     <span class="prod-nombre-v">{{ p.nombre }}</span>
                     <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
@@ -139,7 +156,7 @@
                   </td>
                   <td class="txt-yellow">Bs. {{ precioBs(p).toFixed(2) }}</td>
                   <td :class="{ 'stock-bajo': p.stock < 5 }">{{ p.stock }}</td>
-                  <td><button class="btn-agregar" @click="agregar(p)">+</button></td>
+                  <td><button class="btn-agregar" @click.stop="agregar(p); $refs.inputBuscador.focus()">+</button></td>
                 </tr>
                 <tr v-if="productosFiltrados.length === 0">
                   <td colspan="6" class="sin-datos">Sin resultados</td>
@@ -588,7 +605,8 @@ export default {
       tasaBcv:    null,
       tasaBinance:null,
       factor:     1,
-      busqueda:   '',
+      busqueda:        '',
+      indiceResaltado: -1,
 
       monedaVenta:    'USD',
       tipoPrecio:     'referencial',
@@ -711,6 +729,7 @@ export default {
   },
   watch: {
     busqueda() {
+      this.indiceResaltado = -1
       clearTimeout(this._busquedaTimer)
       this._busquedaTimer = setTimeout(() => this.cargarProductos(), 400)
     },
@@ -1135,6 +1154,38 @@ export default {
       this.ubicPopCargando = false
     },
 
+    // ── Navegación teclado en catálogo ───────────────────────────────────────
+    moverAbajo() {
+      const max = this.productosFiltrados.length - 1
+      if (max < 0) return
+      this.indiceResaltado = this.indiceResaltado < max ? this.indiceResaltado + 1 : 0
+      this._scrollResaltado()
+    },
+    moverArriba() {
+      const max = this.productosFiltrados.length - 1
+      if (max < 0) return
+      this.indiceResaltado = this.indiceResaltado > 0 ? this.indiceResaltado - 1 : max
+      this._scrollResaltado()
+    },
+    seleccionarResaltado() {
+      if (this.indiceResaltado >= 0 && this.indiceResaltado < this.productosFiltrados.length) {
+        this.agregar(this.productosFiltrados[this.indiceResaltado])
+        this.indiceResaltado = -1
+      }
+    },
+    cerrarDropdown() {
+      this.indiceResaltado = -1
+      this.busqueda        = ''
+    },
+    _scrollResaltado() {
+      this.$nextTick(() => {
+        const tbody = this.$refs.tbodyCatalogo
+        if (!tbody) return
+        const fila = tbody.children[this.indiceResaltado]
+        if (fila) fila.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
+    },
+
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -1202,6 +1253,13 @@ export default {
 .stock-bajo { color: var(--danger) !important; }
 .sin-datos { text-align: center; color: var(--texto-muted); padding: 1.5rem 0; }
 .btn-agregar { background: #1A1A1A; color: #FFCC00; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
+.fila-resaltada td { background: #FFCC00 !important; color: #1A1A1A !important; }
+.fila-resaltada .txt-dim,
+.fila-resaltada .txt-green,
+.fila-resaltada .txt-yellow,
+.fila-resaltada .stock-bajo { color: #1A1A1A !important; }
+.fila-resaltada .btn-agregar { background: #1A1A1A; color: #FFCC00; }
+.fila-resaltada .cod-tag-v   { background: #1A1A1A; color: #FFCC00; }
 
 /* ── Panel derecho ── */
 .panel-derecho { display: flex; flex-direction: column; gap: 1rem; }
