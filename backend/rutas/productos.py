@@ -582,11 +582,39 @@ def generar_codigos_masivo(
     sin_codigo = db.query(Producto).filter(
         (Producto.codigo == None) | (Producto.codigo == "")
     ).all()
+
+    # Rastrear códigos asignados en esta ejecución para no depender de flush/identity map
+    asignados_ahora: set[str] = set()
     actualizados = 0
+
     for p in sin_codigo:
-        p.codigo = generar_codigo(p.nombre, db)
-        db.flush()   # visible para la siguiente llamada a generar_codigo()
+        letras  = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X')
+        prefijo = letras + '-'
+
+        # Números ya en BD
+        existentes = db.query(Producto.codigo).filter(
+            Producto.codigo.like(f"{prefijo}%")
+        ).all()
+        numeros = []
+        for (cod,) in existentes:
+            if cod:
+                m = re.search(r'(\d+)$', cod)
+                if m:
+                    numeros.append(int(m.group(1)))
+
+        # Números asignados en este mismo lote
+        for cod in asignados_ahora:
+            if cod.startswith(prefijo):
+                m = re.search(r'(\d+)$', cod)
+                if m:
+                    numeros.append(int(m.group(1)))
+
+        siguiente   = max(numeros) + 1 if numeros else 1
+        nuevo_cod   = f"{prefijo}{siguiente:03d}"
+        p.codigo    = nuevo_cod
+        asignados_ahora.add(nuevo_cod)
         actualizados += 1
+
     db.commit()
     return {"actualizados": actualizados}
 
