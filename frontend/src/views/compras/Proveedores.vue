@@ -182,7 +182,7 @@ export default {
     },
     async cargarInventario() {
       const res = await axios.get('/productos/')
-      this.productosInventario = res.data
+      this.productosInventario = Array.isArray(res.data) ? res.data : (res.data.productos || [])
     },
     abrirNuevo() {
       this.editandoId = null

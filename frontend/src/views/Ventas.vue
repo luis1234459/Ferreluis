@@ -715,7 +715,7 @@ export default {
     // ── Carga inicial ─────────────────────────────────────────────────────────
     async cargarProductos() {
       const r = await axios.get('/productos/')
-      this.productos = r.data
+      this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
     },
     async cargarCuentasPorMetodo() {
       try {

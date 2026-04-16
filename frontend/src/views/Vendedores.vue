@@ -438,7 +438,7 @@ export default {
     async cargarProductos() {
       try {
         const res = await axios.get('/productos/')
-        this.productos = res.data
+        this.productos = Array.isArray(res.data) ? res.data : (res.data.productos || [])
       } catch { this.productos = [] }
     },
 
