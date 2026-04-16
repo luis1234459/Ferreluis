@@ -24,6 +24,8 @@ import Usuarios       from '../views/Usuarios.vue'
 import Presupuestos        from '../views/Presupuestos.vue'
 import Devoluciones        from '../views/Devoluciones.vue'
 import ImportarInventario  from '../views/ImportarInventario.vue'
+import Creditos           from '../views/Creditos.vue'
+import Claves             from '../views/Configuracion/Claves.vue'
 
 const routes = [
   { path: '/',          redirect: '/login' },
@@ -42,6 +44,7 @@ const routes = [
   { path: '/mi-comision',    name: 'MiComision',   component: MiComision,   meta: { permiso: 'mi_comision' } },
   { path: '/presupuestos',  name: 'Presupuestos', component: Presupuestos, meta: { permiso: 'presupuestos' } },
   { path: '/devoluciones',  name: 'Devoluciones', component: Devoluciones, meta: { permiso: 'devoluciones' } },
+  { path: '/creditos',      name: 'Creditos',     component: Creditos,     meta: { permiso: 'creditos' } },
   { path: '/compras/ordenes',      name: 'OrdenesCompra', component: OrdenesCompra, meta: { permiso: 'compras' } },
   { path: '/compras/recibir',      name: 'RecibirCompra', component: RecibirCompra, meta: { permiso: 'compras' } },
   { path: '/compras/proveedores',  name: 'Proveedores',   component: Proveedores,   meta: { permiso: 'proveedores' } },
@@ -54,7 +57,8 @@ const routes = [
   { path: '/bancos/cuentas',       name: 'CuentasBancarias',    component: CuentasBancarias,    meta: { soloAdmin: true } },
   { path: '/bancos/movimientos',   name: 'MovimientosBancarios',component: MovimientosBancarios,meta: { soloAdmin: true } },
   { path: '/bancos/proveedores',   name: 'PagosProveedores',    component: PagosProveedores,    meta: { soloAdmin: true } },
-  { path: '/usuarios',             name: 'Usuarios',            component: Usuarios,            meta: { soloAdmin: true } },
+  { path: '/usuarios',               name: 'Usuarios',   component: Usuarios,   meta: { soloAdmin: true } },
+  { path: '/configuracion/claves',  name: 'Claves',     component: Claves,     meta: { soloAdmin: true } },
 ]
 
 const router = createRouter({

@@ -77,10 +77,11 @@ const GRUPOS = [
     key: 'clientes',
     icono: '👥',
     nombre: 'Clientes',
-    rutas: ['/clientes', '/fidelidad'],
+    rutas: ['/clientes', '/fidelidad', '/creditos'],
     items: [
       { ruta: '/clientes',  label: 'Clientes',  siempre: true },
       { ruta: '/fidelidad', label: 'Fidelidad', siempre: true },
+      { ruta: '/creditos',  label: 'Créditos',  permiso: 'creditos' },
     ],
   },
   {
@@ -128,9 +129,10 @@ const GRUPOS = [
     key: 'admin',
     icono: '⚙️',
     nombre: 'Admin',
-    rutas: ['/usuarios'],
+    rutas: ['/usuarios', '/configuracion'],
     items: [
-      { ruta: '/usuarios', label: 'Usuarios', soloAdmin: true },
+      { ruta: '/usuarios',              label: 'Usuarios',      soloAdmin: true },
+      { ruta: '/configuracion/claves',  label: 'Claves Auth',   soloAdmin: true },
     ],
   },
 ]

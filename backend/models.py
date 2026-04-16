@@ -6,7 +6,7 @@ from database import Base
 # ---------------------------------------------------------------------------
 # Catálogo de métodos de pago y su moneda nativa
 # ---------------------------------------------------------------------------
-METODOS_USD = {"efectivo_usd", "zelle", "binance"}
+METODOS_USD = {"efectivo_usd", "zelle", "binance", "credito"}
 METODOS_BS  = {"efectivo_bs", "transferencia_bs", "pago_movil",
                "punto_banesco", "punto_provincial"}
 METODOS_VALIDOS = METODOS_USD | METODOS_BS
@@ -20,6 +20,7 @@ LABELS_METODO = {
     "pago_movil":      "Pago Móvil",
     "punto_banesco":   "Punto Banesco",
     "punto_provincial":"Punto Provincial",
+    "credito":         "A crédito",
 }
 
 TOLERANCIA    = 0.01   # diferencia mínima aceptable por redondeo
@@ -197,6 +198,15 @@ class Configuracion(Base):
 
     id                 = Column(Integer, primary_key=True, index=True)
     clave_autorizacion = Column(String)
+
+
+class ClaveAutorizacion(Base):
+    __tablename__ = "claves_autorizacion"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    accion      = Column(String,  unique=True, nullable=False)  # "descuento"|"stock"|"devolucion"
+    clave       = Column(String,  nullable=False)
+    descripcion = Column(String,  nullable=True)
 
 
 class ExcepcionVenta(Base):
@@ -432,6 +442,9 @@ class Cliente(Base):
     es_cliente_generico = Column(Boolean,  default=False)  # True = "Consumidor Final"
     credito_disponible  = Column(Float,    default=0)
     codigo              = Column(String,   nullable=True, unique=True, index=True)
+    tiene_credito       = Column(Boolean,  default=False)
+    limite_credito      = Column(Float,    default=0)
+    saldo_credito       = Column(Float,    default=0)
 
     __table_args__ = (
         Index('ix_cliente_nombre_busq',    'nombre'),
@@ -471,6 +484,20 @@ class PremioFidelidad(Base):
     fecha        = Column(DateTime, default=datetime.now)
     otorgado_por = Column(String)
     observacion  = Column(String,   nullable=True)
+
+
+class AbonoCredito(Base):
+    """Registro de cargos (deuda) y abonos (pagos) de crédito a clientes."""
+    __tablename__ = "abonos_credito"
+
+    id          = Column(Integer,  primary_key=True, index=True)
+    cliente_id  = Column(Integer,  nullable=False, index=True)
+    venta_id    = Column(Integer,  nullable=True)   # si viene de una venta a crédito
+    monto       = Column(Float,    nullable=False)  # positivo=abono(pago), negativo=cargo(deuda)
+    metodo_pago = Column(String,   nullable=True)   # método con que abonó (null si es cargo)
+    fecha       = Column(DateTime, default=datetime.now)
+    observacion = Column(String,   nullable=True)
+    usuario     = Column(String,   nullable=True)
 
 
 # ---------------------------------------------------------------------------

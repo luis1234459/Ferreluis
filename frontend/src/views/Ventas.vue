@@ -60,6 +60,11 @@
                         color: clienteSeleccionado.nivel_fidelidad.color }">
               {{ clienteSeleccionado.nivel_fidelidad.nombre }}
             </span>
+            <span v-if="clienteSeleccionado.tiene_credito" class="ck-credito"
+              :class="(clienteSeleccionado.saldo_credito || 0) > 0 ? 'ck-credito-ok' : 'ck-credito-agotado'"
+              title="Saldo de crédito disponible">
+              Crédito: ${{ (clienteSeleccionado.saldo_credito || 0).toFixed(2) }}
+            </span>
             <span class="ck-stats" v-if="!clienteSeleccionado.es_cliente_generico">
               {{ clienteSeleccionado.total_compras }} compras ·
               ${{ (clienteSeleccionado.monto_acumulado_usd || 0).toFixed(0) }} USD
@@ -229,6 +234,9 @@
                       <option value="pago_movil">Pago Móvil</option>
                       <option value="punto_banesco">Punto Banesco</option>
                       <option value="punto_provincial">Punto Provincial</option>
+                    </optgroup>
+                    <optgroup label="— Crédito —" v-if="clienteSeleccionado && clienteSeleccionado.tiene_credito">
+                      <option value="credito">A crédito</option>
                     </optgroup>
                   </select>
 
@@ -556,7 +564,7 @@ import AppSidebar from '../components/AppSidebar.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
 
-const METODOS_USD = ['efectivo_usd', 'zelle', 'binance']
+const METODOS_USD = ['efectivo_usd', 'zelle', 'binance', 'credito']
 const LABELS = {
   efectivo_usd:     'Efectivo $',
   zelle:            'Zelle',
@@ -566,6 +574,7 @@ const LABELS = {
   pago_movil:       'Pago Móvil',
   punto_banesco:    'Punto Banesco',
   punto_provincial: 'Punto Provincial',
+  credito:          'A crédito',
 }
 const TOLERANCIA = 0.01
 
@@ -809,6 +818,40 @@ export default {
     agregarPago() {
       const monto = Number(this.nuevoMonto || 0)
       if (monto <= 0) { this.error = 'El monto debe ser mayor a cero'; return }
+
+      // Pago a crédito — tratamiento especial
+      if (this.nuevoMetodo === 'credito') {
+        if (!this.clienteSeleccionado || !this.clienteSeleccionado.tiene_credito) {
+          this.error = 'El cliente no tiene crédito habilitado'
+          return
+        }
+        // Calcular equivalente como si fuera USD (o convertir si venta en Bs)
+        const equivalente = this.monedaVenta === 'USD'
+          ? monto
+          : (this.tasaBcv ? Number((monto * this.tasaBcv).toFixed(2)) : monto)
+        if (equivalente > this.saldoPendiente + TOLERANCIA) {
+          this.error = `El crédito excede el saldo pendiente (${this.formatMonto(this.saldoPendiente, this.monedaVenta)})`
+          return
+        }
+        const saldoUSD = Number(this.clienteSeleccionado.saldo_credito || 0)
+        if (monto > saldoUSD + TOLERANCIA) {
+          this.error = `Crédito insuficiente. Saldo disponible: $${saldoUSD.toFixed(2)}`
+          return
+        }
+        this.error = ''
+        this.pagos.push({
+          metodo:            'credito',
+          moneda_pago:       'USD',
+          monto_original:    monto,
+          monto_equivalente: equivalente,
+          referencia:        '',
+          cuenta_destino_id: null,
+          cuenta_nombre:     null,
+        })
+        this.nuevoMonto       = ''
+        this.nuevoEquivalente = null
+        return
+      }
 
       const monedaPago  = this.nuevoMonedaPago
       const equivalente = this.calcularEquivalente(monto, monedaPago)
@@ -1128,6 +1171,9 @@ export default {
 .ck-stats { color: var(--texto-muted); font-size: 0.82rem; }
 .btn-cambiar-cliente { margin-left: auto; padding: 0.3rem 0.85rem; background: transparent; border: 1px solid var(--borde); color: var(--texto-sec); border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
 .btn-cambiar-cliente:hover { border-color: var(--texto-principal); color: var(--texto-principal); }
+.ck-credito { font-size: 0.78rem; font-weight: 700; padding: 0.15rem 0.6rem; border-radius: 12px; }
+.ck-credito-ok      { background: #16A34A1A; color: #16A34A; }
+.ck-credito-agotado { background: #DC26261A; color: #DC2626; }
 
 .cliente-selector-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 .cliente-search-wrap { position: relative; flex: 1; min-width: 220px; }

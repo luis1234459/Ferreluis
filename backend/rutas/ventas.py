@@ -30,7 +30,7 @@ from datetime import datetime, date
 from database import get_db
 from models import (
     Producto, Venta, PagoVenta, DetalleVenta,
-    TasaCambio, Configuracion, ExcepcionVenta,
+    TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
@@ -88,10 +88,16 @@ def _calcular_precio_referencial(precio_base: float, factor: float) -> float:
 
 
 def _validar_autorizacion(db: Session, clave: str) -> bool:
-    config = db.query(Configuracion).first()
-    if not config or not config.clave_autorizacion:
-        return False
-    return clave == config.clave_autorizacion
+    obj = db.query(ClaveAutorizacion).filter(
+        ClaveAutorizacion.accion == "descuento"
+    ).first()
+    if not obj or not obj.clave:
+        # Fallback: check legacy Configuracion table
+        config = db.query(Configuracion).first()
+        if not config or not config.clave_autorizacion:
+            return False
+        return clave == config.clave_autorizacion
+    return clave == obj.clave
 
 
 def _registrar_excepcion(db: Session, venta_id: int, motivo: str,
@@ -276,6 +282,27 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         if moneda_pago != moneda_venta and tasa_bcv <= 0:
             raise HTTPException(status_code=400,
                                 detail="Se requiere tasa activa para cobros en distinta moneda")
+
+    # ── Validación especial: pagos a crédito ─────────────────────────────────
+    pagos_credito_in = [p for p in pagos_in if p.get("metodo") == "credito"]
+    if pagos_credito_in:
+        if not cliente_id:
+            raise HTTPException(status_code=400,
+                                detail="Se requiere cliente identificado para ventas a crédito")
+        cliente_obj = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+        if not cliente_obj or not cliente_obj.tiene_credito:
+            raise HTTPException(status_code=400,
+                                detail="El cliente no tiene crédito habilitado")
+        monto_credito_usd = sum(float(p.get("monto", 0)) for p in pagos_credito_in)
+        if moneda_venta == "Bs" and tasa_bcv > 0:
+            monto_credito_usd = round(monto_credito_usd / tasa_bcv, DECIMALES_USD)
+        saldo_disponible = float(cliente_obj.saldo_credito or 0)
+        if saldo_disponible < monto_credito_usd - TOLERANCIA:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CREDITO_EXCEDIDO: saldo disponible ${saldo_disponible:.2f}, "
+                       f"crédito solicitado ${monto_credito_usd:.2f}"
+            )
 
     # ── Procesar productos ───────────────────────────────────────────────────
     motivos_autorizacion = []
@@ -479,6 +506,28 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
     if cliente_id:
         db.add(VentaCliente(venta_id=venta.id, cliente_id=int(cliente_id)))
         db.commit()
+
+    # ── Procesar cargos a crédito ─────────────────────────────────────────────
+    if pagos_credito_in:
+        cliente_obj = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+        if cliente_obj:
+            for p in pagos_procesados:
+                if p["metodo_pago"] == "credito":
+                    monto_cargo = float(p["monto_original"])
+                    # En Bs, convertir a USD para descontar del saldo (saldo está en USD)
+                    if moneda_venta == "Bs" and tasa_bcv > 0:
+                        monto_cargo = round(monto_cargo / tasa_bcv, DECIMALES_USD)
+                    cliente_obj.saldo_credito = round(
+                        float(cliente_obj.saldo_credito or 0) - monto_cargo, 2
+                    )
+                    db.add(AbonoCredito(
+                        cliente_id  = int(cliente_id),
+                        venta_id    = venta.id,
+                        monto       = -monto_cargo,   # negativo = cargo (deuda)
+                        observacion = f"Venta #{venta.id}",
+                        usuario     = usuario,
+                    ))
+            db.commit()
 
     # Excepciones
     for motivo in motivos_autorizacion:

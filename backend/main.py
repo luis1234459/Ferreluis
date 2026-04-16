@@ -4,7 +4,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones
+from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves
 from database import engine, SessionLocal
 from database import Base
 from config import ENVIRONMENT
@@ -53,6 +53,7 @@ app.include_router(dashboard.router)
 app.include_router(presupuestos.router)
 app.include_router(devoluciones.router)
 app.include_router(ubicaciones.router)
+app.include_router(claves.router)
 
 
 @app.on_event("startup")
@@ -140,6 +141,16 @@ def inicializar_datos():
              "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS numero_factura TEXT"],
         )
 
+        # ── clientes: campos crédito ──────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE clientes ADD COLUMN tiene_credito BOOLEAN DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN limite_credito FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN saldo_credito FLOAT DEFAULT 0"],
+            ["ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tiene_credito BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS limite_credito FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_credito FLOAT DEFAULT 0"],
+        )
+
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True
@@ -154,6 +165,24 @@ def inicializar_datos():
                 es_cliente_generico = True,
             ))
             db.commit()
+
+        # ── Seed: Claves de Autorización ──────────────────────────────────────
+        for accion, desc in [
+            ("descuento",   "Descuento en venta / precio base"),
+            ("stock",       "Venta sin stock"),
+            ("devolucion",  "Devolución de productos"),
+            ("precio_base", "Precio base (sin protección cambiaria)"),
+        ]:
+            existe = db.query(models.ClaveAutorizacion).filter(
+                models.ClaveAutorizacion.accion == accion
+            ).first()
+            if not existe:
+                db.add(models.ClaveAutorizacion(
+                    accion      = accion,
+                    clave       = "1234",
+                    descripcion = desc,
+                ))
+        db.commit()
 
     finally:
         db.close()

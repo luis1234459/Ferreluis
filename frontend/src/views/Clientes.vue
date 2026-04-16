@@ -25,6 +25,7 @@
                 <th>Nivel</th>
                 <th>Compras</th>
                 <th>Acumulado USD</th>
+                <th>Crédito</th>
                 <th>Desde</th>
                 <th>Acciones</th>
               </tr>
@@ -42,6 +43,12 @@
                 </td>
                 <td>{{ c.total_compras }}</td>
                 <td class="txt-verde">${{ c.monto_acumulado_usd.toFixed(2) }}</td>
+                <td>
+                  <span v-if="c.tiene_credito" class="badge-credito">
+                    ${{ (c.saldo_credito || 0).toFixed(2) }}
+                  </span>
+                  <span v-else class="txt-muted-sm">—</span>
+                </td>
                 <td>{{ formatFecha(c.fecha_registro) }}</td>
                 <td>
                   <button class="btn-ver" @click="verDetalle(c)">Ver</button>
@@ -51,7 +58,7 @@
                 </td>
               </tr>
               <tr v-if="clientes.length === 0">
-                <td colspan="8" class="sin-datos">No hay clientes registrados</td>
+                <td colspan="9" class="sin-datos">No hay clientes registrados</td>
               </tr>
             </tbody>
           </table>
@@ -102,6 +109,27 @@
                 <label>Notas</label>
                 <input v-model="form.notas" placeholder="Observaciones internas..." />
               </div>
+
+              <!-- Crédito (solo admin) -->
+              <div class="field full credito-section" v-if="esAdmin">
+                <div class="credito-toggle">
+                  <label class="toggle-label">
+                    <input type="checkbox" v-model="form.tiene_credito" />
+                    <span>Habilitar crédito</span>
+                  </label>
+                </div>
+                <div v-if="form.tiene_credito" class="credito-campos">
+                  <div class="field">
+                    <label>Límite de crédito (USD)</label>
+                    <input v-model.number="form.limite_credito" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </div>
+                  <div class="field" v-if="editando">
+                    <label>Saldo disponible</label>
+                    <input :value="'$' + (form.saldo_credito || 0).toFixed(2)" readonly style="background:#F5F5F0;color:#16A34A;font-weight:700;cursor:default" />
+                  </div>
+                </div>
+              </div>
+
               <div class="field" v-if="editando && form.codigo">
                 <label>Código</label>
                 <input :value="form.codigo" readonly style="background:#F5F5F0;color:#888;cursor:default" />
@@ -246,7 +274,7 @@ export default {
       this.clientes = res.data
     },
     abrirCrear() {
-      this.form = { id: null, nombre: '', telefono: '', email: '', tipo_cliente: 'natural', rif_cedula: '', direccion: '', notas: '' }
+      this.form = { id: null, nombre: '', telefono: '', email: '', tipo_cliente: 'natural', rif_cedula: '', direccion: '', notas: '', tiene_credito: false, limite_credito: 0, saldo_credito: 0 }
       this.telefonoNumeros     = ''
       this.prefijoSeleccionado = '0414'
       this.editando    = false
@@ -384,4 +412,15 @@ export default {
 .premio-tipo { color: #16A34A; font-size: 0.78rem; }
 
 .premio-form { background: #FAFAF7; border-radius: 8px; padding: 1rem; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; border: 1px solid var(--borde); }
+
+/* Crédito en tabla */
+.badge-credito { display: inline-block; background: #16A34A1A; color: #16A34A; font-size: 0.78rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 12px; }
+.txt-muted-sm  { color: var(--texto-muted); font-size: 0.82rem; }
+
+/* Crédito en formulario */
+.credito-section { border-top: 1px solid var(--borde-suave); padding-top: 0.75rem; }
+.credito-toggle  { margin-bottom: 0.5rem; }
+.toggle-label    { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--texto-sec); font-size: 0.9rem; font-weight: 600; }
+.toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.credito-campos  { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; }
 </style>

@@ -11,7 +11,7 @@ from typing import Optional
 from database import get_db
 from models import (
     Cliente, VentaCliente, NivelFidelidad, PremioFidelidad,
-    Venta, PagoVenta
+    Venta, PagoVenta, AbonoCredito
 )
 from rutas.usuarios import require_admin
 
@@ -100,6 +100,9 @@ def _serializar_cliente(c: Cliente, db: Session, niveles: list) -> dict:
         "notas":            c.notas,
         "es_cliente_generico": c.es_cliente_generico,
         "codigo":           c.codigo,
+        "tiene_credito":    bool(c.tiene_credito),
+        "limite_credito":   float(c.limite_credito or 0),
+        "saldo_credito":    round(float(c.saldo_credito or 0), 2),
         "total_compras":    stats["total_compras"],
         "monto_acumulado_usd": stats["monto_acumulado_usd"],
         "nivel_fidelidad":  nivel,
@@ -338,9 +341,13 @@ def editar_cliente(cliente_id: int, datos: dict, db: Session = Depends(get_db)):
     c = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    for campo in ["nombre", "telefono", "email", "direccion", "tipo_cliente", "rif_cedula", "notas", "activo"]:
+    for campo in ["nombre", "telefono", "email", "direccion", "tipo_cliente",
+                  "rif_cedula", "notas", "activo", "tiene_credito", "limite_credito"]:
         if campo in datos:
             setattr(c, campo, datos[campo])
+    # Si se habilita crédito y saldo está en 0, inicializar con el límite
+    if datos.get("tiene_credito") and float(c.saldo_credito or 0) == 0 and float(c.limite_credito or 0) > 0:
+        c.saldo_credito = float(c.limite_credito)
     db.commit()
     niveles = db.query(NivelFidelidad).order_by(NivelFidelidad.orden).all()
     return _serializar_cliente(c, db, niveles)
@@ -354,6 +361,64 @@ def desactivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
     c.activo = False
     db.commit()
     return {"ok": True}
+
+
+@router.get("/{cliente_id}/credito")
+def obtener_credito(cliente_id: int, db: Session = Depends(get_db)):
+    """Estado de cuenta de crédito del cliente."""
+    c = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    movimientos = (
+        db.query(AbonoCredito)
+        .filter(AbonoCredito.cliente_id == cliente_id)
+        .order_by(AbonoCredito.fecha.desc())
+        .limit(50)
+        .all()
+    )
+    return {
+        "tiene_credito":  bool(c.tiene_credito),
+        "limite_credito": float(c.limite_credito or 0),
+        "saldo_credito":  round(float(c.saldo_credito or 0), 2),
+        "movimientos": [
+            {
+                "id":          m.id,
+                "monto":       m.monto,
+                "metodo_pago": m.metodo_pago,
+                "fecha":       m.fecha.isoformat() if m.fecha else None,
+                "observacion": m.observacion,
+                "usuario":     m.usuario,
+                "venta_id":    m.venta_id,
+            }
+            for m in movimientos
+        ],
+    }
+
+
+@router.post("/{cliente_id}/abono", dependencies=[Depends(require_admin)])
+def registrar_abono(cliente_id: int, datos: dict, db: Session = Depends(get_db)):
+    """Registra un abono (pago) al crédito del cliente."""
+    c = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    if not c.tiene_credito:
+        raise HTTPException(status_code=400, detail="El cliente no tiene crédito habilitado")
+
+    monto = float(datos.get("monto", 0) or 0)
+    if monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
+
+    c.saldo_credito = round(float(c.saldo_credito or 0) + monto, 2)
+    db.add(AbonoCredito(
+        cliente_id  = cliente_id,
+        monto       = monto,
+        metodo_pago = datos.get("metodo_pago"),
+        observacion = datos.get("observacion"),
+        usuario     = datos.get("usuario"),
+    ))
+    db.commit()
+    return {"ok": True, "saldo_credito": c.saldo_credito}
 
 
 @router.post("/{cliente_id}/premios", dependencies=[Depends(require_admin)])
