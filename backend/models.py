@@ -445,6 +445,7 @@ class Cliente(Base):
     tiene_credito       = Column(Boolean,  default=False)
     limite_credito      = Column(Float,    default=0)
     saldo_credito       = Column(Float,    default=0)
+    saldo_a_favor       = Column(Float,    default=0)   # crédito acumulado por devoluciones
 
     __table_args__ = (
         Index('ix_cliente_nombre_busq',    'nombre'),

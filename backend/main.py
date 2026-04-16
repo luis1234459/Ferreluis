@@ -141,14 +141,16 @@ def inicializar_datos():
              "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS numero_factura TEXT"],
         )
 
-        # ── clientes: campos crédito ──────────────────────────────────────────
+        # ── clientes: campos crédito y saldo a favor ─────────────────────────
         migrar(
             ["ALTER TABLE clientes ADD COLUMN tiene_credito BOOLEAN DEFAULT 0",
              "ALTER TABLE clientes ADD COLUMN limite_credito FLOAT DEFAULT 0",
-             "ALTER TABLE clientes ADD COLUMN saldo_credito FLOAT DEFAULT 0"],
+             "ALTER TABLE clientes ADD COLUMN saldo_credito FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN saldo_a_favor FLOAT DEFAULT 0"],
             ["ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tiene_credito BOOLEAN DEFAULT FALSE",
              "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS limite_credito FLOAT DEFAULT 0",
-             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_credito FLOAT DEFAULT 0"],
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_credito FLOAT DEFAULT 0",
+             "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_a_favor FLOAT DEFAULT 0"],
         )
 
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────

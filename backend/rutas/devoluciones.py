@@ -5,7 +5,8 @@ from models import (
     DevolucionCliente, DetalleDevolucionCliente,
     DevolucionProveedor,
     Producto, Cliente, Proveedor, RecepcionCompra,
-    MovimientoBancario, CuentaBancaria,
+    MovimientoBancario, CuentaBancaria, MetodoPagoCuenta,
+    Venta, VentaCliente, DetalleVenta,
 )
 from datetime import datetime
 from typing import Optional
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
 
 
 # ---------------------------------------------------------------------------
-# Helpers — serialización
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _serializar_dev_cliente(d: DevolucionCliente, db: Session) -> dict:
@@ -35,11 +36,11 @@ def _serializar_dev_cliente(d: DevolucionCliente, db: Session) -> dict:
         "observacion":     d.observacion,
         "detalles": [
             {
-                "producto_id":      dd.producto_id,
-                "nombre_producto":  dd.nombre_producto,
-                "cantidad":         dd.cantidad,
-                "precio_unitario":  dd.precio_unitario,
-                "vuelve_inventario":dd.vuelve_inventario,
+                "producto_id":       dd.producto_id,
+                "nombre_producto":   dd.nombre_producto,
+                "cantidad":          dd.cantidad,
+                "precio_unitario":   dd.precio_unitario,
+                "vuelve_inventario": dd.vuelve_inventario,
             }
             for dd in detalles
         ],
@@ -68,8 +69,266 @@ def _serializar_dev_proveedor(d: DevolucionProveedor, db: Session) -> dict:
     }
 
 
+def _cuenta_para_metodo(db: Session, metodo_pago: str) -> Optional[int]:
+    """Devuelve el cuenta_id vinculado al método de pago, o None si no existe."""
+    mc = db.query(MetodoPagoCuenta).filter(
+        MetodoPagoCuenta.metodo_pago == metodo_pago,
+        MetodoPagoCuenta.activo == True,
+    ).first()
+    return mc.cuenta_id if mc else None
+
+
 # ---------------------------------------------------------------------------
-# Devoluciones de clientes
+# Devoluciones de clientes — búsqueda de ventas
+# ---------------------------------------------------------------------------
+
+@router.get("/buscar-ventas")
+def buscar_ventas(
+    telefono:     Optional[str] = None,
+    fecha_inicio: Optional[str] = None,
+    fecha_fin:    Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve ventas con sus productos.
+    Requiere: telefono  ó  fecha_inicio (+ fecha_fin opcional).
+    """
+    if not telefono and not fecha_inicio:
+        raise HTTPException(status_code=400,
+                            detail="Proporciona telefono o fecha_inicio")
+
+    if telefono:
+        cliente = db.query(Cliente).filter(Cliente.telefono == telefono).first()
+        if not cliente:
+            return []
+        vinculos  = db.query(VentaCliente).filter(VentaCliente.cliente_id == cliente.id).all()
+        venta_ids = [v.venta_id for v in vinculos]
+        if not venta_ids:
+            return []
+        ventas = (
+            db.query(Venta)
+            .filter(Venta.id.in_(venta_ids))
+            .order_by(Venta.fecha.desc())
+            .limit(50)
+            .all()
+        )
+    else:
+        try:
+            fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+            ff = (
+                datetime.strptime(fecha_fin, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+                if fecha_fin
+                else fi.replace(hour=23, minute=59, second=59)
+            )
+        except ValueError:
+            raise HTTPException(status_code=400,
+                                detail="Formato de fecha inválido — usa YYYY-MM-DD")
+        ventas = (
+            db.query(Venta)
+            .filter(Venta.fecha >= fi, Venta.fecha <= ff)
+            .order_by(Venta.fecha.desc())
+            .limit(100)
+            .all()
+        )
+
+    resultado = []
+    for v in ventas:
+        detalles = db.query(DetalleVenta).filter(DetalleVenta.venta_id == v.id).all()
+        vc = db.query(VentaCliente).filter(VentaCliente.venta_id == v.id).first()
+
+        cliente_nombre   = "Consumidor Final"
+        cliente_telefono = None
+        cliente_id       = None
+        es_consumidor    = True
+
+        if vc:
+            c = db.query(Cliente).filter(Cliente.id == vc.cliente_id).first()
+            if c:
+                cliente_nombre   = c.nombre
+                cliente_telefono = c.telefono
+                cliente_id       = c.id
+                es_consumidor    = bool(c.es_cliente_generico)
+
+        productos = []
+        for d in detalles:
+            prod  = db.query(Producto).filter(Producto.id == d.producto_id).first()
+            productos.append({
+                "detalle_id":      d.id,
+                "producto_id":     d.producto_id,
+                "nombre":          prod.nombre if prod else f"Producto #{d.producto_id}",
+                "cantidad":        d.cantidad,
+                "precio_unitario": round(float(d.precio_unitario or 0), 2),
+            })
+
+        resultado.append({
+            "venta_id":         v.id,
+            "fecha":            v.fecha.isoformat() if v.fecha else None,
+            "cliente_nombre":   cliente_nombre,
+            "cliente_telefono": cliente_telefono,
+            "cliente_id":       cliente_id,
+            "es_consumidor":    es_consumidor,
+            "total":            round(float(v.total or 0), 2),
+            "moneda":           v.moneda_venta,
+            "productos":        productos,
+        })
+
+    return resultado
+
+
+# ---------------------------------------------------------------------------
+# Devoluciones de clientes — registro nuevo (por detalle individual)
+# ---------------------------------------------------------------------------
+
+@router.post("/cliente/procesar")
+def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
+    """
+    Procesa una devolución de un producto individual.
+    Body: { detalle_id, producto_id, cantidad_devuelta, tipo,
+            producto_nuevo_id, monto_diferencia, direccion_diferencia,
+            metodo_pago, usuario, observacion }
+    """
+    detalle_id        = datos.get("detalle_id")
+    cantidad_dev      = float(datos.get("cantidad_devuelta", 1) or 1)
+    tipo              = datos.get("tipo", "reembolso")
+    producto_nuevo_id = datos.get("producto_nuevo_id")
+    monto_diferencia  = float(datos.get("monto_diferencia", 0) or 0)
+    dir_diferencia    = datos.get("direccion_diferencia", "ninguna")
+    metodo_pago       = datos.get("metodo_pago", "efectivo_usd")
+    usuario           = datos.get("usuario", "admin")
+    observacion       = datos.get("observacion", "")
+
+    if not detalle_id:
+        raise HTTPException(status_code=400, detail="detalle_id es requerido")
+    if tipo not in ("reembolso", "cambio", "credito"):
+        raise HTTPException(status_code=400, detail="tipo debe ser reembolso | cambio | credito")
+    if cantidad_dev <= 0:
+        raise HTTPException(status_code=400, detail="cantidad_devuelta debe ser > 0")
+
+    # ── Cargar detalle de venta ──────────────────────────────────────────────
+    detalle = db.query(DetalleVenta).filter(DetalleVenta.id == detalle_id).first()
+    if not detalle:
+        raise HTTPException(status_code=404, detail="Detalle de venta no encontrado")
+    if cantidad_dev > float(detalle.cantidad or 0):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No puede devolver más de {detalle.cantidad} unidad(es)"
+        )
+
+    # ── Cargar cliente vinculado ─────────────────────────────────────────────
+    vc      = db.query(VentaCliente).filter(VentaCliente.venta_id == detalle.venta_id).first()
+    cliente = None
+    if vc:
+        cliente = db.query(Cliente).filter(Cliente.id == vc.cliente_id).first()
+
+    # ── Producto original ────────────────────────────────────────────────────
+    prod_original   = db.query(Producto).filter(Producto.id == detalle.producto_id).first()
+    nombre_producto = prod_original.nombre if prod_original else f"Producto #{detalle.producto_id}"
+    precio_unitario = round(float(detalle.precio_unitario or 0), 2)
+    monto_devolucion = round(precio_unitario * cantidad_dev, 2)
+
+    # ── 1. Restaurar stock del producto original ─────────────────────────────
+    if prod_original:
+        prod_original.stock = int(float(prod_original.stock or 0)) + int(cantidad_dev)
+
+    ahora = datetime.now()
+
+    # ── 2. Lógica por tipo ───────────────────────────────────────────────────
+    METODOS_USD_SET = {"efectivo_usd", "zelle", "binance", "credito"}
+
+    if tipo == "reembolso":
+        # Egreso de caja — se devuelve dinero al cliente
+        cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+        moneda    = "USD" if metodo_pago in METODOS_USD_SET else "Bs"
+        db.add(MovimientoBancario(
+            fecha             = ahora,
+            tipo              = "devolucion_cliente",
+            cuenta_origen_id  = cuenta_id,
+            monto             = monto_devolucion,
+            moneda            = moneda,
+            concepto          = f"Reembolso devolución venta #{detalle.venta_id}",
+            categoria         = "devoluciones",
+            registrado_por    = usuario,
+            estado            = "registrado",
+        ))
+
+    elif tipo == "cambio":
+        # Descontar stock del producto nuevo
+        if producto_nuevo_id:
+            prod_nuevo = db.query(Producto).filter(Producto.id == producto_nuevo_id).first()
+            if prod_nuevo:
+                prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - int(cantidad_dev))
+
+        # Diferencia de precio
+        if dir_diferencia == "cobrar" and monto_diferencia > 0:
+            # Cliente paga la diferencia → ingreso de caja
+            cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+            db.add(MovimientoBancario(
+                fecha              = ahora,
+                tipo               = "ingreso_venta",
+                cuenta_destino_id  = cuenta_id,
+                monto              = round(monto_diferencia, 2),
+                moneda             = "USD",
+                concepto           = f"Cobro diferencia cambio venta #{detalle.venta_id}",
+                categoria          = "ventas",
+                registrado_por     = usuario,
+                estado             = "registrado",
+            ))
+        elif dir_diferencia == "devolver" and monto_diferencia > 0:
+            # Negocio devuelve diferencia → egreso de caja
+            cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+            db.add(MovimientoBancario(
+                fecha             = ahora,
+                tipo              = "devolucion_cliente",
+                cuenta_origen_id  = cuenta_id,
+                monto             = round(monto_diferencia, 2),
+                moneda            = "USD",
+                concepto          = f"Vuelto cambio devolución venta #{detalle.venta_id}",
+                categoria         = "devoluciones",
+                registrado_por    = usuario,
+                estado            = "registrado",
+            ))
+
+    elif tipo == "credito":
+        # Acreditar saldo_a_favor al cliente
+        if cliente and not cliente.es_cliente_generico:
+            cliente.saldo_a_favor = round(float(cliente.saldo_a_favor or 0) + monto_devolucion, 2)
+
+    # ── 3. Registrar DevolucionCliente + Detalle ─────────────────────────────
+    dev = DevolucionCliente(
+        venta_id        = detalle.venta_id,
+        cliente_id      = cliente.id if cliente else None,
+        usuario         = usuario,
+        motivo          = f"Devolución {tipo}",
+        tipo_resolucion = tipo,
+        monto_total     = monto_devolucion,
+        observacion     = observacion,
+    )
+    db.add(dev)
+    db.flush()
+
+    db.add(DetalleDevolucionCliente(
+        devolucion_id     = dev.id,
+        producto_id       = detalle.producto_id,
+        nombre_producto   = nombre_producto,
+        cantidad          = cantidad_dev,
+        precio_unitario   = precio_unitario,
+        vuelve_inventario = True,
+    ))
+
+    db.commit()
+    db.refresh(dev)
+
+    return {
+        "ok":            True,
+        "devolucion_id": dev.id,
+        "monto_total":   monto_devolucion,
+        "tipo":          tipo,
+        "saldo_a_favor": round(float(cliente.saldo_a_favor or 0), 2) if cliente else 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Devoluciones de clientes — historial (endpoint legado, se mantiene)
 # ---------------------------------------------------------------------------
 
 @router.get("/cliente/")
@@ -113,20 +372,16 @@ def registrar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
             vuelve_inventario = item.get("vuelve_inventario", True),
         )
         db.add(dd)
-
-        # Retornar al inventario si aplica
         if item.get("vuelve_inventario", True) and item.get("producto_id"):
             prod = db.query(Producto).filter(Producto.id == item["producto_id"]).first()
             if prod:
                 prod.stock += int(float(item.get("cantidad", 0)))
 
-    # Acreditar al cliente si es tipo crédito
     if datos.get("tipo_resolucion") == "credito" and datos.get("cliente_id"):
         cliente = db.query(Cliente).filter(Cliente.id == datos["cliente_id"]).first()
         if cliente:
             cliente.credito_disponible = round((cliente.credito_disponible or 0) + monto_total, 2)
 
-    # Si se devuelve dinero, registrar egreso en movimientos bancarios
     if datos.get("tipo_resolucion") == "dinero":
         moneda     = datos.get("moneda", "USD")
         nombre_caja = "Caja Ferreutil USD" if moneda == "USD" else "Caja Ferreutil Bs"
@@ -202,22 +457,19 @@ def registrar_devolucion_proveedor(datos: dict, db: Session = Depends(get_db)):
     db.add(dev)
     db.flush()
 
-    # Descontar stock inmediatamente
     if datos.get("producto_id"):
         prod = db.query(Producto).filter(Producto.id == datos["producto_id"]).first()
         if prod:
             prod.stock = max(0, prod.stock - int(cantidad))
 
-    # Si es crédito a favor: registrar en el proveedor
     if datos.get("tipo_resolucion") == "credito" and datos.get("proveedor_id"):
         prov = db.query(Proveedor).filter(Proveedor.id == datos["proveedor_id"]).first()
         if prov:
             prov.credito_disponible = round((prov.credito_disponible or 0) + monto_total, 2)
 
-    # Si es descuento en factura: descontar del monto de la recepción pendiente
     if datos.get("tipo_resolucion") == "descuento_factura" and datos.get("orden_compra_id"):
         recepcion = db.query(RecepcionCompra).filter(
-            RecepcionCompra.orden_id  == datos["orden_compra_id"],
+            RecepcionCompra.orden_id    == datos["orden_compra_id"],
             RecepcionCompra.estado_pago == "pendiente",
         ).first()
         if recepcion and recepcion.monto_factura:
