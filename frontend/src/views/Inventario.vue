@@ -19,6 +19,10 @@
               <button class="btn-cancelar-edicion" @click="cancelarModoEdicion">✕ Cancelar</button>
             </template>
           </template>
+          <button v-if="esAdmin" class="btn-gen-codigos" :disabled="generandoCodigos"
+            @click="generarCodigos">
+            {{ generandoCodigos ? 'Generando...' : '# Generar códigos' }}
+          </button>
           <button class="btn-nuevo" @click="abrirNuevoProducto">+ Nuevo producto</button>
         </div>
       </div>
@@ -902,6 +906,7 @@ export default {
       filasModificadas: new Set(),
       guardandoMasivo:  false,
       toastMasivo:      '',
+      generandoCodigos: false,
     }
   },
 
@@ -1189,6 +1194,19 @@ export default {
     mostrarToast(msg) {
       this.toastMasivo = msg
       setTimeout(() => { this.toastMasivo = '' }, 3000)
+    },
+    async generarCodigos() {
+      if (!confirm('¿Generar códigos automáticos para todos los productos sin código?')) return
+      this.generandoCodigos = true
+      try {
+        const res = await axios.post('/productos/generar-codigos-masivo')
+        await this.cargarProductos()
+        this.mostrarToast(`✓ ${res.data.actualizados} productos actualizados con código`)
+      } catch (e) {
+        this.mostrarToast('Error al generar códigos')
+      } finally {
+        this.generandoCodigos = false
+      }
     },
 
     // ── Paginación ────────────────────────────────────────────────────────────
@@ -1587,6 +1605,9 @@ export default {
 .top-acciones { display: flex; gap: 0.6rem; align-items: center; }
 .btn-deptos   { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; }
 .btn-deptos:hover { border-color: var(--amarillo); }
+.btn-gen-codigos { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 700; }
+.btn-gen-codigos:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-gen-codigos:not(:disabled):hover { background: #333; }
 .btn-importar { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.88rem; text-decoration: none; }
 .btn-importar:hover { border-color: var(--amarillo); color: var(--texto-principal); }
 

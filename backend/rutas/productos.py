@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database import get_db
 from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ from typing import Optional
 from datetime import date
 from rutas.usuarios import require_admin
 import io
+import re
 import pandas as pd
 
 router = APIRouter(prefix="/productos", tags=["productos"])
@@ -117,6 +119,23 @@ def _tasas_actuales(db: Session):
     bcv     = float(obj.tasa or 1)
     binance = float(obj.tasa_binance or bcv)
     return bcv, binance
+
+
+def _generar_codigo(nombre: str, db: Session) -> str:
+    """Genera un código único: 3 letras del nombre + número secuencial (ej: PAL-001)."""
+    prefijo = re.sub(r'[^A-Z]', '', nombre.upper())[:3].ljust(3, 'X')
+    patron  = f"{prefijo}-%"
+    usados  = {
+        p.codigo for p in
+        db.query(Producto.codigo).filter(Producto.codigo.like(patron)).all()
+        if p.codigo
+    }
+    n = 1
+    while True:
+        candidato = f"{prefijo}-{n:03d}"
+        if candidato not in usados:
+            return candidato
+        n += 1
 
 
 # ============================================================================
@@ -404,6 +423,7 @@ def listar_productos(
         q = q.filter(Producto.departamento_id == departamento_id)
     total = q.count()
     bcv, binance = _tasas_actuales(db)
+    q = q.order_by(func.length(Producto.nombre), Producto.nombre)
     productos = [_enriquecer(p, bcv, binance) for p in q.offset(skip).limit(limit).all()]
     return {"total": total, "productos": productos}
 
@@ -539,12 +559,31 @@ def crear_producto(
         existe = db.query(Producto).filter(Producto.codigo == producto.codigo).first()
         if existe:
             raise HTTPException(status_code=400, detail="Ya existe un producto con ese código")
-    nuevo = Producto(**producto.dict())
+    datos = producto.dict()
+    if not datos.get("codigo"):
+        datos["codigo"] = _generar_codigo(producto.nombre, db)
+    nuevo = Producto(**datos)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
     bcv, binance = _tasas_actuales(db)
     return _enriquecer(nuevo, bcv, binance)
+
+
+@router.post("/generar-codigos-masivo")
+def generar_codigos_masivo(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    sin_codigo = db.query(Producto).filter(
+        (Producto.codigo == None) | (Producto.codigo == "")
+    ).all()
+    actualizados = 0
+    for p in sin_codigo:
+        p.codigo = _generar_codigo(p.nombre, db)
+        actualizados += 1
+    db.commit()
+    return {"actualizados": actualizados}
 
 
 @router.get("/{producto_id}")
