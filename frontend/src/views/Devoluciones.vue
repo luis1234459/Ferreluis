@@ -294,7 +294,7 @@ export default {
     async cargarProductosProveedor() {
       if (!this.devProv.proveedor_id) { this.productosProveedor = []; return }
       const res = await axios.get('/productos/', { params: { proveedor_id: this.devProv.proveedor_id } })
-      this.productosProveedor = res.data
+      this.productosProveedor = Array.isArray(res.data) ? res.data : (res.data.productos || [])
     },
 
     seleccionarProductoProv() {

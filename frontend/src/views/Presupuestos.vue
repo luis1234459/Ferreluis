@@ -298,8 +298,8 @@ export default {
 
     async buscarProductos() {
       if (!this.busqProducto || this.busqProducto.length < 2) { this.productosSugeridos = []; return }
-      const res = await axios.get('/productos/', { params: { buscar: this.busqProducto, limit: 8 } })
-      this.productosSugeridos = res.data
+      const res = await axios.get('/productos/', { params: { busqueda: this.busqProducto, limit: 8 } })
+      this.productosSugeridos = Array.isArray(res.data) ? res.data : (res.data.productos || [])
     },
     precioProducto(p) {
       return parseFloat(p.costo_usd || 0) * (1 + parseFloat(p.margen || 0.30))
