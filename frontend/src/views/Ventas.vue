@@ -234,7 +234,7 @@
           <input
             v-model="busquedaClientes"
             @input="buscarEnTab"
-            placeholder="Buscar por nombre o teléfono..."
+            placeholder="Teléfono o nombre del cliente..."
             class="buscador"
           />
           <button class="btn-nuevo-cliente" @click="abrirDialogNuevo">+ Nuevo Cliente</button>
