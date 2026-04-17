@@ -134,11 +134,13 @@
                   {{ p.nombre }}
                   <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
                 </span>
-                <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
-                <span class="pi-ref">${{ precioRef(p).toFixed(2) }}</span>
-                <span class="pi-stock">{{ p.stock }}</span>
-                <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
-                <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
+                <span class="pi-precios">
+                  <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
+                  <span class="pi-ref">${{ precioRef(p).toFixed(2) }}</span>
+                  <span class="pi-stock">{{ p.stock }}</span>
+                  <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
+                  <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
+                </span>
               </div>
               <div v-if="productosFiltrados.length === 0" class="prod-sin-res">{{ busqueda.length < 2 ? 'Escribe 2+ caracteres para buscar' : 'Sin resultados' }}</div>
             </div>
@@ -1317,6 +1319,7 @@ export default {
 }
 .prod-item {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem 0.6rem;
@@ -1325,6 +1328,8 @@ export default {
   font-size: 0.82rem;
   position: relative;
   transition: background 0.08s;
+  width: 100%;
+  box-sizing: border-box;
 }
 .prod-item:last-child { border-bottom: none; }
 .prod-item:hover, .prod-item-resaltado { background: #FFCC00; }
@@ -1340,8 +1345,11 @@ export default {
 .prod-item-resaltado .cod-tag-v { background: #1A1A1A; color: #FFCC00; }
 .prod-item:hover .pi-base,
 .prod-item-resaltado .pi-base { display: inline; }
+.prod-item:hover .pi-precios,
+.prod-item-resaltado .pi-precios { color: #1A1A1A; }
 
 .pi-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--texto-principal); }
+.pi-precios { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
 .pi-bs     { color: #B08800; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-ref    { color: #16A34A; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-stock  { color: var(--texto-muted); font-size: 0.78rem; white-space: nowrap; }
