@@ -1348,8 +1348,22 @@ export default {
 .prod-item:hover .pi-precios,
 .prod-item-resaltado .pi-precios { color: #1A1A1A; }
 
-.pi-nombre { flex: 1; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--texto-principal); }
-.pi-precios { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.pi-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--texto-principal);
+}
+.pi-precios {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .pi-bs     { color: #B08800; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-ref    { color: #16A34A; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-stock  { color: var(--texto-muted); font-size: 0.78rem; white-space: nowrap; }
