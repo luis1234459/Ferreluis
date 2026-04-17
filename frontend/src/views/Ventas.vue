@@ -34,7 +34,7 @@
         Modo <strong>Precio Base USD</strong> — se aplicará descuento divisa. Requiere autorización.
       </div>
 
-      <!-- ── Navegación de pestañas ── -->
+      <!-- ── Tabs nav ── -->
       <div class="tabs-nav">
         <button :class="['tab-btn', tabActivo === 'venta' ? 'tab-activo' : '']"
           @click="tabActivo = 'venta'">Nueva Venta</button>
@@ -44,14 +44,11 @@
           @click="cambiarTab('historial')">Historial</button>
       </div>
 
-      <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- Tab: Nueva Venta                                                  -->
-      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════ Tab: Nueva Venta ══════════════════════════════ -->
       <div v-show="tabActivo === 'venta'">
 
-        <!-- 1. Selector de cliente (PRIMER paso, siempre visible) -->
+        <!-- Selector de cliente -->
         <div class="cliente-top">
-          <!-- Cliente ya seleccionado -->
           <div v-if="clienteSeleccionado" class="cliente-card">
             <span class="ck-check">✓</span>
             <span class="ck-nombre">{{ clienteSeleccionado.nombre }}</span>
@@ -72,7 +69,6 @@
             <button class="btn-cambiar-cliente" @click="quitarCliente">Cambiar cliente</button>
           </div>
 
-          <!-- Sin cliente seleccionado -->
           <div v-else class="cliente-selector-row">
             <div class="cliente-search-wrap">
               <input
@@ -104,15 +100,14 @@
           </div>
         </div>
 
-        <!-- Aviso si falta cliente -->
         <div v-if="!clienteSeleccionado" class="aviso-sin-cliente">
           Selecciona un cliente o usa <strong>Consumidor Final</strong> para comenzar la venta
         </div>
 
-        <!-- 2. Grid de venta (solo cuando hay cliente) -->
+        <!-- ── Grid 50/50 ── -->
         <div v-if="clienteSeleccionado" class="venta-grid">
 
-          <!-- ── Catálogo ── -->
+          <!-- ── Columna izq: Catálogo ── -->
           <div class="catalogo">
             <input
               v-model="busqueda"
@@ -125,50 +120,32 @@
               @keydown.enter.prevent="seleccionarResaltado"
               @keydown.escape="cerrarDropdown"
             />
-            <table>
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>P. Base</th>
-                  <th>P. Ref.</th>
-                  <th>Bs</th>
-                  <th>Stock</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody ref="tbodyCatalogo">
-                <tr
-                  v-for="(p, index) in productosFiltrados" :key="p.id"
-                  :class="{ 'fila-resaltada': index === indiceResaltado }"
-                  @mouseenter="indiceResaltado = index"
-                  @mouseleave="indiceResaltado = -1"
-                  @click="agregar(p); $refs.inputBuscador.focus()"
-                  style="cursor:pointer"
-                >
-                  <td>
-                    <span class="prod-nombre-v">{{ p.nombre }}</span>
-                    <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
-                    <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
-                  </td>
-                  <td class="txt-dim">${{ precioBase(p).toFixed(2) }}</td>
-                  <td :class="tipoPrecio === 'referencial' ? 'txt-green' : 'txt-dim'">
-                    ${{ precioRef(p).toFixed(2) }}
-                  </td>
-                  <td class="txt-yellow">Bs. {{ precioBs(p).toFixed(2) }}</td>
-                  <td :class="{ 'stock-bajo': p.stock < 5 }">{{ p.stock }}</td>
-                  <td><button class="btn-agregar" @click.stop="agregar(p); $refs.inputBuscador.focus()">+</button></td>
-                </tr>
-                <tr v-if="productosFiltrados.length === 0">
-                  <td colspan="6" class="sin-datos">Sin resultados</td>
-                </tr>
-              </tbody>
-            </table>
+
+            <!-- Lista compacta de productos -->
+            <div class="prod-list" ref="tbodyCatalogo">
+              <div
+                v-for="(p, index) in productosFiltrados" :key="p.id"
+                :class="['prod-item', index === indiceResaltado ? 'prod-item-resaltado' : '']"
+                @mouseenter="indiceResaltado = index"
+                @mouseleave="indiceResaltado = -1"
+                @click="agregar(p); $refs.inputBuscador.focus()"
+              >
+                <span class="pi-nombre">
+                  {{ p.nombre }}
+                  <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
+                </span>
+                <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
+                <span class="pi-ref">${{ precioRef(p).toFixed(2) }}</span>
+                <span class="pi-stock">{{ p.stock }}</span>
+                <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
+                <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
+              </div>
+              <div v-if="productosFiltrados.length === 0" class="prod-sin-res">Sin resultados</div>
+            </div>
           </div>
 
-          <!-- ── Panel derecho ── -->
-          <div class="panel-derecho">
-
-            <!-- Carrito -->
+          <!-- ── Columna der: Carrito ── -->
+          <div class="carrito-col">
             <div class="carrito-box">
               <h2>Carrito</h2>
               <div v-if="carrito.length === 0" class="vacio">Sin productos</div>
@@ -233,122 +210,25 @@
               </div>
             </div>
 
-            <!-- Cobro -->
-            <div class="cobro-box" v-if="carrito.length > 0">
-              <h2>Cobro</h2>
+            <!-- Botón abrir cobro -->
+            <button
+              class="btn-abrir-cobro"
+              @click="modalCobro = true"
+              :disabled="carrito.length === 0"
+              v-if="carrito.length > 0"
+            >✓ Registrar venta</button>
 
-              <div class="form-pago">
-                <div class="form-pago-row">
-                  <select v-model="nuevoMetodo" @change="onCambioMetodo">
-                    <optgroup label="— USD —">
-                      <option value="efectivo_usd">Efectivo $</option>
-                      <option value="zelle">Zelle</option>
-                      <option value="binance">Binance</option>
-                    </optgroup>
-                    <optgroup label="— Bolívares —">
-                      <option value="efectivo_bs">Efectivo Bs</option>
-                      <option value="transferencia_bs">Transferencia Bs</option>
-                      <option value="pago_movil">Pago Móvil</option>
-                      <option value="punto_banesco">Punto Banesco</option>
-                      <option value="punto_provincial">Punto Provincial</option>
-                    </optgroup>
-                    <optgroup label="— Crédito —" v-if="clienteSeleccionado && clienteSeleccionado.tiene_credito">
-                      <option value="credito">A crédito</option>
-                    </optgroup>
-                  </select>
-
-                  <select v-if="cuentasDelMetodo.length > 1"
-                    v-model="nuevaCuentaId" class="sel-cuenta">
-                    <option :value="null">— Cuenta destino —</option>
-                    <option v-for="c in cuentasDelMetodo" :key="c.id" :value="c.id">
-                      {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
-                    </option>
-                  </select>
-                  <span v-else-if="cuentasDelMetodo.length === 1" class="cuenta-unica">
-                    {{ cuentasDelMetodo[0].nombre }}
-                  </span>
-
-                  <div class="monto-wrap">
-                    <span class="moneda-tag">{{ nuevoMonedaPago === 'USD' ? '$' : 'Bs.' }}</span>
-                    <input v-model.number="nuevoMonto" type="number" min="0.01"
-                      step="0.01" placeholder="0.00" @input="calcularEquivPrevisualizacion" />
-                  </div>
-
-                  <button class="btn-agregar-pago" @click="agregarPago"
-                    :disabled="!nuevoMonto || nuevoMonto <= 0">
-                    + Agregar
-                  </button>
-                </div>
-
-                <input v-model="nuevaReferencia" placeholder="Referencia (opcional)"
-                  class="input-referencia" />
-
-                <div class="equiv-preview" v-if="nuevoMonto > 0 && nuevoEquivalente !== null">
-                  <span class="equiv-label">Equivale en {{ monedaVenta }}:</span>
-                  <span class="equiv-valor">{{ formatMonto(nuevoEquivalente, monedaVenta) }}</span>
-                  <span class="saldo-preview"
-                    :class="nuevoEquivalente > saldoPendiente + 0.01 ? 'exceso' : ''">
-                    (Saldo: {{ formatMonto(saldoPendiente, monedaVenta) }})
-                  </span>
-                </div>
-              </div>
-
-              <div class="lista-pagos" v-if="pagos.length > 0">
-                <div v-for="(p, i) in pagos" :key="i" class="pago-item">
-                  <div class="pago-izq">
-                    <span class="pago-metodo">{{ labelMetodo(p.metodo) }}</span>
-                    <span class="pago-monto">{{ p.moneda_pago === 'USD' ? '$' : 'Bs.' }}{{ p.monto_original.toFixed(2) }}</span>
-                    <span class="pago-equiv">= {{ formatMonto(p.monto_equivalente, monedaVenta) }} {{ monedaVenta }}</span>
-                    <span class="pago-ref" v-if="p.referencia">| {{ p.referencia }}</span>
-                  </div>
-                  <button class="btn-rm-pago" @click="quitarPago(i)">×</button>
-                </div>
-              </div>
-
-              <div class="resumen-cobro" v-if="pagos.length > 0">
-                <div class="resumen-fila"><span>Total:</span><strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong></div>
-                <div class="resumen-fila"><span>Abonado:</span><strong class="txt-verde">{{ formatMonto(totalAbonado, monedaVenta) }}</strong></div>
-                <div class="resumen-fila" v-if="saldoPendiente > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(saldoPendiente, monedaVenta) }}</strong></div>
-                <div class="resumen-fila" v-if="exceso > 0.01"><span>Vuelto:</span><strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong></div>
-              </div>
-
-              <div v-if="requiereAutorizacion" class="autorizacion-box">
-                <p class="aut-titulo">Se requiere autorización</p>
-                <ul class="aut-motivos">
-                  <li v-for="(m, i) in motivosAutorizacion" :key="i">{{ m }}</li>
-                </ul>
-                <input v-model="autorizacionClave" type="password"
-                  placeholder="Clave de autorización" />
-              </div>
-
-              <div class="field">
-                <label>Observación</label>
-                <input v-model="observacion" placeholder="Opcional..." />
-              </div>
-
-              <div class="btn-cobrar-grupo">
-                <button class="btn-cobrar-accion" @click="cobrar('solo')"
-                  :disabled="!pagoCompleto || cargando">✓</button>
-                <button class="btn-cobrar-accion" @click="cobrar('whatsapp')"
-                  :disabled="!pagoCompleto || cargando">✓ 💬</button>
-                <button class="btn-cobrar-accion" @click="cobrar('imprimir')"
-                  :disabled="!pagoCompleto || cargando">✓ 🖨️</button>
-              </div>
-
-              <div v-if="exitoso" class="venta-exito-row">
-                <p class="msg-exito">¡Venta #{{ ultimaVentaId }} registrada!</p>
-                <button class="btn-pdf" @click="imprimirPDF(ultimaVentaId)">🖨 Imprimir PDF</button>
-              </div>
-              <p class="msg-error" v-if="error">{{ error }}</p>
+            <!-- Éxito post-venta -->
+            <div v-if="exitoso" class="venta-exito-row">
+              <p class="msg-exito">¡Venta #{{ ultimaVentaId }} registrada!</p>
+              <button class="btn-pdf" @click="imprimirPDF(ultimaVentaId)">🖨 Imprimir PDF</button>
             </div>
+          </div>
 
-          </div><!-- /panel-derecho -->
         </div><!-- /venta-grid -->
       </div><!-- /tab venta -->
 
-      <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- Tab: Clientes                                                     -->
-      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════ Tab: Clientes ══════════════════════════════ -->
       <div v-show="tabActivo === 'clientes'" class="tab-clientes">
         <div class="tc-header">
           <input
@@ -406,9 +286,7 @@
         </div>
       </div>
 
-      <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- Tab: Historial                                                    -->
-      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════ Tab: Historial ══════════════════════════════ -->
       <div v-show="tabActivo === 'historial'" class="tab-historial">
         <div class="th-header">
           <span class="th-subtitulo">Ventas de hoy</span>
@@ -445,9 +323,7 @@
         </div>
       </div>
 
-      <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- Dialog: Nuevo Cliente                                             -->
-      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- ══════════════════════════════ Dialog: Nuevo Cliente ══════════════════════════════ -->
       <div class="dialog-overlay" v-if="dialogNuevoCliente" @click.self="cerrarDialog">
         <div class="dialog">
           <div class="dialog-header">
@@ -496,7 +372,6 @@
               />
             </div>
 
-            <!-- Teléfono duplicado -->
             <div v-if="telefonoDuplicado" class="aviso-duplicado">
               <p>⚠ Ya existe un cliente con ese teléfono: <strong>{{ telefonoDuplicado.nombre }}</strong></p>
               <div class="duplicado-btns">
@@ -516,7 +391,7 @@
         </div>
       </div>
 
-      <!-- Popup ubicaciones producto -->
+      <!-- Popup ubicaciones -->
       <div class="ubic-pop-overlay" v-if="ubicPop" @click.self="ubicPop = null">
         <div class="ubic-pop">
           <div class="ubic-pop-header">
@@ -540,6 +415,129 @@
       </div>
 
     </main>
+
+    <!-- ══════════════════════════════ Modal: Cobro ══════════════════════════════ -->
+    <div class="cobro-modal-overlay" v-if="modalCobro" @click.self="modalCobro = false">
+      <div class="cobro-modal">
+
+        <div class="cobro-modal-header">
+          <h3>Cobro</h3>
+          <button class="cobro-modal-cerrar" @click="modalCobro = false">✕</button>
+        </div>
+
+        <div class="cobro-modal-resumen">
+          <span>Total a cobrar:</span>
+          <strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong>
+        </div>
+
+        <!-- Formulario de pago -->
+        <div class="cobro-modal-body">
+          <div class="form-pago">
+            <div class="form-pago-row">
+              <select v-model="nuevoMetodo" @change="onCambioMetodo">
+                <optgroup label="— USD —">
+                  <option value="efectivo_usd">Efectivo $</option>
+                  <option value="zelle">Zelle</option>
+                  <option value="binance">Binance</option>
+                </optgroup>
+                <optgroup label="— Bolívares —">
+                  <option value="efectivo_bs">Efectivo Bs</option>
+                  <option value="transferencia_bs">Transferencia Bs</option>
+                  <option value="pago_movil">Pago Móvil</option>
+                  <option value="punto_banesco">Punto Banesco</option>
+                  <option value="punto_provincial">Punto Provincial</option>
+                </optgroup>
+                <optgroup label="— Crédito —" v-if="clienteSeleccionado && clienteSeleccionado.tiene_credito">
+                  <option value="credito">A crédito</option>
+                </optgroup>
+              </select>
+
+              <select v-if="cuentasDelMetodo.length > 1"
+                v-model="nuevaCuentaId" class="sel-cuenta">
+                <option :value="null">— Cuenta destino —</option>
+                <option v-for="c in cuentasDelMetodo" :key="c.id" :value="c.id">
+                  {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+                </option>
+              </select>
+              <span v-else-if="cuentasDelMetodo.length === 1" class="cuenta-unica">
+                {{ cuentasDelMetodo[0].nombre }}
+              </span>
+
+              <div class="monto-wrap">
+                <span class="moneda-tag">{{ nuevoMonedaPago === 'USD' ? '$' : 'Bs.' }}</span>
+                <input v-model.number="nuevoMonto" type="number" min="0.01"
+                  step="0.01" placeholder="0.00" @input="calcularEquivPrevisualizacion" />
+              </div>
+
+              <button class="btn-agregar-pago" @click="agregarPago"
+                :disabled="!nuevoMonto || nuevoMonto <= 0">
+                + Agregar
+              </button>
+            </div>
+
+            <input v-model="nuevaReferencia" placeholder="Referencia (opcional)"
+              class="input-referencia" />
+
+            <div class="equiv-preview" v-if="nuevoMonto > 0 && nuevoEquivalente !== null">
+              <span class="equiv-label">Equivale en {{ monedaVenta }}:</span>
+              <span class="equiv-valor">{{ formatMonto(nuevoEquivalente, monedaVenta) }}</span>
+              <span class="saldo-preview"
+                :class="nuevoEquivalente > saldoPendiente + 0.01 ? 'exceso' : ''">
+                (Saldo: {{ formatMonto(saldoPendiente, monedaVenta) }})
+              </span>
+            </div>
+          </div>
+
+          <div class="lista-pagos" v-if="pagos.length > 0">
+            <div v-for="(p, i) in pagos" :key="i" class="pago-item">
+              <div class="pago-izq">
+                <span class="pago-metodo">{{ labelMetodo(p.metodo) }}</span>
+                <span class="pago-monto">{{ p.moneda_pago === 'USD' ? '$' : 'Bs.' }}{{ p.monto_original.toFixed(2) }}</span>
+                <span class="pago-equiv">= {{ formatMonto(p.monto_equivalente, monedaVenta) }} {{ monedaVenta }}</span>
+                <span class="pago-ref" v-if="p.referencia">| {{ p.referencia }}</span>
+              </div>
+              <button class="btn-rm-pago" @click="quitarPago(i)">×</button>
+            </div>
+          </div>
+
+          <div class="resumen-cobro" v-if="pagos.length > 0">
+            <div class="resumen-fila"><span>Total:</span><strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong></div>
+            <div class="resumen-fila"><span>Abonado:</span><strong class="txt-verde">{{ formatMonto(totalAbonado, monedaVenta) }}</strong></div>
+            <div class="resumen-fila" v-if="saldoPendiente > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(saldoPendiente, monedaVenta) }}</strong></div>
+            <div class="resumen-fila" v-if="exceso > 0.01"><span>Vuelto:</span><strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong></div>
+          </div>
+
+          <div v-if="requiereAutorizacion" class="autorizacion-box">
+            <p class="aut-titulo">Se requiere autorización</p>
+            <ul class="aut-motivos">
+              <li v-for="(m, i) in motivosAutorizacion" :key="i">{{ m }}</li>
+            </ul>
+            <input v-model="autorizacionClave" type="password"
+              placeholder="Clave de autorización" />
+          </div>
+
+          <div class="field">
+            <label>Observación</label>
+            <input v-model="observacion" placeholder="Opcional..." />
+          </div>
+
+          <p class="msg-error" v-if="error">{{ error }}</p>
+        </div>
+
+        <div class="cobro-modal-footer">
+          <button class="btn-cancelar-cobro" @click="modalCobro = false">✕ Cancelar</button>
+          <div class="btn-cobrar-grupo">
+            <button class="btn-cobrar-accion" @click="cobrar('solo')"
+              :disabled="!pagoCompleto || cargando" title="Registrar">✓</button>
+            <button class="btn-cobrar-accion" @click="cobrar('whatsapp')"
+              :disabled="!pagoCompleto || cargando" title="Registrar y enviar WhatsApp">✓ 💬</button>
+            <button class="btn-cobrar-accion" @click="cobrar('imprimir')"
+              :disabled="!pagoCompleto || cargando" title="Registrar e imprimir">✓ 🖨️</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- Nota de entrega para impresión -->
     <div id="nota-print" v-if="notaImpresion">
@@ -629,12 +627,15 @@ export default {
       clienteSeleccionado: null,
       clienteTimer:        null,
 
-      // Estado de la venta
+      // Estado
       cargando:      false,
       exitoso:       false,
       error:         '',
       ultimaVentaId: null,
       cuentasPorMetodo: {},
+
+      // Modal cobro
+      modalCobro: false,
 
       // Tabs
       tabActivo: 'venta',
@@ -661,7 +662,7 @@ export default {
       ubicaciones:    [],
       ubicPopCargando: false,
 
-      // Nota de entrega para impresión
+      // Nota de entrega
       notaImpresion: null,
     }
   },
@@ -674,7 +675,6 @@ export default {
     productosFiltrados() {
       const q = this.busqueda.toLowerCase()
       if (!q) return this.productos
-      // Priorizar coincidencia exacta de código (útil para lectores de barras)
       const exactCodigo = this.productos.filter(p =>
         p.codigo && p.codigo.toLowerCase() === q
       )
@@ -725,7 +725,7 @@ export default {
         return Array.isArray(p) ? p.includes(modulo) : true
       }
     },
-    cuentasDelMetodo()     { return this.cuentasPorMetodo[this.nuevoMetodo] || [] },
+    cuentasDelMetodo() { return this.cuentasPorMetodo[this.nuevoMetodo] || [] },
   },
   watch: {
     busqueda() {
@@ -742,7 +742,6 @@ export default {
     ])
   },
   methods: {
-    // ── Carga inicial ─────────────────────────────────────────────────────────
     async cargarProductos() {
       const params = { limit: 100 }
       if (this.busqueda) params.busqueda = this.busqueda
@@ -753,7 +752,7 @@ export default {
       try {
         const r = await axios.get('/bancos/metodos-pago/cuentas')
         this.cuentasPorMetodo = r.data
-      } catch { /* módulo bancario aún no configurado */ }
+      } catch { /* módulo bancario no configurado */ }
     },
     async cargarTasa() {
       const r = await axios.get('/tasa/')
@@ -762,13 +761,11 @@ export default {
       this.factor      = r.data.factor || 1
     },
 
-    // ── Precios ───────────────────────────────────────────────────────────────
     precioBase(p)     { return Number(p.costo_usd || 0) * (1 + Number(p.margen || 0)) },
     precioRef(p)      { return this.precioBase(p) * this.factor },
     precioBs(p)       { return this.precioBase(p) * (this.tasaBinance || 0) },
     precioParaTier(p) { return this.tipoPrecio === 'base' ? this.precioBase(p) : this.precioRef(p) },
 
-    // ── Carrito ───────────────────────────────────────────────────────────────
     cambiarTipoPrecio(nuevo) {
       this.tipoPrecio = nuevo
       this.carrito.forEach(item => {
@@ -812,7 +809,6 @@ export default {
       return Number(item.precio_unitario) < Number(item.precio_original) - TOLERANCIA
     },
 
-    // ── Pagos ─────────────────────────────────────────────────────────────────
     labelMetodo(metodo) { return LABELS[metodo] || metodo },
     calcularEquivalente(monto, monedaPago) {
       if (!this.tasaBcv && monedaPago !== this.monedaVenta) return null
@@ -838,13 +834,10 @@ export default {
       const monto = Number(this.nuevoMonto || 0)
       if (monto <= 0) { this.error = 'El monto debe ser mayor a cero'; return }
 
-      // Pago a crédito — tratamiento especial
       if (this.nuevoMetodo === 'credito') {
         if (!this.clienteSeleccionado || !this.clienteSeleccionado.tiene_credito) {
-          this.error = 'El cliente no tiene crédito habilitado'
-          return
+          this.error = 'El cliente no tiene crédito habilitado'; return
         }
-        // Calcular equivalente como si fuera USD (o convertir si venta en Bs)
         const equivalente = this.monedaVenta === 'USD'
           ? monto
           : (this.tasaBcv ? Number((monto * this.tasaBcv).toFixed(2)) : monto)
@@ -859,24 +852,18 @@ export default {
         }
         this.error = ''
         this.pagos.push({
-          metodo:            'credito',
-          moneda_pago:       'USD',
-          monto_original:    monto,
-          monto_equivalente: equivalente,
-          referencia:        '',
-          cuenta_destino_id: null,
-          cuenta_nombre:     null,
+          metodo: 'credito', moneda_pago: 'USD',
+          monto_original: monto, monto_equivalente: equivalente,
+          referencia: '', cuenta_destino_id: null, cuenta_nombre: null,
         })
-        this.nuevoMonto       = ''
-        this.nuevoEquivalente = null
+        this.nuevoMonto = ''; this.nuevoEquivalente = null
         return
       }
 
       const monedaPago  = this.nuevoMonedaPago
       const equivalente = this.calcularEquivalente(monto, monedaPago)
       if (equivalente === null) {
-        this.error = 'No se puede calcular el equivalente. Verifica la tasa.'
-        return
+        this.error = 'No se puede calcular el equivalente. Verifica la tasa.'; return
       }
 
       const esEfectivo = ['efectivo_usd', 'efectivo_bs'].includes(this.nuevoMetodo)
@@ -885,38 +872,30 @@ export default {
         return
       }
 
-      const cuentas  = this.cuentasDelMetodo
+      const cuentas = this.cuentasDelMetodo
       if (cuentas.length > 1 && !this.nuevaCuentaId) {
-        this.error = `Debes seleccionar la cuenta destino para ${this.nuevoMetodo}`
-        return
+        this.error = `Debes seleccionar la cuenta destino para ${this.nuevoMetodo}`; return
       }
       const cuentaId     = this.nuevaCuentaId || (cuentas.length === 1 ? cuentas[0].id : null)
       const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre || null
 
       this.error = ''
       this.pagos.push({
-        metodo:            this.nuevoMetodo,
-        moneda_pago:       monedaPago,
-        monto_original:    monto,
-        monto_equivalente: equivalente,
-        referencia:        this.nuevaReferencia,
-        cuenta_destino_id: cuentaId,
-        cuenta_nombre:     cuentaNombre,
+        metodo: this.nuevoMetodo, moneda_pago: monedaPago,
+        monto_original: monto, monto_equivalente: equivalente,
+        referencia: this.nuevaReferencia,
+        cuenta_destino_id: cuentaId, cuenta_nombre: cuentaNombre,
       })
-      this.nuevoMonto       = ''
-      this.nuevoEquivalente = null
-      this.nuevaReferencia  = ''
+      this.nuevoMonto = ''; this.nuevoEquivalente = null; this.nuevaReferencia = ''
     },
     quitarPago(i) { this.pagos.splice(i, 1) },
 
-    // ── Cliente ───────────────────────────────────────────────────────────────
     buscarCliente() {
       clearTimeout(this.clienteTimer)
       if (this.clienteBusqueda.length < 2) { this.clienteResultados = []; return }
       this.clienteTimer = setTimeout(async () => {
         try {
-          const res = await axios.get('/clientes/buscar-rapido',
-            { params: { q: this.clienteBusqueda } })
+          const res = await axios.get('/clientes/buscar-rapido', { params: { q: this.clienteBusqueda } })
           this.clienteResultados = res.data
         } catch { /* ignorar */ }
       }, 200)
@@ -940,7 +919,6 @@ export default {
       }
     },
 
-    // ── Dialog Nuevo Cliente ──────────────────────────────────────────────────
     abrirDialogNuevo() {
       this.nuevoCliente      = { nombre: '', telefono: '', tipo_cliente: 'natural', rif_cedula: '' }
       this.errorCliente      = ''
@@ -954,17 +932,9 @@ export default {
       this.telefonoDuplicado  = null
     },
     async guardarNuevoCliente() {
-      if (!this.nuevoCliente.nombre.trim()) {
-        this.errorCliente = 'El nombre es requerido'
-        return
-      }
-      if (!this.nuevoCliente.telefono.trim()) {
-        this.errorCliente = 'El teléfono es requerido'
-        return
-      }
-      this.guardandoCliente  = true
-      this.errorCliente      = ''
-      this.telefonoDuplicado = null
+      if (!this.nuevoCliente.nombre.trim()) { this.errorCliente = 'El nombre es requerido'; return }
+      if (!this.nuevoCliente.telefono.trim()) { this.errorCliente = 'El teléfono es requerido'; return }
+      this.guardandoCliente = true; this.errorCliente = ''; this.telefonoDuplicado = null
       try {
         const res = await axios.post('/clientes/', this.nuevoCliente)
         this.cerrarDialog()
@@ -991,7 +961,6 @@ export default {
       }
     },
 
-    // ── Tabs ──────────────────────────────────────────────────────────────────
     cambiarTab(tab) {
       this.tabActivo = tab
       if (tab === 'clientes') this.cargarClientesRecientes()
@@ -1006,13 +975,11 @@ export default {
     buscarEnTab() {
       clearTimeout(this.busquedaTabTimer)
       if (!this.busquedaClientes || this.busquedaClientes.length < 2) {
-        this.resultadosClientes = []
-        return
+        this.resultadosClientes = []; return
       }
       this.busquedaTabTimer = setTimeout(async () => {
         try {
-          const res = await axios.get('/clientes/buscar-rapido',
-            { params: { q: this.busquedaClientes } })
+          const res = await axios.get('/clientes/buscar-rapido', { params: { q: this.busquedaClientes } })
           this.resultadosClientes = res.data
         } catch { this.resultadosClientes = [] }
       }, 200)
@@ -1030,13 +997,12 @@ export default {
       finally { this.cargandoHistorial = false }
     },
 
-    // ── Confirmar venta ───────────────────────────────────────────────────────
     async cobrar(accion = 'solo') {
       this.error = ''
-      if (!this.pagoCompleto)        { this.error = 'El cobro no cubre el total'; return }
+      if (!this.pagoCompleto)       { this.error = 'El cobro no cubre el total'; return }
       if (this.requiereAutorizacion && !this.autorizacionClave)
-                                     { this.error = 'Ingresa la clave de autorización'; return }
-      if (!this.tasaBcv)             { this.error = 'No hay tasa definida. Ve a Tasa BCV.'; return }
+                                    { this.error = 'Ingresa la clave de autorización'; return }
+      if (!this.tasaBcv)            { this.error = 'No hay tasa definida. Ve a Tasa BCV.'; return }
 
       this.cargando = true
       try {
@@ -1064,31 +1030,23 @@ export default {
         const res = await axios.post('/ventas/', payload)
         this.ultimaVentaId = res.data.venta_id
         this.exitoso       = true
+        this.modalCobro    = false
 
-        // Snapshot ANTES de limpiar
         const snapshotProductos = this.carrito.map(item => ({
-          nombre:          item.nombre,
-          cantidad:        Number(item.cantidad),
-          precio_unitario: Number(item.precio_unitario),
+          nombre: item.nombre, cantidad: Number(item.cantidad), precio_unitario: Number(item.precio_unitario),
         }))
-        const snapshotCliente  = this.clienteSeleccionado
-        const snapshotTasaBcv  = this.tasaBcv
-        const snapshotTotalBs  = this.subtotalUSD * (this.tasaBcv || 1)
-        const snapshotVentaId  = res.data.venta_id
+        const snapshotCliente = this.clienteSeleccionado
+        const snapshotTasaBcv = this.tasaBcv
+        const snapshotTotalBs = this.subtotalUSD * (this.tasaBcv || 1)
+        const snapshotVentaId = res.data.venta_id
 
-        // Limpiar estado de la venta
-        this.carrito             = []
-        this.pagos               = []
-        this.descuentoGlobal     = 0
-        this.autorizacionClave   = ''
-        this.observacion         = ''
-        this.clienteSeleccionado = null
-        this.nuevoMonto          = ''
+        this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
+        this.autorizacionClave = ''; this.observacion = ''
+        this.clienteSeleccionado = null; this.nuevoMonto = ''
 
         setTimeout(() => { this.exitoso = false }, 5000)
         await this.cargarProductos()
 
-        // ── Acciones post-venta ───────────────────────────────────────────────
         if (accion === 'whatsapp') {
           const nombre  = snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final'
           const fecha   = new Date().toLocaleDateString('es-VE')
@@ -1105,18 +1063,16 @@ export default {
               }
             }
           }
-          if (num) {
-            window.open(`https://wa.me/${num}?text=${mensaje}`, '_blank')
-          }
+          if (num) window.open(`https://wa.me/${num}?text=${mensaje}`, '_blank')
 
         } else if (accion === 'imprimir') {
           this.notaImpresion = {
-            ventaId:     snapshotVentaId,
+            ventaId: snapshotVentaId,
             clienteNombre: snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final',
-            fecha:       new Date().toLocaleDateString('es-VE'),
-            productos:   snapshotProductos,
-            totalBs:     Number(snapshotTotalBs),
-            tasaBcv:     Number(snapshotTasaBcv),
+            fecha:   new Date().toLocaleDateString('es-VE'),
+            productos: snapshotProductos,
+            totalBs: Number(snapshotTotalBs),
+            tasaBcv: Number(snapshotTasaBcv),
           }
           await this.$nextTick()
           window.print()
@@ -1130,7 +1086,6 @@ export default {
       }
     },
 
-    // ── Utilidades ────────────────────────────────────────────────────────────
     formatMonto(valor, moneda) {
       if (moneda === 'USD') return `$${Number(valor).toFixed(2)}`
       return `Bs. ${Number(valor).toFixed(2)}`
@@ -1144,9 +1099,7 @@ export default {
       }
     },
     async abrirUbicPop(p) {
-      this.ubicPop        = p
-      this.ubicaciones    = []
-      this.ubicPopCargando = true
+      this.ubicPop = p; this.ubicaciones = []; this.ubicPopCargando = true
       try {
         const res = await axios.get(`/ubicaciones/producto/${p.id}`)
         this.ubicaciones = res.data
@@ -1154,7 +1107,6 @@ export default {
       this.ubicPopCargando = false
     },
 
-    // ── Navegación teclado en catálogo ───────────────────────────────────────
     moverAbajo() {
       const max = this.productosFiltrados.length - 1
       if (max < 0) return
@@ -1179,9 +1131,9 @@ export default {
     },
     _scrollResaltado() {
       this.$nextTick(() => {
-        const tbody = this.$refs.tbodyCatalogo
-        if (!tbody) return
-        const fila = tbody.children[this.indiceResaltado]
+        const cont = this.$refs.tbodyCatalogo
+        if (!cont) return
+        const fila = cont.children[this.indiceResaltado]
         if (fila) fila.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
       })
     },
@@ -1195,7 +1147,7 @@ export default {
 </script>
 
 <style scoped>
-/* ── Top bar extras ── */
+/* ── Top bar ── */
 .top-meta { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
 .selector-group { display: flex; align-items: center; gap: 0.4rem; }
 .selector-label { color: #555555; font-size: 0.88rem; font-weight: 600; }
@@ -1243,30 +1195,67 @@ export default {
 .aviso-sin-cliente { background: var(--fondo-tabla-alt); border: 1px dashed var(--borde); color: var(--texto-sec); border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 1rem; font-size: 0.95rem; }
 .aviso-sin-cliente strong { color: var(--texto-principal); }
 
-/* ── Grid de venta ── */
-.venta-grid { display: grid; grid-template-columns: 1fr 420px; gap: 1.5rem; }
+/* ── Grid 50/50 ── */
+.venta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
 
-/* ── Catálogo ── */
-.catalogo { background: #FFFFFF; border-radius: 12px; padding: 1rem; border: 1px solid var(--borde); }
-.buscador { width: 100%; padding: 0.6rem 1rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 8px; margin-bottom: 0.75rem; box-sizing: border-box; }
+/* ── Catálogo (col izq) ── */
+.catalogo { background: #FFFFFF; border-radius: 12px; padding: 0.85rem; border: 1px solid var(--borde); }
+.buscador { width: 100%; padding: 0.55rem 0.9rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 8px; margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.9rem; }
+
+/* Lista compacta de productos */
+.prod-list {
+  max-height: calc(100vh - 320px);
+  min-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+.prod-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--borde-suave);
+  font-size: 0.88rem;
+  position: relative;
+  transition: background 0.08s;
+}
+.prod-item:last-child { border-bottom: none; }
+.prod-item:hover, .prod-item-resaltado { background: #FFCC00; }
+.prod-item:hover .pi-nombre,
+.prod-item:hover .pi-bs,
+.prod-item:hover .pi-ref,
+.prod-item:hover .pi-stock,
+.prod-item-resaltado .pi-nombre,
+.prod-item-resaltado .pi-bs,
+.prod-item-resaltado .pi-ref,
+.prod-item-resaltado .pi-stock { color: #1A1A1A !important; }
+.prod-item:hover .cod-tag-v,
+.prod-item-resaltado .cod-tag-v { background: #1A1A1A; color: #FFCC00; }
+.prod-item:hover .pi-base,
+.prod-item-resaltado .pi-base { display: inline; }
+
+.pi-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--texto-principal); }
+.pi-bs     { color: #B08800; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
+.pi-ref    { color: #16A34A; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
+.pi-stock  { color: var(--texto-muted); font-size: 0.78rem; white-space: nowrap; }
+.pi-base   { color: var(--texto-muted); font-size: 0.75rem; display: none; white-space: nowrap; }
+
+.prod-sin-res { text-align: center; color: var(--texto-muted); padding: 1.5rem 0; font-size: 0.88rem; }
 .txt-dim { color: var(--texto-muted); }
-.stock-bajo { color: var(--danger) !important; }
 .sin-datos { text-align: center; color: var(--texto-muted); padding: 1.5rem 0; }
-.btn-agregar { background: #1A1A1A; color: #FFCC00; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
-.fila-resaltada td { background: #FFCC00 !important; color: #1A1A1A !important; }
-.fila-resaltada .txt-dim,
-.fila-resaltada .txt-green,
-.fila-resaltada .txt-yellow,
-.fila-resaltada .stock-bajo { color: #1A1A1A !important; }
-.fila-resaltada .btn-agregar { background: #1A1A1A; color: #FFCC00; }
-.fila-resaltada .cod-tag-v   { background: #1A1A1A; color: #FFCC00; }
 
-/* ── Panel derecho ── */
-.panel-derecho { display: flex; flex-direction: column; gap: 1rem; }
+/* ── Carrito (col der) ── */
+.carrito-col { display: flex; flex-direction: column; gap: 0.75rem; }
 
-/* ── Carrito ── */
-.carrito-box { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; border: 1px solid var(--borde); }
-.carrito-box h2 { color: var(--texto-principal); margin: 0 0 1rem; font-size: 1rem; font-weight: 700; }
+.carrito-box { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; border: 1px solid var(--borde); max-height: calc(100vh - 280px); overflow-y: auto; }
+.carrito-box h2 { color: var(--texto-principal); margin: 0 0 1rem; font-size: 1rem; font-weight: 700; position: sticky; top: 0; background: #FFFFFF; padding-bottom: 0.5rem; border-bottom: 1px solid var(--borde-suave); }
 .vacio { color: var(--texto-muted); text-align: center; padding: 1.5rem 0; font-size: 0.9rem; }
 
 .item { border-bottom: 1px solid var(--borde-suave); padding: 0.75rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -1295,10 +1284,105 @@ export default {
 .descuento-global label { color: var(--texto-sec); font-size: 0.82rem; display: block; margin-bottom: 0.25rem; font-weight: 600; }
 .descuento-global input { width: 100%; padding: 0.4rem 0.6rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; box-sizing: border-box; }
 
-/* ── Cobro ── */
-.cobro-box { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; border: 1px solid var(--borde); }
-.cobro-box h2 { color: var(--texto-principal); margin: 0 0 1rem; font-size: 1rem; font-weight: 700; }
+/* Botón abrir cobro */
+.btn-abrir-cobro {
+  width: 100%;
+  padding: 0.9rem;
+  background: #1A1A1A;
+  color: #FFCC00;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.15s;
+}
+.btn-abrir-cobro:hover { background: #333333; }
+.btn-abrir-cobro:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* Éxito post-venta */
+.venta-exito-row { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; padding: 0.75rem; background: #F0FDF4; border: 1px solid #16A34A33; border-radius: 8px; }
+.msg-exito { color: #16A34A; font-weight: 600; margin: 0; font-size: 0.9rem; }
+.btn-pdf { background: var(--success); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; }
+
+/* ── Modal Cobro ── */
+.cobro-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.cobro-modal {
+  background: #FAFAF7;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+}
+.cobro-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem 0.85rem;
+  border-bottom: 1px solid var(--borde);
+  background: #FFFFFF;
+  border-radius: 14px 14px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.cobro-modal-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #1A1A1A; }
+.cobro-modal-cerrar { background: transparent; border: none; font-size: 1.1rem; cursor: pointer; color: var(--texto-muted); padding: 0.2rem 0.45rem; border-radius: 4px; }
+.cobro-modal-cerrar:hover { background: #F3F4F6; color: #1A1A1A; }
+
+.cobro-modal-resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  background: #1A1A1A;
+  color: #FFCC00;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.cobro-modal-resumen strong { font-size: 1.1rem; }
+
+.cobro-modal-body { padding: 0.75rem 1.25rem; flex: 1; }
+
+.cobro-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--borde);
+  background: #FFFFFF;
+  border-radius: 0 0 14px 14px;
+  position: sticky;
+  bottom: 0;
+}
+.btn-cancelar-cobro {
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: 1px solid var(--borde);
+  color: var(--texto-sec);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.btn-cancelar-cobro:hover { border-color: #DC2626; color: #DC2626; }
+
+/* Formulario de pago en modal */
 .form-pago { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
 .form-pago-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .form-pago select { flex: 1; min-width: 140px; padding: 0.5rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; font-size: 0.88rem; }
@@ -1326,8 +1410,8 @@ export default {
 
 .resumen-cobro { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; border: 1px solid var(--borde); }
 .resumen-fila { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--texto-sec); font-size: 0.9rem; }
-.txt-verde  { color: #16A34A; font-weight: 600; }
-.txt-rojo   { color: #DC2626; font-weight: 600; }
+.txt-verde   { color: #16A34A; font-weight: 600; }
+.txt-rojo    { color: #DC2626; font-weight: 600; }
 .txt-amarillo { color: #996600; font-weight: 600; }
 
 .autorizacion-box { background: #FFF7ED; border: 1px solid #F59E0B; border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; }
@@ -1339,44 +1423,32 @@ export default {
 .field label { color: var(--texto-sec); font-size: 0.85rem; display: block; margin-bottom: 0.25rem; font-weight: 600; }
 .field input { width: 100%; padding: 0.5rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; box-sizing: border-box; }
 
-.btn-cobrar-grupo { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.btn-cobrar-accion { flex: 1; padding: 0.85rem; background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
+.btn-cobrar-grupo { display: flex; gap: 0.5rem; }
+.btn-cobrar-accion { flex: 1; padding: 0.75rem; background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; cursor: pointer; font-size: 1.05rem; font-weight: 700; }
 .btn-cobrar-accion:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-cobrar-accion:not(:disabled):hover { background: #333; }
 
-/* ── Nota de entrega (solo visible al imprimir) ── */
-#nota-print { display: none; font-family: Arial, sans-serif; padding: 20px; background: #fff; color: #000; width: 520px; }
-.np-encabezado { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-.np-empresa    { font-size: 1.3rem; font-weight: 900; margin: 0; letter-spacing: 0.05em; }
-.np-subtitulo  { font-size: 0.9rem; margin: 4px 0 0; color: #444; }
-.np-datos      { margin-bottom: 14px; font-size: 0.88rem; line-height: 1.7; }
-.np-datos p    { margin: 0; }
-.np-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 14px; }
-.np-tabla th { background: #1A1A1A; color: #FFCC00; padding: 6px 8px; text-align: left; }
-.np-th-num    { text-align: right !important; }
-.np-tabla td  { padding: 5px 8px; border-bottom: 1px solid #ddd; }
-.np-td-num    { text-align: right; }
-.np-tabla tbody tr:nth-child(even) { background: #F5F5F0; }
-.np-total { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
-
-@media print {
-  body > * { display: none !important; }
-  #app      { display: none !important; }
-  #nota-print {
-    display: block !important;
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    padding: 20px !important;
-    z-index: 99999 !important;
-  }
-}
-.venta-exito-row { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap; }
-.msg-exito { color: #16A34A; font-weight: 600; margin: 0; }
-.btn-pdf { background: var(--success); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+.msg-error { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
 .sel-cuenta { padding: 0.4rem 0.6rem; background: #FFFFFF; border: 1px solid var(--borde); color: var(--texto-principal); border-radius: 6px; font-size: 0.82rem; min-width: 160px; }
 .cuenta-unica { color: #16A34A; font-size: 0.82rem; align-self: center; white-space: nowrap; font-weight: 600; }
-.msg-error { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
+
+/* ── Código tag ── */
+.cod-tag-v { font-size: 0.72rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
+
+/* ── Ubicaciones popup ── */
+.btn-ubicar-v { background: transparent; border: none; cursor: pointer; font-size: 0.8rem; padding: 0 0.1rem; opacity: 0.5; flex-shrink: 0; }
+.btn-ubicar-v:hover { opacity: 1; }
+
+.ubic-pop-overlay { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; }
+.ubic-pop { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 12px; box-shadow: 0 8px 32px #0000001A; width: 420px; max-width: 95vw; overflow: hidden; }
+.ubic-pop-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid var(--borde); font-weight: 600; font-size: 0.9rem; color: var(--texto-principal); }
+.btn-cerrar-modal { background: transparent; border: none; cursor: pointer; color: var(--texto-muted); font-size: 1rem; }
+.btn-cerrar-modal:hover { color: var(--texto-principal); }
+.ubic-pop-cargando { padding: 1rem; color: var(--texto-muted); font-size: 0.88rem; }
+.ubic-pop-vacio    { padding: 1rem; color: var(--texto-muted); font-size: 0.88rem; margin: 0; }
+.ubic-pop-tabla    { width: 100%; border-collapse: collapse; }
+.ubic-pop-tabla th { padding: 0.45rem 0.75rem; background: var(--fondo-sidebar); color: var(--texto-muted); font-size: 0.78rem; text-align: left; font-weight: 700; }
+.ubic-pop-tabla td { padding: 0.45rem 0.75rem; border-top: 1px solid var(--borde-suave); font-size: 0.88rem; color: var(--texto-principal); }
 
 /* ── Tab: Clientes ── */
 .tab-clientes { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; border: 1px solid var(--borde); }
@@ -1430,20 +1502,38 @@ export default {
 .btn-sec { padding: 0.55rem 1.2rem; background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
 .btn-sec:hover { background: var(--borde-suave); }
 
-/* ── Código tag en ventas ── */
-.prod-nombre-v { display: block; font-weight: 600; }
-.cod-tag-v { font-size: 0.72rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
+/* ── Nota de entrega (print) ── */
+#nota-print { display: none; font-family: Arial, sans-serif; padding: 20px; background: #fff; color: #000; width: 520px; }
+.np-encabezado { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+.np-empresa    { font-size: 1.3rem; font-weight: 900; margin: 0; letter-spacing: 0.05em; }
+.np-subtitulo  { font-size: 0.9rem; margin: 4px 0 0; color: #444; }
+.np-datos      { margin-bottom: 14px; font-size: 0.88rem; line-height: 1.7; }
+.np-datos p    { margin: 0; }
+.np-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 14px; }
+.np-tabla th { background: #1A1A1A; color: #FFCC00; padding: 6px 8px; text-align: left; }
+.np-th-num    { text-align: right !important; }
+.np-tabla td  { padding: 5px 8px; border-bottom: 1px solid #ddd; }
+.np-td-num    { text-align: right; }
+.np-tabla tbody tr:nth-child(even) { background: #F5F5F0; }
+.np-total { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
 
-/* ── Ubicaciones popup ── */
-.btn-ubicar-v { background: transparent; border: none; cursor: pointer; font-size: 0.85rem; padding: 0 0.15rem; opacity: 0.6; }
-.btn-ubicar-v:hover { opacity: 1; }
+@media print {
+  body > * { display: none !important; }
+  #app      { display: none !important; }
+  #nota-print {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    padding: 20px !important;
+    z-index: 99999 !important;
+  }
+}
 
-.ubic-pop-overlay { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; }
-.ubic-pop { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 12px; box-shadow: 0 8px 32px #0000001A; width: 420px; max-width: 95vw; overflow: hidden; }
-.ubic-pop-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid var(--borde); font-weight: 600; font-size: 0.9rem; color: var(--texto-principal); }
-.ubic-pop-cargando { padding: 1rem; color: var(--texto-muted); font-size: 0.88rem; }
-.ubic-pop-vacio    { padding: 1rem; color: var(--texto-muted); font-size: 0.88rem; margin: 0; }
-.ubic-pop-tabla    { width: 100%; border-collapse: collapse; }
-.ubic-pop-tabla th { padding: 0.45rem 0.75rem; background: var(--fondo-sidebar); color: var(--texto-muted); font-size: 0.78rem; text-align: left; font-weight: 700; }
-.ubic-pop-tabla td { padding: 0.45rem 0.75rem; border-top: 1px solid var(--borde-suave); font-size: 0.88rem; color: var(--texto-principal); }
+/* ── Responsive móvil ── */
+@media (max-width: 768px) {
+  .venta-grid { grid-template-columns: 1fr; }
+  .prod-list  { max-height: 40vh; }
+  .carrito-box { max-height: none; }
+}
 </style>
