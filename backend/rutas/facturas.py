@@ -1,10 +1,19 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import anthropic
 import base64
 import json
 import io
-
 import os
+from datetime import datetime
+from typing import Optional
+from sqlalchemy.orm import Session
+from database import get_db
+from models import (
+    OrdenCompra, DetalleOrdenCompra,
+    RecepcionCompra, DetalleRecepcion,
+    Producto, Proveedor, CatalogoProveedor,
+    MovimientoBancario, TasaCambio,
+)
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -21,24 +30,31 @@ MEDIA_TYPE_MAP = {
 
 
 def _pdf_a_imagen_base64(contenido: bytes) -> tuple[str, str]:
-    """Convierte la primera página de un PDF a JPEG. Retorna (base64, media_type)."""
     try:
         from pdf2image import convert_from_bytes
     except ImportError:
         raise HTTPException(
             status_code=500,
-            detail="pdf2image no está instalado. Ejecuta: pip install pdf2image  (y asegúrate de tener poppler instalado en el sistema).",
+            detail="pdf2image no está instalado. Ejecuta: pip install pdf2image",
         )
     try:
         paginas = convert_from_bytes(contenido, first_page=1, last_page=1, dpi=200)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo convertir el PDF: {e}")
-
     buffer = io.BytesIO()
     paginas[0].save(buffer, format="JPEG", quality=90)
-    imagen_b64 = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
-    return imagen_b64, "image/jpeg"
+    return base64.standard_b64encode(buffer.getvalue()).decode("utf-8"), "image/jpeg"
 
+
+def _next_oc_numero(db: Session) -> str:
+    ultimo = db.query(OrdenCompra).order_by(OrdenCompra.id.desc()).first()
+    n = (ultimo.id + 1) if ultimo else 1
+    return f"OC-{n:04d}"
+
+
+# ---------------------------------------------------------------------------
+# POST /facturas/escanear
+# ---------------------------------------------------------------------------
 
 @router.post("/escanear")
 async def escanear_factura(archivo: UploadFile = File(...)):
@@ -46,7 +62,6 @@ async def escanear_factura(archivo: UploadFile = File(...)):
     contenido    = await archivo.read()
     content_type = (archivo.content_type or "").lower().split(";")[0].strip()
 
-    # ── Determinar imagen y media_type para Claude ────────────────────────
     if content_type == "application/pdf":
         imagen_b64, media_type = _pdf_a_imagen_base64(contenido)
     elif content_type in TIPOS_IMAGEN:
@@ -55,61 +70,260 @@ async def escanear_factura(archivo: UploadFile = File(...)):
     else:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Tipo de archivo no soportado: '{content_type or 'desconocido'}'. "
-                "Formatos aceptados: JPEG, PNG, WebP, GIF o PDF."
-            ),
+            detail=f"Tipo no soportado: '{content_type}'. Usa JPEG, PNG, WebP, GIF o PDF.",
         )
 
-    # ── Llamar a Claude con visión ─────────────────────────────────────────
     mensaje = client.messages.create(
         model="claude-opus-4-5",
         max_tokens=2048,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type":       "base64",
-                            "media_type": media_type,
-                            "data":       imagen_b64,
-                        },
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "Analiza esta factura de proveedor y extrae todos los productos.\n"
-                            "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
-                            "{\n"
-                            '  "proveedor": "nombre del proveedor o vacío si no se ve",\n'
-                            '  "fecha": "fecha de la factura o vacío",\n'
-                            '  "productos": [\n'
-                            "    {\n"
-                            '      "nombre": "nombre del producto",\n'
-                            '      "cantidad": numero,\n'
-                            '      "precio_unitario": numero,\n'
-                            '      "precio_venta_sugerido": numero o null,\n'
-                            '      "descripcion": "descripcion adicional o vacío"\n'
-                            "    }\n"
-                            "  ]\n"
-                            "}\n"
-                            "precio_venta_sugerido solo si aparece explícitamente en la factura, de lo contrario null."
-                        ),
-                    },
-                ],
-            }
-        ],
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": imagen_b64},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "Analiza esta factura de proveedor y extrae todos los datos.\n"
+                        "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
+                        "{\n"
+                        '  "proveedor": "nombre del proveedor o vacío",\n'
+                        '  "numero_factura": "número de factura o vacío",\n'
+                        '  "fecha": "fecha en formato YYYY-MM-DD o vacío",\n'
+                        '  "subtotal": numero o null,\n'
+                        '  "descuento_detectado": numero o null,\n'
+                        '  "total": numero o null,\n'
+                        '  "productos": [\n'
+                        "    {\n"
+                        '      "nombre": "nombre del producto",\n'
+                        '      "codigo_proveedor": "código del proveedor si aparece o vacío",\n'
+                        '      "cantidad": numero,\n'
+                        '      "precio_unitario": numero,\n'
+                        '      "subtotal_linea": numero o null\n'
+                        "    }\n"
+                        "  ]\n"
+                        "}\n"
+                        "IMPORTANTE: Si la factura incluye IVA u otros impuestos, inclúyelos en el total final.\n"
+                        "No separes IVA — trabaja siempre con valores finales netos.\n"
+                        "precio_unitario debe ser el costo final unitario incluyendo cualquier impuesto proporcional."
+                    ),
+                },
+            ],
+        }],
     )
 
     texto = mensaje.content[0].text.strip()
-    # Limpiar posibles bloques de código markdown
     if texto.startswith("```"):
         lineas = texto.splitlines()
-        texto  = "\n".join(lineas[1:-1] if lineas[-1].strip() == "```" else lineas[1:])
+        texto = "\n".join(lineas[1:-1] if lineas[-1].strip() == "```" else lineas[1:])
 
     try:
         return json.loads(texto)
     except Exception as e:
         return {"error": str(e), "respuesta": texto}
+
+
+# ---------------------------------------------------------------------------
+# GET /facturas/buscar-proveedor
+# ---------------------------------------------------------------------------
+
+@router.get("/buscar-proveedor")
+def buscar_proveedor(nombre: str = "", db: Session = Depends(get_db)):
+    if len(nombre) < 2:
+        return []
+    q = db.query(Proveedor).filter(
+        Proveedor.nombre.ilike(f"%{nombre}%"),
+        Proveedor.activo == True,
+    ).limit(10).all()
+    return [{"id": p.id, "nombre": p.nombre, "rif": p.rif or ""} for p in q]
+
+
+# ---------------------------------------------------------------------------
+# GET /facturas/buscar-producto
+# ---------------------------------------------------------------------------
+
+@router.get("/buscar-producto")
+def buscar_producto(
+    nombre: str = "",
+    proveedor_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    resultados = []
+    ids_ya: set[int] = set()
+
+    # Prioridad: buscar por código en catálogo del proveedor
+    if proveedor_id and nombre:
+        cats = db.query(CatalogoProveedor).filter(
+            CatalogoProveedor.proveedor_id == proveedor_id,
+            CatalogoProveedor.codigo_proveedor.ilike(f"%{nombre}%"),
+        ).limit(5).all()
+        for c in cats:
+            if c.producto_id:
+                p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+                if p and p.id not in ids_ya:
+                    resultados.append({
+                        "id": p.id, "nombre": p.nombre,
+                        "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
+                    })
+                    ids_ya.add(p.id)
+
+    # Buscar por nombre en inventario
+    if len(nombre) >= 2:
+        prods = db.query(Producto).filter(
+            Producto.nombre.ilike(f"%{nombre}%")
+        ).limit(10).all()
+        for p in prods:
+            if p.id not in ids_ya:
+                resultados.append({
+                    "id": p.id, "nombre": p.nombre,
+                    "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
+                })
+                ids_ya.add(p.id)
+
+    return resultados[:10]
+
+
+# ---------------------------------------------------------------------------
+# POST /facturas/confirmar-compra
+# ---------------------------------------------------------------------------
+
+@router.post("/confirmar-compra")
+def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
+    proveedor_id   = datos.get("proveedor_id")
+    numero_factura = datos.get("numero_factura", "")
+    fecha_str      = datos.get("fecha")
+    productos_data = datos.get("productos", [])
+    descuento      = float(datos.get("descuento", 0))
+    total_factura  = float(datos.get("total_factura", 0))
+    condicion_pago = datos.get("condicion_pago", "credito_completo")
+    monto_abonado  = float(datos.get("monto_abonado", 0))
+    metodo_pago    = datos.get("metodo_pago")
+    usuario        = datos.get("usuario", "admin")
+
+    try:
+        fecha = datetime.fromisoformat(fecha_str) if fecha_str else datetime.now()
+    except Exception:
+        fecha = datetime.now()
+
+    subtotal = sum(
+        float(p.get("precio_unitario_usd", 0)) * float(p.get("cantidad", 0))
+        for p in productos_data
+    )
+
+    # ── Orden de compra cerrada directamente ──────────────────────────────────
+    orden = OrdenCompra(
+        numero           = _next_oc_numero(db),
+        proveedor_id     = proveedor_id,
+        fecha_creacion   = fecha,
+        fecha_aprobacion = fecha,
+        estado           = "cerrada",
+        creado_por       = usuario,
+        aprobado_por     = usuario,
+        moneda           = "USD",
+        subtotal         = round(subtotal, 2),
+        descuento        = round(descuento, 2),
+        total            = round(total_factura, 2),
+        observacion      = f"Factura IA: {numero_factura}",
+    )
+    db.add(orden)
+    db.flush()
+
+    for p in productos_data:
+        db.add(DetalleOrdenCompra(
+            orden_id            = orden.id,
+            producto_id         = p.get("producto_id"),
+            nombre_producto     = p.get("nombre_producto", ""),
+            codigo_proveedor    = p.get("codigo_proveedor", ""),
+            cantidad_pedida     = float(p.get("cantidad", 0)),
+            precio_unitario_usd = float(p.get("precio_unitario_usd", 0)),
+            subtotal            = float(p.get("subtotal", 0)),
+            es_producto_nuevo   = False,
+        ))
+
+    # ── Estado de pago ────────────────────────────────────────────────────────
+    if condicion_pago == "contado":
+        estado_pago  = "pagado"
+        abonado_real = total_factura
+        saldo_pend   = 0.0
+    elif condicion_pago == "credito_parcial":
+        estado_pago  = "pendiente"
+        abonado_real = monto_abonado
+        saldo_pend   = round(total_factura - monto_abonado, 2)
+    else:  # credito_completo
+        estado_pago  = "pendiente"
+        abonado_real = 0.0
+        saldo_pend   = total_factura
+
+    # ── Recepción ─────────────────────────────────────────────────────────────
+    recepcion = RecepcionCompra(
+        orden_id          = orden.id,
+        fecha_recepcion   = fecha,
+        recibido_por      = usuario,
+        observacion       = f"Factura: {numero_factura}",
+        total_recibido    = round(subtotal, 2),
+        monto_factura     = round(total_factura, 2),
+        estado_pago       = estado_pago,
+        numero_factura    = numero_factura,
+    )
+    db.add(recepcion)
+    db.flush()
+
+    # ── Detalles de recepción + stock + costo ─────────────────────────────────
+    for p in productos_data:
+        prod_id    = p.get("producto_id")
+        cantidad   = float(p.get("cantidad", 0))
+        precio     = float(p.get("precio_unitario_usd", 0))
+        actualizar = bool(p.get("actualizar_costo", False))
+        costo_ant  = None
+
+        if prod_id:
+            prod = db.query(Producto).filter(Producto.id == prod_id).first()
+            if prod:
+                prod.stock = (prod.stock or 0) + int(cantidad)
+                if actualizar:
+                    costo_ant      = prod.costo_usd
+                    prod.costo_usd = precio
+
+        db.add(DetalleRecepcion(
+            recepcion_id             = recepcion.id,
+            detalle_orden_id         = 0,
+            producto_id              = prod_id or 0,
+            cantidad_recibida        = cantidad,
+            precio_unitario_real_usd = precio,
+            subtotal                 = round(cantidad * precio, 2),
+            actualizo_costo          = actualizar,
+            costo_anterior           = costo_ant,
+        ))
+
+    # ── Movimiento bancario si hubo pago ──────────────────────────────────────
+    if abonado_real > 0 and metodo_pago:
+        tasa_rec = db.query(TasaCambio).order_by(TasaCambio.fecha.desc()).first()
+        tasa     = tasa_rec.tasa if tasa_rec else 1.0
+        prov     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
+
+        db.add(MovimientoBancario(
+            fecha            = datetime.now(),
+            tipo             = "pago_proveedor",
+            cuenta_origen_id = None,
+            monto            = round(abonado_real, 2),
+            moneda           = "USD",
+            tasa_cambio      = tasa,
+            monto_convertido = round(abonado_real * tasa, 2),
+            concepto         = f"Pago factura {numero_factura}",
+            beneficiario     = prov.nombre if prov else "",
+            categoria        = "proveedores",
+            proveedor_id     = proveedor_id,
+            orden_compra_id  = orden.id,
+            registrado_por   = usuario,
+        ))
+
+    db.commit()
+    return {
+        "recepcion_id":   recepcion.id,
+        "orden_id":       orden.id,
+        "orden_numero":   orden.numero,
+        "saldo_pendiente": round(saldo_pend, 2),
+        "mensaje":        f"Compra registrada: {orden.numero}",
+    }
