@@ -105,10 +105,10 @@
         </div>
 
         <!-- ── Grid 50/50 ── -->
-        <div v-if="clienteSeleccionado" class="venta-grid">
+        <div v-if="clienteSeleccionado" class="venta-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;">
 
           <!-- ── Columna izq: Catálogo ── -->
-          <div class="catalogo">
+          <div class="catalogo" style="width:100%;min-width:0;overflow:hidden;">
             <input
               v-model="busqueda"
               ref="inputBuscador"
