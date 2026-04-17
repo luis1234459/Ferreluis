@@ -1325,7 +1325,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   border-bottom: 1px solid var(--borde-suave);
@@ -1364,13 +1364,13 @@ export default {
 .pi-precios {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1.5rem;
   flex-shrink: 0;
   margin-left: auto;
 }
-.pi-bs     { color: #B08800; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
-.pi-ref    { color: #16A34A; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
-.pi-stock  { color: var(--texto-muted); font-size: 0.78rem; white-space: nowrap; }
+.pi-bs    { color: #B08800; font-size: 0.85rem; white-space: nowrap; font-weight: 700; }
+.pi-ref   { color: #16A34A; font-size: 0.85rem; white-space: nowrap; font-weight: 700; }
+.pi-stock { color: var(--texto-muted); font-size: 0.82rem; white-space: nowrap; background: var(--borde-suave); padding: 0.1rem 0.4rem; border-radius: 4px; }
 .pi-base   { color: var(--texto-muted); font-size: 0.75rem; display: none; white-space: nowrap; }
 
 .prod-sin-res { text-align: center; color: var(--texto-muted); padding: 1.5rem 0; font-size: 0.88rem; }
