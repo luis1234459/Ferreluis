@@ -1306,7 +1306,7 @@ export default {
 }
 
 /* ── Catálogo (col izq) ── */
-.catalogo { background: #FFFFFF; border-radius: 12px; padding: 0.85rem; border: 1px solid var(--borde); }
+.catalogo { background: #FFFFFF; border-radius: 12px; padding: 0.85rem; border: 1px solid var(--borde); min-width: 0; }
 .buscador { width: 100%; padding: 0.55rem 0.9rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 8px; margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.9rem; }
 
 /* Lista compacta de productos */
@@ -1348,8 +1348,8 @@ export default {
 .prod-item:hover .pi-precios,
 .prod-item-resaltado .pi-precios { color: #1A1A1A; }
 
-.pi-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--texto-principal); }
-.pi-precios { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+.pi-nombre { flex: 1; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--texto-principal); }
+.pi-precios { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
 .pi-bs     { color: #B08800; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-ref    { color: #16A34A; font-size: 0.8rem; white-space: nowrap; font-weight: 600; }
 .pi-stock  { color: var(--texto-muted); font-size: 0.78rem; white-space: nowrap; }
@@ -1367,6 +1367,7 @@ export default {
   height: calc(100vh - 280px);
   position: sticky;
   top: 1rem;
+  min-width: 0;
 }
 
 .carrito-box {
