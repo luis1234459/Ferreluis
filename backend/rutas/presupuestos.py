@@ -120,7 +120,11 @@ def crear_presupuesto(datos: dict, db: Session = Depends(get_db)):
         cliente_telefono = datos.get("cliente_telefono"),
         usuario          = datos.get("usuario", "admin"),
         fecha            = datetime.now(),
-        fecha_vencimiento= datetime.now() + timedelta(hours=24),
+        fecha_vencimiento= (
+            datetime.fromisoformat(datos["fecha_vencimiento"])
+            if datos.get("fecha_vencimiento")
+            else datetime.now() + timedelta(hours=24)
+        ),
         subtotal         = round(subtotal, 2),
         descuento        = round(descuento, 2),
         total            = round(total, 2),

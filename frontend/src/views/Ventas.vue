@@ -140,7 +140,7 @@
                 <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
                 <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
               </div>
-              <div v-if="productosFiltrados.length === 0" class="prod-sin-res">Sin resultados</div>
+              <div v-if="productosFiltrados.length === 0" class="prod-sin-res">{{ busqueda.length < 2 ? 'Escribe 2+ caracteres para buscar' : 'Sin resultados' }}</div>
             </div>
           </div>
 
@@ -150,34 +150,16 @@
               <h2>Carrito</h2>
               <div v-if="carrito.length === 0" class="vacio">Sin productos</div>
 
-              <div v-for="(item, i) in carrito" :key="i" class="item">
-                <div class="item-header">
-                  <span class="item-nombre">
-                    {{ item.nombre }}
-                    <span v-if="item.codigo" class="cod-tag-v" style="font-size:0.7rem">{{ item.codigo }}</span>
-                  </span>
-                  <button class="btn-quitar" @click="quitar(i)">×</button>
+              <div v-for="(item, i) in carrito" :key="i" class="item-row">
+                <button class="btn-cnt" @click="restar(i)">−</button>
+                <span class="item-qty">{{ item.cantidad }}</span>
+                <button class="btn-cnt" @click="sumar(i)">+</button>
+                <div class="item-info">
+                  <span class="item-nombre">{{ item.nombre }}<span v-if="item.codigo" class="cod-tag-v">{{ item.codigo }}</span></span>
+                  <span class="item-ref">Ref: ${{ Number(item.precio_unitario).toFixed(2) }}</span>
                 </div>
-                <div class="item-controles">
-                  <button @click="restar(i)">−</button>
-                  <span>{{ item.cantidad }}</span>
-                  <button @click="sumar(i)">+</button>
-                  <span class="item-precio-snap">
-                    {{ tipoPrecio === 'base' ? 'Base:' : 'Ref:' }}
-                    ${{ item.precio_original.toFixed(2) }}
-                  </span>
-                </div>
-                <div class="item-precio-edit">
-                  <label>Precio aplicado (USD)</label>
-                  <input v-model.number="item.precio_unitario" type="number"
-                    min="0" step="0.01" @input="normalizarPrecio(item)" />
-                </div>
-                <div class="item-subtotal">
-                  <span v-if="tieneDescuento(item)" class="tag-desc">
-                    Dto: ${{ descuentoLinea(item).toFixed(2) }}
-                  </span>
-                  <span>Sub: {{ formatMonto(subtotalLinea(item), monedaVenta) }}</span>
-                </div>
+                <span class="item-sub">{{ formatMonto(subtotalLinea(item), monedaVenta) }}</span>
+                <button class="btn-quitar" @click="quitar(i)">✕</button>
               </div>
 
               <!-- Totales -->
@@ -210,13 +192,11 @@
               </div>
             </div>
 
-            <!-- Botón abrir cobro -->
-            <button
-              class="btn-abrir-cobro"
-              @click="modalCobro = true"
-              :disabled="carrito.length === 0"
-              v-if="carrito.length > 0"
-            >✓ Registrar venta</button>
+            <!-- Botones inferiores (siempre visibles) -->
+            <div class="botones-carrito" v-if="carrito.length > 0">
+              <button class="btn-guardar-presupuesto" @click="abrirModalPresupuesto">📋 Guardar como presupuesto</button>
+              <button class="btn-abrir-cobro" @click="modalCobro = true">✓ Registrar venta</button>
+            </div>
 
             <!-- Éxito post-venta -->
             <div v-if="exitoso" class="venta-exito-row">
@@ -539,6 +519,59 @@
       </div>
     </div>
 
+    <!-- ══════════════════════════════ Modal: Presupuesto ══════════════════════════════ -->
+    <div class="cobro-modal-overlay" v-if="modalPresupuesto" @click.self="continuarVenta">
+      <div class="cobro-modal">
+        <template v-if="!presupuestoExito">
+          <div class="cobro-modal-header">
+            <h3>📋 Guardar Presupuesto</h3>
+            <button class="cobro-modal-cerrar" @click="continuarVenta">✕</button>
+          </div>
+          <div class="cobro-modal-body">
+            <div class="field">
+              <label>Nombre / Referencia *</label>
+              <input v-model="presupuestoNombre" placeholder="Ej: Cotización materiales Juan" />
+            </div>
+            <div class="field">
+              <label>Cliente</label>
+              <input class="input-readonly"
+                :value="clienteSeleccionado ? clienteSeleccionado.nombre + (clienteSeleccionado.telefono ? ' · ' + clienteSeleccionado.telefono : '') : 'Consumidor Final'"
+                readonly />
+            </div>
+            <div class="field">
+              <label>Observación <small>(opcional)</small></label>
+              <input v-model="presupuestoObs" placeholder="Opcional..." />
+            </div>
+            <div class="field">
+              <label>Fecha de validez <small>(opcional)</small></label>
+              <input v-model="presupuestoFechaValidez" type="date" />
+            </div>
+            <p class="msg-error" v-if="presupuestoError">{{ presupuestoError }}</p>
+          </div>
+          <div class="cobro-modal-footer">
+            <button class="btn-cancelar-cobro" @click="continuarVenta">✕ Cancelar</button>
+            <button class="btn-primary" @click="guardarPresupuesto" :disabled="presupuestoGuardando">
+              {{ presupuestoGuardando ? 'Guardando...' : 'Guardar presupuesto' }}
+            </button>
+          </div>
+        </template>
+        <template v-else>
+          <div class="cobro-modal-header">
+            <h3>✓ {{ presupuestoExito.numero }}</h3>
+            <button class="cobro-modal-cerrar" @click="continuarVenta">✕</button>
+          </div>
+          <div class="cobro-modal-body">
+            <p class="pres-exito-msg">Presupuesto guardado exitosamente</p>
+            <div class="pres-opciones">
+              <button class="btn-primary" @click="continuarVenta">Continuar venta</button>
+              <button class="btn-sec" @click="limpiarCarritoDesdePresupuesto">Limpiar carrito</button>
+              <button class="btn-sec" @click="verPresupuesto">Ver presupuestos</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
     <!-- Nota de entrega para impresión -->
     <div id="nota-print" v-if="notaImpresion">
       <div class="np-encabezado">
@@ -637,6 +670,15 @@ export default {
       // Modal cobro
       modalCobro: false,
 
+      // Modal presupuesto
+      modalPresupuesto: false,
+      presupuestoNombre: '',
+      presupuestoObs: '',
+      presupuestoFechaValidez: '',
+      presupuestoGuardando: false,
+      presupuestoError: '',
+      presupuestoExito: null,
+
       // Tabs
       tabActivo: 'venta',
 
@@ -673,8 +715,8 @@ export default {
       return 'Nueva Venta'
     },
     productosFiltrados() {
-      const q = this.busqueda.toLowerCase()
-      if (!q) return this.productos
+      const q = this.busqueda.trim().toLowerCase()
+      if (q.length < 2) return []
       const exactCodigo = this.productos.filter(p =>
         p.codigo && p.codigo.toLowerCase() === q
       )
@@ -1138,6 +1180,64 @@ export default {
       })
     },
 
+    abrirModalPresupuesto() {
+      this.presupuestoNombre = ''
+      this.presupuestoObs = ''
+      this.presupuestoFechaValidez = ''
+      this.presupuestoError = ''
+      this.presupuestoExito = null
+      this.modalPresupuesto = true
+    },
+    async guardarPresupuesto() {
+      if (!this.presupuestoNombre.trim()) {
+        this.presupuestoError = 'El nombre/referencia es requerido'
+        return
+      }
+      this.presupuestoGuardando = true
+      this.presupuestoError = ''
+      try {
+        const obs = [this.presupuestoNombre.trim(), this.presupuestoObs.trim()].filter(Boolean).join(' — ')
+        const payload = {
+          cliente_id:       this.clienteSeleccionado?.id || null,
+          cliente_nombre:   this.clienteSeleccionado?.nombre || 'Consumidor Final',
+          cliente_telefono: this.clienteSeleccionado?.telefono || null,
+          usuario:          this.usuario.usuario || 'cajero',
+          moneda:           this.monedaVenta,
+          descuento:        Number(this.descuentoGlobal || 0),
+          observacion:      obs,
+          productos: this.carrito.map(item => ({
+            producto_id:     Number(item.id),
+            nombre_producto: item.nombre,
+            cantidad:        Number(item.cantidad),
+            precio_unitario: Number(item.precio_unitario),
+          })),
+        }
+        if (this.presupuestoFechaValidez) payload.fecha_vencimiento = this.presupuestoFechaValidez
+        const res = await axios.post('/presupuestos/', payload)
+        this.presupuestoExito = res.data
+      } catch (e) {
+        this.presupuestoError = e?.response?.data?.detail || 'Error al guardar el presupuesto'
+      } finally {
+        this.presupuestoGuardando = false
+      }
+    },
+    continuarVenta() {
+      this.modalPresupuesto = false
+      this.presupuestoExito = null
+      this.presupuestoNombre = ''
+      this.presupuestoObs = ''
+      this.presupuestoFechaValidez = ''
+    },
+    limpiarCarritoDesdePresupuesto() {
+      this.carrito = []
+      this.descuentoGlobal = 0
+      this.continuarVenta()
+    },
+    verPresupuesto() {
+      this.$router.push('/presupuestos')
+      this.continuarVenta()
+    },
+
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -1219,10 +1319,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.6rem;
   cursor: pointer;
   border-bottom: 1px solid var(--borde-suave);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   position: relative;
   transition: background 0.08s;
 }
@@ -1252,27 +1352,42 @@ export default {
 .sin-datos { text-align: center; color: var(--texto-muted); padding: 1.5rem 0; }
 
 /* ── Carrito (col der) ── */
-.carrito-col { display: flex; flex-direction: column; gap: 0.75rem; }
+.carrito-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: calc(100vh - 280px);
+  position: sticky;
+  top: 1rem;
+}
 
-.carrito-box { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; border: 1px solid var(--borde); max-height: calc(100vh - 280px); overflow-y: auto; }
-.carrito-box h2 { color: var(--texto-principal); margin: 0 0 1rem; font-size: 1rem; font-weight: 700; position: sticky; top: 0; background: #FFFFFF; padding-bottom: 0.5rem; border-bottom: 1px solid var(--borde-suave); }
-.vacio { color: var(--texto-muted); text-align: center; padding: 1.5rem 0; font-size: 0.9rem; }
+.carrito-box {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.carrito-box h2 { color: var(--texto-principal); margin: 0 0 0.65rem; font-size: 0.95rem; font-weight: 700; position: sticky; top: 0; background: #FFFFFF; padding-bottom: 0.4rem; border-bottom: 1px solid var(--borde-suave); }
+.vacio { color: var(--texto-muted); text-align: center; padding: 1.5rem 0; font-size: 0.88rem; }
 
-.item { border-bottom: 1px solid var(--borde-suave); padding: 0.75rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.item-header { display: flex; justify-content: space-between; align-items: center; }
-.item-nombre { color: var(--texto-principal); font-weight: 600; font-size: 0.9rem; }
-.btn-quitar { background: var(--danger); color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+/* Item row compacto */
+.item-row { display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0; border-bottom: 1px solid var(--borde-suave); font-size: 0.82rem; }
+.item-row:last-child { border-bottom: none; }
+.btn-cnt { background: var(--borde-suave); color: var(--texto-principal); border: 1px solid var(--borde); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; flex-shrink: 0; line-height: 1; }
+.btn-cnt:hover { background: var(--borde); }
+.item-qty { min-width: 18px; text-align: center; font-weight: 700; color: var(--texto-principal); font-size: 0.85rem; }
+.item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.05rem; }
+.item-nombre { font-weight: 600; color: var(--texto-principal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; }
+.item-ref { color: #16A34A; font-size: 0.75rem; font-weight: 600; }
+.item-sub { color: var(--texto-sec); font-size: 0.78rem; white-space: nowrap; font-weight: 600; }
+.btn-quitar { background: transparent; color: var(--texto-muted); border: none; width: 20px; height: 20px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; flex-shrink: 0; }
+.btn-quitar:hover { background: #DC26261A; color: #DC2626; }
 
-.item-controles { display: flex; align-items: center; gap: 0.5rem; }
-.item-controles button { background: var(--borde-suave); color: var(--texto-principal); border: 1px solid var(--borde); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; }
-.item-precio-snap { color: var(--texto-sec); font-size: 0.82rem; margin-left: auto; }
-
-.item-precio-edit { display: flex; flex-direction: column; gap: 0.2rem; }
-.item-precio-edit label { color: var(--texto-sec); font-size: 0.8rem; }
-.item-precio-edit input { padding: 0.4rem 0.6rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; font-size: 0.9rem; width: 100%; box-sizing: border-box; }
-
-.item-subtotal { display: flex; justify-content: space-between; color: var(--texto-sec); font-size: 0.85rem; }
-.tag-desc { color: #996600; }
+/* Botones inferiores fijos */
+.botones-carrito { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
 
 .totales-box { border-top: 1px solid var(--borde); margin-top: 0.75rem; padding-top: 0.75rem; }
 .fila-total { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--texto-sec); font-size: 0.9rem; }
@@ -1284,22 +1399,34 @@ export default {
 .descuento-global label { color: var(--texto-sec); font-size: 0.82rem; display: block; margin-bottom: 0.25rem; font-weight: 600; }
 .descuento-global input { width: 100%; padding: 0.4rem 0.6rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; box-sizing: border-box; }
 
-/* Botón abrir cobro */
+/* Botones carrito inferiores */
 .btn-abrir-cobro {
   width: 100%;
-  padding: 0.9rem;
+  padding: 0.75rem;
   background: #1A1A1A;
   color: #FFCC00;
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   transition: background 0.15s;
 }
 .btn-abrir-cobro:hover { background: #333333; }
-.btn-abrir-cobro:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-guardar-presupuesto {
+  width: 100%;
+  padding: 0.6rem;
+  background: #FFFFFF;
+  color: #1A1A1A;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.btn-guardar-presupuesto:hover { border-color: #1A1A1A; background: var(--fondo-tabla-alt); }
 
 /* Éxito post-venta */
 .venta-exito-row { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; padding: 0.75rem; background: #F0FDF4; border: 1px solid #16A34A33; border-radius: 8px; }
@@ -1530,10 +1657,18 @@ export default {
   }
 }
 
+/* ── Presupuesto modal extras ── */
+.input-readonly { background: var(--fondo-tabla-alt) !important; color: var(--texto-sec) !important; cursor: default; }
+.pres-exito-msg { color: #16A34A; font-weight: 700; font-size: 1rem; margin: 0 0 1.25rem; text-align: center; }
+.pres-opciones { display: flex; flex-direction: column; gap: 0.5rem; }
+.pres-opciones .btn-primary { padding: 0.75rem; font-size: 0.95rem; }
+.pres-opciones .btn-sec { padding: 0.6rem; font-size: 0.9rem; text-align: center; }
+
 /* ── Responsive móvil ── */
 @media (max-width: 768px) {
   .venta-grid { grid-template-columns: 1fr; }
   .prod-list  { max-height: 40vh; }
-  .carrito-box { max-height: none; }
+  .carrito-col { height: auto; position: static; }
+  .carrito-box { flex: none; max-height: 50vh; }
 }
 </style>
