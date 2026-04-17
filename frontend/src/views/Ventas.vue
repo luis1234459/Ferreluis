@@ -34,6 +34,9 @@
         Modo <strong>Precio Base USD</strong> — se aplicará descuento divisa. Requiere autorización.
       </div>
 
+      <!-- ── Área interior con padding ── -->
+      <div class="contenido-inner" style="padding-top:0;">
+
       <!-- ── Tabs nav ── -->
       <div class="tabs-nav">
         <button :class="['tab-btn', tabActivo === 'venta' ? 'tab-activo' : '']"
@@ -396,6 +399,7 @@
         </div>
       </div>
 
+      </div><!-- /contenido-inner -->
     </main>
 
     <!-- ══════════════════════════════ Modal: Cobro ══════════════════════════════ -->
