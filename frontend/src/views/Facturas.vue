@@ -218,70 +218,120 @@
                   :key="op.val"
                   class="btn-condicion"
                   :class="{ active: condicionPago === op.val }"
-                  @click="condicionPago = op.val"
+                  @click="condicionPago = op.val; pagos = []"
                 >{{ op.label }}</button>
               </div>
 
-              <div v-if="condicionPago === 'credito_parcial'" class="field-group" style="margin-top:1rem">
-                <label class="field-label">Monto abonado (USD)</label>
-                <input
-                  v-model.number="montoAbonado"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input-field"
-                />
-              </div>
-
-              <div v-if="condicionPago !== 'credito_completo'" class="field-group" style="margin-top:1rem">
-                <label class="field-label">Método de pago</label>
-                <select v-model="metodoPago" class="input-field">
-                  <option value="">Seleccionar...</option>
-                  <option value="efectivo_usd">Efectivo USD</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="zelle">Zelle</option>
-                  <option value="pago_movil">Pago móvil</option>
-                  <option value="punto">Punto de venta</option>
-                </select>
-              </div>
-
+              <!-- Descuento en % -->
               <div class="field-group" style="margin-top:1rem">
-                <label class="field-label">Descuento (USD)</label>
-                <input
-                  v-model.number="descuento"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input-field"
-                />
+                <label class="field-label">¿La factura tiene descuento?</label>
+                <div class="btn-group">
+                  <button
+                    :class="['btn-condicion', !tieneDescuento ? 'active' : '']"
+                    @click="tieneDescuento = false; descuentoPct = 0"
+                  >No</button>
+                  <button
+                    :class="['btn-condicion', tieneDescuento ? 'active' : '']"
+                    @click="tieneDescuento = true"
+                  >Sí</button>
+                </div>
+              </div>
+              <div v-if="tieneDescuento" class="field-group" style="margin-top:0.5rem">
+                <label class="field-label">Descuento del proveedor (%)</label>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <input
+                    v-model.number="descuentoPct"
+                    type="number" min="0" max="100" step="0.1"
+                    class="input-field" placeholder="0.0" style="max-width:100px"
+                  />
+                  <button class="btn-condicion active" @click="aplicarDescuento">Aplicar</button>
+                </div>
+                <small class="txt-muted" v-if="descuentoPct > 0">
+                  Se aplicará {{ descuentoPct }}% a cada producto
+                </small>
+              </div>
+
+              <!-- Pagos múltiples -->
+              <div v-if="condicionPago !== 'credito_completo'" style="margin-top:1rem">
+                <label class="field-label">Pagos</label>
+
+                <!-- Lista de pagos agregados -->
+                <div v-for="(p, i) in pagos" :key="i" class="pago-item">
+                  <span class="pago-metodo">{{ p.label }}</span>
+                  <span class="pago-cuenta" v-if="p.cuenta_nombre">· {{ p.cuenta_nombre }}</span>
+                  <span class="pago-monto">{{ p.moneda === 'USD' ? '$' : 'Bs.' }}{{ p.monto.toFixed(2) }}</span>
+                  <span class="pago-usd" v-if="p.moneda === 'Bs'">≈ ${{ p.monto_usd.toFixed(2) }}</span>
+                  <button class="btn-del-linea" @click="pagos.splice(i, 1)">✕</button>
+                </div>
+
+                <!-- Formulario nuevo pago -->
+                <div class="nuevo-pago-form" v-if="saldoPendiente > 0.01">
+                  <div class="btn-group" style="margin-bottom:0.5rem">
+                    <button
+                      :class="['btn-condicion', nuevoPagoMoneda === 'USD' ? 'active' : '']"
+                      @click="nuevoPagoMoneda = 'USD'; nuevoPagoMetodo = 'efectivo_usd'; nuevoPagoCuentaId = null"
+                    >USD</button>
+                    <button
+                      :class="['btn-condicion', nuevoPagoMoneda === 'Bs' ? 'active' : '']"
+                      @click="nuevoPagoMoneda = 'Bs'; nuevoPagoMetodo = 'efectivo_bs'; nuevoPagoCuentaId = null"
+                    >Bs</button>
+                  </div>
+                  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+                    <select
+                      v-model="nuevoPagoMetodo"
+                      class="input-field" style="flex:1;min-width:140px"
+                      @change="nuevoPagoCuentaId = null"
+                    >
+                      <option v-for="m in metodosDisponiblesPago" :key="m.value" :value="m.value">{{ m.label }}</option>
+                    </select>
+                    <select
+                      v-if="cuentasDelNuevoPago.length > 1"
+                      v-model="nuevoPagoCuentaId"
+                      class="input-field" style="flex:1;min-width:140px"
+                    >
+                      <option :value="null">— Cuenta —</option>
+                      <option v-for="c in cuentasDelNuevoPago" :key="c.id" :value="c.id">
+                        {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+                      </option>
+                    </select>
+                    <span v-else-if="cuentasDelNuevoPago.length === 1" class="cuenta-unica">
+                      {{ cuentasDelNuevoPago[0].nombre }}
+                    </span>
+                    <input
+                      v-model.number="nuevoPagoMonto"
+                      type="number" min="0.01" step="0.01"
+                      :placeholder="nuevoPagoMoneda === 'USD' ? '$0.00' : 'Bs. 0.00'"
+                      class="input-field" style="width:110px"
+                    />
+                    <button class="btn-condicion active" @click="agregarPago">+ Agregar</button>
+                  </div>
+                  <small class="txt-muted" v-if="tasaBcv">Tasa BCV: Bs. {{ tasaBcv.toFixed(2) }}</small>
+                </div>
+                <div
+                  v-if="saldoPendiente <= 0.01 && pagos.length > 0"
+                  class="pagado-row"
+                  style="margin-top:0.5rem;font-size:0.85rem"
+                >✓ Pago completo</div>
               </div>
             </div>
 
             <div class="resumen-col">
               <h3 class="seccion-titulo">Resumen</h3>
               <div class="resumen-box">
-                <div class="resumen-row">
-                  <span>Subtotal</span>
-                  <span>{{ fmtUSD(subtotalCalculado) }}</span>
-                </div>
-                <div v-if="descuento > 0" class="resumen-row descuento-row">
-                  <span>Descuento</span>
-                  <span>-{{ fmtUSD(descuento) }}</span>
-                </div>
                 <div class="resumen-row total-row">
                   <span>Total factura</span>
                   <span>{{ fmtUSD(totalCalculado) }}</span>
                 </div>
-                <div v-if="condicionPago === 'credito_parcial' && montoAbonado > 0" class="resumen-row abono-row">
-                  <span>Abono</span>
-                  <span>{{ fmtUSD(montoAbonado) }}</span>
+                <div v-if="condicionPago !== 'credito_completo' && totalPagado > 0" class="resumen-row abono-row">
+                  <span>Pagado</span>
+                  <span>{{ fmtUSD(totalPagado) }}</span>
                 </div>
                 <div
                   class="resumen-row"
-                  :class="saldoPendiente > 0 ? 'saldo-row' : 'pagado-row'"
+                  :class="saldoPendiente > 0.01 ? 'saldo-row' : 'pagado-row'"
                 >
-                  <span>{{ saldoPendiente > 0 ? 'Saldo pendiente' : 'Estado' }}</span>
-                  <span>{{ saldoPendiente > 0 ? fmtUSD(saldoPendiente) : '✓ Pagado' }}</span>
+                  <span>{{ saldoPendiente > 0.01 ? 'Saldo pendiente' : 'Estado' }}</span>
+                  <span>{{ saldoPendiente > 0.01 ? fmtUSD(saldoPendiente) : '✓ Pagado' }}</span>
                 </div>
               </div>
               <button
@@ -341,22 +391,41 @@ export default {
       fechaFactura: '',
       // Paso 2 — productos
       lineas: [],
-      // Paso 2 — pago
+      // Paso 2 — descuento
+      tieneDescuento: false,
+      descuentoPct: 0,
+      // Paso 2 — condición de pago
       condicionPago: 'credito_completo',
       condicionOpciones: [
         { val: 'contado',          label: 'Contado'          },
         { val: 'credito_parcial',  label: 'Crédito parcial'  },
         { val: 'credito_completo', label: 'Crédito completo' },
       ],
-      montoAbonado: 0,
-      metodoPago: '',
-      descuento: 0,
+      // Paso 2 — pagos múltiples
+      pagos: [],
+      nuevoPagoMetodo:   'efectivo_usd',
+      nuevoPagoMoneda:   'USD',
+      nuevoPagoCuentaId: null,
+      nuevoPagoMonto:    '',
+      cuentasPorMetodo:  {},
+      tasaBcv:           null,
       // Confirmación
       confirmando: false,
       errorConfirmar: '',
       confirmadoOk: false,
       resultadoConfirmar: {},
     }
+  },
+
+  async mounted() {
+    try {
+      const r = await axios.get('/bancos/metodos-pago/cuentas')
+      this.cuentasPorMetodo = r.data
+    } catch {}
+    try {
+      const t = await axios.get('/tasa/')
+      this.tasaBcv = t.data.tasa
+    } catch {}
   },
 
   computed: {
@@ -367,16 +436,35 @@ export default {
       )
     },
     totalCalculado() {
-      return Math.max(this.subtotalCalculado - (Number(this.descuento) || 0), 0)
+      return this.subtotalCalculado
+    },
+    totalPagado() {
+      return this.pagos.reduce((s, p) => s + p.monto_usd, 0)
     },
     saldoPendiente() {
-      if (this.condicionPago === 'contado') return 0
-      if (this.condicionPago === 'credito_parcial')
-        return Math.max(this.totalCalculado - (Number(this.montoAbonado) || 0), 0)
-      return this.totalCalculado
+      if (this.condicionPago === 'credito_completo') return this.totalCalculado
+      return Math.max(this.totalCalculado - this.totalPagado, 0)
     },
     puedeConfirmar() {
       return this.lineas.length > 0 && this.totalCalculado > 0
+    },
+    metodosDisponiblesPago() {
+      const USD = [
+        { value: 'efectivo_usd', label: 'Efectivo $' },
+        { value: 'zelle',        label: 'Zelle' },
+        { value: 'binance',      label: 'Binance' },
+      ]
+      const BS = [
+        { value: 'efectivo_bs',      label: 'Efectivo Bs' },
+        { value: 'transferencia_bs', label: 'Transferencia Bs' },
+        { value: 'pago_movil',       label: 'Pago Móvil' },
+        { value: 'punto_banesco',    label: 'Punto Banesco' },
+        { value: 'punto_provincial', label: 'Punto Provincial' },
+      ]
+      return this.nuevoPagoMoneda === 'USD' ? USD : BS
+    },
+    cuentasDelNuevoPago() {
+      return this.cuentasPorMetodo[this.nuevoPagoMetodo] || []
     },
   },
 
@@ -426,11 +514,12 @@ export default {
 
     // ── Carga de datos escaneados ─────────────────────────────────────
     cargarDatosScan(data) {
-      this.numeroFactura = data.numero_factura || ''
-      this.fechaFactura  = data.fecha          || new Date().toISOString().slice(0, 10)
-      this.descuento     = Number(data.descuento_detectado) || 0
-      this.proveedorBusq = data.proveedor || ''
-      this.proveedorId   = null
+      this.numeroFactura  = data.numero_factura || ''
+      this.fechaFactura   = data.fecha || new Date().toISOString().slice(0, 10)
+      this.tieneDescuento = false
+      this.descuentoPct   = 0
+      this.proveedorBusq  = data.proveedor || ''
+      this.proveedorId    = null
 
       if (data.proveedor) this.buscarProveedorInicial(data.proveedor)
 
@@ -448,6 +537,17 @@ export default {
       }))
 
       this.lineas.forEach(l => this.autoMatchProducto(l))
+    },
+
+    // ── Descuento % ───────────────────────────────────────────────────
+    aplicarDescuento() {
+      if (!this.tieneDescuento || !this.descuentoPct) return
+      const factor = 1 - (this.descuentoPct / 100)
+      this.lineas.forEach(l => {
+        l.precio_unitario = Math.round(Number(l.precio_unitario) * factor * 10000) / 10000
+      })
+      this.tieneDescuento = false
+      this.descuentoPct   = 0
     },
 
     // ── Proveedor ─────────────────────────────────────────────────────
@@ -493,7 +593,7 @@ export default {
         if (this.proveedorId) params.proveedor_id = this.proveedorId
         const { data } = await axios.get('/facturas/buscar-producto', { params })
         if (data.length > 0) {
-          linea.match     = data[0]
+          linea.match      = data[0]
           linea._busqTexto = data[0].nombre
         }
       } catch {}
@@ -519,8 +619,8 @@ export default {
       linea._busqResultados = []
     },
     limpiarMatch(linea) {
-      linea.match      = null
-      linea._busqTexto = ''
+      linea.match            = null
+      linea._busqTexto       = ''
       linea.actualizar_costo = false
     },
     abrirLineaDropdown(linea) {
@@ -540,26 +640,57 @@ export default {
       })
     },
 
+    // ── Pagos múltiples ───────────────────────────────────────────────
+    agregarPago() {
+      const monto = Number(this.nuevoPagoMonto || 0)
+      if (monto <= 0) return
+      const cuentas = this.cuentasDelNuevoPago
+      if (cuentas.length > 1 && !this.nuevoPagoCuentaId) {
+        alert('Selecciona la cuenta destino')
+        return
+      }
+      const cuentaId     = this.nuevoPagoCuentaId || (cuentas.length === 1 ? cuentas[0].id : null)
+      const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre || null
+      const monto_usd    = this.nuevoPagoMoneda === 'USD'
+        ? monto
+        : (this.tasaBcv ? monto / this.tasaBcv : monto)
+      const label = this.metodosDisponiblesPago.find(m => m.value === this.nuevoPagoMetodo)?.label || this.nuevoPagoMetodo
+      this.pagos.push({
+        metodo:       this.nuevoPagoMetodo,
+        moneda:       this.nuevoPagoMoneda,
+        monto,
+        monto_usd:    Math.round(monto_usd * 100) / 100,
+        cuenta_id:    cuentaId,
+        cuenta_nombre: cuentaNombre,
+        label,
+      })
+      this.nuevoPagoMonto = ''
+    },
+
     // ── Confirmar compra ──────────────────────────────────────────────
     async confirmarCompra() {
       this.confirmando    = true
       this.errorConfirmar = ''
 
-      const abonadoReal =
-        this.condicionPago === 'contado'         ? this.totalCalculado :
-        this.condicionPago === 'credito_parcial' ? (Number(this.montoAbonado) || 0) :
-        0
+      const abonadoReal = this.condicionPago === 'credito_completo' ? 0 : this.totalPagado
 
       const payload = {
         proveedor_id:   this.proveedorId,
         numero_factura: this.numeroFactura,
         fecha:          this.fechaFactura || new Date().toISOString().slice(0, 10),
-        descuento:      Number(this.descuento) || 0,
+        descuento:      0,
         total_factura:  this.totalCalculado,
         condicion_pago: this.condicionPago,
         monto_abonado:  abonadoReal,
-        metodo_pago:    this.condicionPago !== 'credito_completo' ? this.metodoPago : null,
+        metodo_pago:    this.pagos[0]?.metodo || null,
         usuario:        JSON.parse(localStorage.getItem('usuario') || '{}').nombre || 'admin',
+        pagos: this.pagos.map(p => ({
+          metodo:    p.metodo,
+          moneda:    p.moneda,
+          monto:     p.monto,
+          monto_usd: p.monto_usd,
+          cuenta_id: p.cuenta_id,
+        })),
         productos: this.lineas.map(l => ({
           producto_id:         l.match?.id        || null,
           nombre_producto:     l.match?.nombre    || l.nombre_ia,
@@ -587,20 +718,24 @@ export default {
     },
 
     resetearFormulario() {
-      this.paso            = 1
+      this.paso                = 1
       this.archivoSeleccionado = null
-      this.previewUrl      = null
-      this.lineas          = []
-      this.proveedorId     = null
-      this.proveedorBusq   = ''
-      this.provResultados  = []
-      this.numeroFactura   = ''
-      this.fechaFactura    = ''
-      this.descuento       = 0
-      this.condicionPago   = 'credito_completo'
-      this.montoAbonado    = 0
-      this.metodoPago      = ''
-      this.errorConfirmar  = ''
+      this.previewUrl          = null
+      this.lineas              = []
+      this.proveedorId         = null
+      this.proveedorBusq       = ''
+      this.provResultados      = []
+      this.numeroFactura       = ''
+      this.fechaFactura        = ''
+      this.tieneDescuento      = false
+      this.descuentoPct        = 0
+      this.condicionPago       = 'credito_completo'
+      this.pagos               = []
+      this.nuevoPagoMonto      = ''
+      this.nuevoPagoMoneda     = 'USD'
+      this.nuevoPagoMetodo     = 'efectivo_usd'
+      this.nuevoPagoCuentaId   = null
+      this.errorConfirmar      = ''
       if (this.$refs.fileInput) this.$refs.fileInput.value = ''
     },
 
@@ -757,6 +892,26 @@ select.input-field { cursor: pointer; }
 .btn-condicion.active { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; font-weight: 600; }
 .btn-condicion:not(.active):hover { border-color: #FFCC00; }
 
+.btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.txt-muted { color: var(--texto-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem; }
+
+/* Pagos múltiples */
+.pago-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--fondo-tabla-alt, #F8F8F4); border-radius: 6px;
+  padding: 0.4rem 0.75rem; margin-bottom: 0.35rem;
+  font-size: 0.85rem; flex-wrap: wrap;
+}
+.pago-metodo { font-weight: 600; color: var(--texto-principal); }
+.pago-cuenta { color: var(--texto-muted); font-size: 0.8rem; }
+.pago-monto  { color: #DC2626; font-weight: 600; margin-left: auto; }
+.pago-usd    { color: var(--texto-muted); font-size: 0.78rem; }
+.nuevo-pago-form {
+  background: var(--fondo-tabla-alt, #F8F8F4);
+  border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;
+}
+.cuenta-unica { color: #16A34A; font-size: 0.82rem; font-weight: 600; }
+
 .resumen-box {
   background: var(--fondo-sidebar, #F8F8F8);
   border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem;
@@ -767,7 +922,6 @@ select.input-field { cursor: pointer; }
   border-bottom: 1px solid var(--borde);
 }
 .resumen-row:last-child { border-bottom: none; }
-.descuento-row { color: #DC2626; }
 .total-row     { font-weight: 700; font-size: 1rem; color: var(--texto-principal); }
 .abono-row     { color: #15803D; }
 .saldo-row     { color: #DC2626; font-weight: 600; }

@@ -199,7 +199,6 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
     total_factura  = float(datos.get("total_factura", 0))
     condicion_pago = datos.get("condicion_pago", "credito_completo")
     monto_abonado  = float(datos.get("monto_abonado", 0))
-    metodo_pago    = datos.get("metodo_pago")
     usuario        = datos.get("usuario", "admin")
 
     try:
@@ -297,27 +296,33 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             costo_anterior           = costo_ant,
         ))
 
-    # ── Movimiento bancario si hubo pago ──────────────────────────────────────
-    if abonado_real > 0 and metodo_pago:
+    # ── Movimientos bancarios por cada pago ──────────────────────────────────
+    pagos_data = datos.get("pagos", [])
+    if pagos_data and abonado_real > 0:
         tasa_rec = db.query(TasaCambio).order_by(TasaCambio.fecha.desc()).first()
-        tasa     = tasa_rec.tasa if tasa_rec else 1.0
+        tasa     = float(tasa_rec.tasa if tasa_rec else 1.0)
         prov     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
-
-        db.add(MovimientoBancario(
-            fecha            = datetime.now(),
-            tipo             = "pago_proveedor",
-            cuenta_origen_id = None,
-            monto            = round(abonado_real, 2),
-            moneda           = "USD",
-            tasa_cambio      = tasa,
-            monto_convertido = round(abonado_real * tasa, 2),
-            concepto         = f"Pago factura {numero_factura}",
-            beneficiario     = prov.nombre if prov else "",
-            categoria        = "proveedores",
-            proveedor_id     = proveedor_id,
-            orden_compra_id  = orden.id,
-            registrado_por   = usuario,
-        ))
+        for pago in pagos_data:
+            monto_pago  = float(pago.get("monto", 0))
+            moneda_pago = pago.get("moneda", "USD")
+            cuenta_id_p = pago.get("cuenta_id")
+            if monto_pago <= 0:
+                continue
+            db.add(MovimientoBancario(
+                fecha            = datetime.now(),
+                tipo             = "pago_proveedor",
+                cuenta_origen_id = int(cuenta_id_p) if cuenta_id_p else None,
+                monto            = monto_pago,
+                moneda           = moneda_pago,
+                tasa_cambio      = tasa if moneda_pago == "Bs" else None,
+                monto_convertido = round(monto_pago / tasa, 2) if moneda_pago == "Bs" and tasa > 0 else monto_pago,
+                concepto         = f"Pago factura {numero_factura}",
+                beneficiario     = prov.nombre if prov else "",
+                categoria        = "proveedores",
+                proveedor_id     = proveedor_id,
+                orden_compra_id  = orden.id,
+                registrado_por   = usuario,
+            ))
 
     db.commit()
     return {
