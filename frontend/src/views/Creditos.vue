@@ -88,18 +88,39 @@
               <h3>Registrar abono</h3>
               <div class="form-row">
                 <div class="field">
-                  <label>Monto (USD)</label>
+                  <label>Moneda</label>
+                  <div class="btn-group">
+                    <button :class="['btn-moneda', formAbono.moneda === 'USD' ? 'activo' : '']"
+                      @click="formAbono.moneda = 'USD'; formAbono.metodo_pago = 'efectivo_usd'; formAbono.cuenta_id = null">USD</button>
+                    <button :class="['btn-moneda', formAbono.moneda === 'Bs' ? 'activo' : '']"
+                      @click="formAbono.moneda = 'Bs'; formAbono.metodo_pago = 'efectivo_bs'; formAbono.cuenta_id = null">Bs</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Monto ({{ formAbono.moneda }})</label>
                   <input v-model.number="formAbono.monto" type="number" min="0.01" step="0.01" placeholder="0.00" />
+                  <small v-if="formAbono.moneda === 'Bs' && tasaBcv" class="txt-muted">
+                    ≈ ${{ montoEquivalenteUSD.toFixed(2) }} USD
+                  </small>
                 </div>
                 <div class="field">
                   <label>Método de pago</label>
-                  <select v-model="formAbono.metodo_pago">
-                    <option value="efectivo_usd">Efectivo $</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="binance">Binance</option>
-                    <option value="transferencia_bs">Transferencia Bs</option>
-                    <option value="pago_movil">Pago Móvil</option>
+                  <select v-model="formAbono.metodo_pago" @change="formAbono.cuenta_id = null">
+                    <option v-for="m in metodosDisponibles" :key="m.value" :value="m.value">{{ m.label }}</option>
                   </select>
+                </div>
+                <div class="field" v-if="cuentasDelMetodo.length > 1">
+                  <label>Cuenta destino</label>
+                  <select v-model="formAbono.cuenta_id">
+                    <option :value="null">— Seleccionar —</option>
+                    <option v-for="c in cuentasDelMetodo" :key="c.id" :value="c.id">
+                      {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+                    </option>
+                  </select>
+                </div>
+                <div class="field" v-else-if="cuentasDelMetodo.length === 1">
+                  <label>Cuenta destino</label>
+                  <input :value="cuentasDelMetodo[0].nombre" readonly class="input-readonly" />
                 </div>
                 <div class="field">
                   <label>Observación</label>
@@ -193,12 +214,16 @@ export default {
       cargandoCredito: false,
       formAbono: {
         monto:       '',
+        moneda:      'USD',
         metodo_pago: 'efectivo_usd',
+        cuenta_id:   null,
         observacion: '',
       },
-      guardando:  false,
-      errorAbono: '',
-      abonoOk:    false,
+      guardando:        false,
+      errorAbono:       '',
+      abonoOk:          false,
+      cuentasPorMetodo: {},
+      tasaBcv:          null,
     }
   },
   computed: {
@@ -209,6 +234,39 @@ export default {
       const usado  = limite - (this.credito.saldo_credito || 0)
       return Math.min(100, Math.max(0, (usado / limite) * 100))
     },
+    cuentasDelMetodo() {
+      return this.cuentasPorMetodo[this.formAbono.metodo_pago] || []
+    },
+    metodosDisponibles() {
+      const USD = [
+        { value: 'efectivo_usd', label: 'Efectivo $' },
+        { value: 'zelle',        label: 'Zelle' },
+        { value: 'binance',      label: 'Binance' },
+      ]
+      const BS = [
+        { value: 'efectivo_bs',      label: 'Efectivo Bs' },
+        { value: 'transferencia_bs', label: 'Transferencia Bs' },
+        { value: 'pago_movil',       label: 'Pago Móvil' },
+        { value: 'punto_banesco',    label: 'Punto Banesco' },
+        { value: 'punto_provincial', label: 'Punto Provincial' },
+      ]
+      return this.formAbono.moneda === 'USD' ? USD : BS
+    },
+    montoEquivalenteUSD() {
+      if (!this.formAbono.monto) return 0
+      if (this.formAbono.moneda === 'USD') return Number(this.formAbono.monto)
+      return this.tasaBcv ? Number(this.formAbono.monto) / this.tasaBcv : 0
+    },
+  },
+  async mounted() {
+    try {
+      const r = await axios.get('/bancos/metodos-pago/cuentas')
+      this.cuentasPorMetodo = r.data
+    } catch {}
+    try {
+      const t = await axios.get('/tasa/')
+      this.tasaBcv = t.data.tasa
+    } catch {}
   },
   methods: {
     buscar() {
@@ -234,7 +292,6 @@ export default {
       try {
         const res        = await axios.get(`/clientes/${clienteId}/credito`)
         this.credito     = res.data
-        // Actualizar saldo en cliente seleccionado
         this.clienteSeleccionado.saldo_credito = res.data.saldo_credito
       } catch (e) {
         console.error(e)
@@ -250,11 +307,15 @@ export default {
       try {
         await axios.post(`/clientes/${this.clienteSeleccionado.id}/abono`, {
           monto:       Number(this.formAbono.monto),
+          moneda:      this.formAbono.moneda,
+          monto_usd:   this.montoEquivalenteUSD,
           metodo_pago: this.formAbono.metodo_pago,
+          cuenta_id:   this.formAbono.cuenta_id || (this.cuentasDelMetodo.length === 1 ? this.cuentasDelMetodo[0].id : null),
           observacion: this.formAbono.observacion,
           usuario:     this.usuario.usuario || 'admin',
+          tasa_bcv:    this.tasaBcv,
         })
-        this.abonoOk      = true
+        this.abonoOk               = true
         this.formAbono.monto       = ''
         this.formAbono.observacion = ''
         await this.cargarCredito(this.clienteSeleccionado.id)
@@ -333,6 +394,11 @@ export default {
 .btn-abonar:disabled { opacity: 0.45; cursor: not-allowed; }
 .msg-error { color: #DC2626; font-size: 0.85rem; margin: 0.5rem 0 0; }
 .msg-ok    { color: #16A34A; font-size: 0.85rem; margin: 0.5rem 0 0; font-weight: 600; }
+
+.btn-group { display: flex; gap: 0.5rem; }
+.btn-moneda { padding: 0.4rem 1rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--texto-sec); }
+.btn-moneda.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.input-readonly { background: var(--fondo-tabla-alt) !important; color: var(--texto-sec) !important; cursor: default; }
 
 /* Movimientos */
 .movimientos h3 { color: var(--texto-principal); font-size: 0.95rem; margin: 0 0 0.75rem; }

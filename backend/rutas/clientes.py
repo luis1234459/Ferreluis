@@ -11,7 +11,7 @@ from typing import Optional
 from database import get_db
 from models import (
     Cliente, VentaCliente, NivelFidelidad, PremioFidelidad,
-    Venta, PagoVenta, AbonoCredito
+    Venta, PagoVenta, AbonoCredito, MovimientoBancario
 )
 from rutas.usuarios import require_admin
 
@@ -409,13 +409,31 @@ def registrar_abono(cliente_id: int, datos: dict, db: Session = Depends(get_db))
     if monto <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
 
-    c.saldo_credito = round(float(c.saldo_credito or 0) + monto, 2)
+    moneda    = datos.get("moneda", "USD")
+    monto_usd = float(datos.get("monto_usd", monto) or monto)
+    cuenta_id = datos.get("cuenta_id")
+    tasa_bcv  = float(datos.get("tasa_bcv", 1) or 1)
+
+    c.saldo_credito = round(float(c.saldo_credito or 0) + monto_usd, 2)
     db.add(AbonoCredito(
         cliente_id  = cliente_id,
-        monto       = monto,
+        monto       = monto_usd,
         metodo_pago = datos.get("metodo_pago"),
         observacion = datos.get("observacion"),
         usuario     = datos.get("usuario"),
+    ))
+    db.add(MovimientoBancario(
+        fecha             = datetime.now(),
+        tipo              = "ingreso_externo",
+        cuenta_destino_id = int(cuenta_id) if cuenta_id else None,
+        monto             = monto,
+        moneda            = moneda,
+        tasa_cambio       = tasa_bcv if moneda == "Bs" else None,
+        monto_convertido  = monto_usd if moneda == "Bs" else None,
+        concepto          = f"Abono crédito cliente #{cliente_id}",
+        categoria         = "clientes",
+        registrado_por    = datos.get("usuario", "admin"),
+        estado            = "registrado",
     ))
     db.commit()
     return {"ok": True, "saldo_credito": c.saldo_credito}
