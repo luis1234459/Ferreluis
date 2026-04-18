@@ -131,7 +131,7 @@
 
                   <!-- Depto / Categoría — solo lectura en ambos modos -->
                   <td class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</td>
-                  <td class="txt-muted">{{ p.categoria || '—' }}</td>
+                  <td class="txt-muted">{{ nombreCategoria(p.categoria_id) }}</td>
 
                   <!-- Costo USD -->
                   <td>
@@ -1045,6 +1045,11 @@ export default {
       if (!id) return '—'
       const d = this.departamentos.find(x => x.id === id)
       return d ? d.nombre : '—'
+    },
+    nombreCategoria(id) {
+      if (!id) return '—'
+      const c = this.categorias.find(x => x.id === id)
+      return c ? c.nombre : '—'
     },
     actualizarMargen() {
       this.form.margen = Number(this.form.margen_pct || 0) / 100
