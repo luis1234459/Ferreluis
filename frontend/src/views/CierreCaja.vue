@@ -112,6 +112,35 @@
                 <span class="dev-monto-neto">${{ Math.max((resumen.total_usd || 0) - (resumen.devoluciones.total_usd || 0), 0).toFixed(2) }}</span>
               </div>
             </div>
+            <div v-if="resumen.devoluciones.detalle && resumen.devoluciones.detalle.length > 0" style="margin-top:0.75rem;">
+              <p style="font-size:0.82rem;font-weight:700;color:#92400E;margin:0 0 0.5rem;">Detalle por devolución:</p>
+              <table class="tabla-dev-detalle">
+                <thead>
+                  <tr>
+                    <th>Hora</th>
+                    <th>Cliente</th>
+                    <th>Producto(s)</th>
+                    <th>Tipo</th>
+                    <th>Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(d, i) in resumen.devoluciones.detalle" :key="i">
+                    <td>{{ formatHora(d.fecha) }}</td>
+                    <td>{{ d.cliente }}</td>
+                    <td>
+                      <span v-for="(p, j) in d.productos" :key="j">
+                        {{ p.nombre }} x{{ p.cantidad }}<br v-if="j < d.productos.length - 1"/>
+                      </span>
+                    </td>
+                    <td>{{ d.tipo }}</td>
+                    <td class="txt-rojo">
+                      {{ d.moneda === 'USD' ? '$' : 'Bs.' }}{{ Number(d.monto).toFixed(2) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Observación y cierre -->
@@ -266,6 +295,10 @@ export default {
       if (!iso) return ''
       return new Date(iso).toLocaleString('es-VE')
     },
+    formatHora(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
+    },
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -342,4 +375,9 @@ export default {
 .dev-monto { color: #DC2626; font-weight: 600; }
 .dev-neto { border-top: 1px solid #F59E0B; padding-top: 0.5rem; margin-top: 0.25rem; }
 .dev-monto-neto { color: #16A34A; font-weight: 700; font-size: 1rem; }
+
+.tabla-dev-detalle { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 0.5rem; }
+.tabla-dev-detalle th { background: #F59E0B22; color: #92400E; padding: 0.35rem 0.6rem; text-align: left; font-weight: 700; font-size: 0.78rem; }
+.tabla-dev-detalle td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #F59E0B33; color: var(--texto-principal); vertical-align: top; }
+.txt-rojo { color: #DC2626; font-weight: 600; }
 </style>

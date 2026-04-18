@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 from database import get_db
-from models import Venta, PagoVenta, CierreCaja, CuentaBancaria, MovimientoBancario, MetodoPagoCuenta, METODOS_VALIDOS
+from models import Venta, PagoVenta, CierreCaja, CuentaBancaria, MovimientoBancario, MetodoPagoCuenta, METODOS_VALIDOS, DevolucionCliente, DetalleDevolucionCliente, Cliente
 from rutas.usuarios import require_admin
 
 router = APIRouter(prefix="/cierres", tags=["cierres"])
@@ -94,6 +94,40 @@ def resumen_caja(db: Session = Depends(get_db)):
             devoluciones_por_moneda.get(moneda, 0) + monto, 2
         )
 
+    # Detalle individual de devoluciones — consulta directa a DevolucionCliente
+    devs_q = db.query(DevolucionCliente)
+    if desde:
+        devs_q = devs_q.filter(DevolucionCliente.fecha >= desde)
+    devs_q = devs_q.filter(DevolucionCliente.fecha <= ahora)
+    devs_clientes = devs_q.order_by(DevolucionCliente.fecha.asc()).all()
+
+    detalle_devoluciones = []
+    for dev in devs_clientes:
+        detalles_dev = db.query(DetalleDevolucionCliente).filter(
+            DetalleDevolucionCliente.devolucion_id == dev.id
+        ).all()
+        cliente_nombre = "—"
+        if dev.cliente_id:
+            c = db.query(Cliente).filter(Cliente.id == dev.cliente_id).first()
+            if c:
+                cliente_nombre = c.nombre
+        detalle_devoluciones.append({
+            "fecha":    dev.fecha.isoformat() if dev.fecha else None,
+            "cliente":  cliente_nombre,
+            "tipo":     dev.tipo_resolucion or "reembolso",
+            "monto":    float(dev.monto_total or 0),
+            "moneda":   "USD",
+            "productos": [
+                {
+                    "nombre":          dd.nombre_producto,
+                    "cantidad":        float(dd.cantidad or 0),
+                    "precio_unitario": float(dd.precio_unitario or 0),
+                }
+                for dd in detalles_dev
+            ],
+            "usuario": dev.usuario,
+        })
+
     return {
         "totales":         _calcular_totales_por_metodo(pagos),
         "cantidad_ventas": len(ventas),
@@ -101,9 +135,10 @@ def resumen_caja(db: Session = Depends(get_db)):
         "desde":           desde.isoformat() if desde else None,
         "hasta":           ahora.isoformat(),
         "devoluciones": {
-            "total_usd": round(total_devoluciones_usd, 2),
+            "total_usd":  round(total_devoluciones_usd, 2),
             "por_moneda": devoluciones_por_moneda,
             "cantidad":   len(devoluciones),
+            "detalle":    detalle_devoluciones,
         },
     }
 
