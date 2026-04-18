@@ -490,8 +490,12 @@
             </div>
             <div class="resumen-mixto" v-else>
               <div class="resumen-mixto-fila">
-                <span>Total venta:</span>
-                <strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong>
+                <span>Total USD:</span>
+                <strong>${{ totalUSD.toFixed(2) }}</strong>
+              </div>
+              <div class="resumen-mixto-fila">
+                <span>Total Bs:</span>
+                <strong>Bs. {{ totalBs.toFixed(2) }}</strong>
               </div>
               <div class="resumen-mixto-fila" v-if="totalAbonadoUSD > 0">
                 <span>Abonado USD:</span>
@@ -501,14 +505,16 @@
                 <span>Abonado Bs:</span>
                 <strong class="txt-verde">Bs. {{ totalAbonadoBs.toFixed(2) }}</strong>
               </div>
-              <div class="resumen-mixto-fila" v-if="saldoPendiente > 0.01" style="border-top:1px solid var(--borde);padding-top:0.4rem;margin-top:0.2rem;">
-                <span>Falta en USD:</span>
-                <strong class="txt-rojo">${{ saldoPendienteUSD.toFixed(2) }}</strong>
-              </div>
-              <div class="resumen-mixto-fila" v-if="saldoPendiente > 0.01">
-                <span>Falta en Bs:</span>
-                <strong class="txt-rojo">Bs. {{ saldoPendienteBs.toFixed(2) }}</strong>
-              </div>
+              <template v-if="saldoPendiente > 0.01">
+                <div class="resumen-mixto-fila" style="border-top:1px solid var(--borde);padding-top:0.4rem;margin-top:0.3rem;">
+                  <span>Falta en USD:</span>
+                  <strong class="txt-rojo">${{ saldoPendienteUSD.toFixed(2) }}</strong>
+                </div>
+                <div class="resumen-mixto-fila">
+                  <span>Falta en Bs:</span>
+                  <strong class="txt-rojo">Bs. {{ saldoPendienteBs.toFixed(2) }}</strong>
+                </div>
+              </template>
               <div class="resumen-mixto-fila" v-if="exceso > 0.01">
                 <span>Vuelto:</span>
                 <strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong>
@@ -824,16 +830,32 @@ export default {
     totalAbonadoBs() {
       return this.pagos.filter(p => p.moneda_pago === 'Bs').reduce((s, p) => s + p.monto_original, 0)
     },
-    saldoPendienteUSD() {
-      const totalUSD = this.subtotalUSD - (this.monedaVenta === 'USD' ? Number(this.descuentoGlobal || 0) : Number(this.descuentoGlobal || 0) / (this.tasaBcv || 1))
-      const abonadoUSD = this.pagos.reduce((s, p) => {
+    totalUSD() {
+      const descuentoUSD = this.monedaVenta === 'USD'
+        ? Number(this.descuentoGlobal || 0)
+        : (this.tasaBcv ? Number(this.descuentoGlobal || 0) / this.tasaBcv : 0)
+      return Math.max(this.subtotalUSD - descuentoUSD, 0)
+    },
+    totalBs() {
+      return this.tasaBcv ? this.totalUSD * this.tasaBcv : 0
+    },
+    pagadoUSD() {
+      return this.pagos.reduce((s, p) => {
         if (p.moneda_pago === 'USD') return s + p.monto_original
         return s + (this.tasaBcv ? p.monto_original / this.tasaBcv : 0)
       }, 0)
-      return Math.max(totalUSD - abonadoUSD, 0)
+    },
+    pagadoBs() {
+      return this.pagos.reduce((s, p) => {
+        if (p.moneda_pago === 'Bs') return s + p.monto_original
+        return s + p.monto_original * (this.tasaBcv || 1)
+      }, 0)
+    },
+    saldoPendienteUSD() {
+      return Math.max(this.totalUSD - this.pagadoUSD, 0)
     },
     saldoPendienteBs() {
-      return this.tasaBcv ? this.saldoPendienteUSD * this.tasaBcv : 0
+      return Math.max(this.totalBs - this.pagadoBs, 0)
     },
   },
   watch: {
