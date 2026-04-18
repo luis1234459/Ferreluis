@@ -58,32 +58,53 @@ def _total_ventas_en_usd(ventas: list) -> float:
 def resumen_caja(db: Session = Depends(get_db)):
     ultimo  = db.query(CierreCaja).order_by(CierreCaja.id.desc()).first()
     desde   = ultimo.fecha_hasta if ultimo else None
+    ahora   = datetime.now()
 
     q = db.query(Venta)
     if desde:
         q = q.filter(Venta.fecha > desde)
     ventas = q.all()
 
-    if not ventas:
-        return {
-            "totales":         {m: 0.0 for m in ALL_METODOS},
-            "cantidad_ventas": 0,
-            "total_usd":       0.0,
-            "desde":           desde.isoformat() if desde else None,
-            "hasta":           datetime.now().isoformat(),
-        }
-
     venta_ids = [v.id for v in ventas]
-    pagos     = db.query(PagoVenta).filter(
+    pagos = db.query(PagoVenta).filter(
         PagoVenta.venta_id.in_(venta_ids)
-    ).all()
+    ).all() if venta_ids else []
+
+    # Devoluciones del período (egresos por reembolsos a clientes)
+    dev_q = db.query(MovimientoBancario).filter(
+        MovimientoBancario.tipo == "devolucion_cliente",
+        MovimientoBancario.estado == "registrado",
+    )
+    if desde:
+        dev_q = dev_q.filter(MovimientoBancario.fecha >= desde)
+    dev_q = dev_q.filter(MovimientoBancario.fecha <= ahora)
+    devoluciones = dev_q.all()
+
+    total_devoluciones_usd = 0.0
+    devoluciones_por_moneda = {}
+    for d in devoluciones:
+        moneda = d.moneda
+        monto  = float(d.monto or 0)
+        tasa   = getattr(d, 'tasa_cambio', None)
+        if moneda == "USD":
+            total_devoluciones_usd += monto
+        elif moneda == "Bs" and tasa and float(tasa) > 0:
+            total_devoluciones_usd += monto / float(tasa)
+        devoluciones_por_moneda[moneda] = round(
+            devoluciones_por_moneda.get(moneda, 0) + monto, 2
+        )
 
     return {
         "totales":         _calcular_totales_por_metodo(pagos),
         "cantidad_ventas": len(ventas),
         "total_usd":       _total_ventas_en_usd(ventas),
         "desde":           desde.isoformat() if desde else None,
-        "hasta":           datetime.now().isoformat(),
+        "hasta":           ahora.isoformat(),
+        "devoluciones": {
+            "total_usd": round(total_devoluciones_usd, 2),
+            "por_moneda": devoluciones_por_moneda,
+            "cantidad":   len(devoluciones),
+        },
     }
 
 
@@ -110,13 +131,36 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
     esperados = _calcular_totales_por_metodo(pagos)
     contados  = data.get("contados", {})
 
+    # Devoluciones del período (egresos por reembolsos a clientes)
+    dev_q = db.query(MovimientoBancario).filter(
+        MovimientoBancario.tipo == "devolucion_cliente",
+        MovimientoBancario.estado == "registrado",
+    )
+    if desde:
+        dev_q = dev_q.filter(MovimientoBancario.fecha >= desde)
+    dev_q = dev_q.filter(MovimientoBancario.fecha <= ahora)
+    devoluciones = dev_q.all()
+
+    total_devoluciones_usd = 0.0
+    for d in devoluciones:
+        monto = float(d.monto or 0)
+        tasa  = getattr(d, 'tasa_cambio', None)
+        if d.moneda == "USD":
+            total_devoluciones_usd += monto
+        elif d.moneda == "Bs" and tasa and float(tasa) > 0:
+            total_devoluciones_usd += monto / float(tasa)
+
+    total_ventas_usd_neto = max(
+        round(_total_ventas_en_usd(ventas) - total_devoluciones_usd, 2), 0
+    )
+
     cierre = CierreCaja(
         fecha               = ahora,
         usuario             = data.get("usuario", ""),
         fecha_desde         = desde,
         fecha_hasta         = ahora,
         cantidad_ventas     = len(ventas),
-        total_ventas_usd    = _total_ventas_en_usd(ventas),
+        total_ventas_usd    = total_ventas_usd_neto,
 
         esp_efectivo_usd    = esperados["efectivo_usd"],
         esp_zelle           = esperados["zelle"],

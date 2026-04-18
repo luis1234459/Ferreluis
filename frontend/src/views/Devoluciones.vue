@@ -334,7 +334,7 @@
                   @mouseenter="indiceResaltadoCambio = idx"
                 >
                   <span class="drop-nombre">{{ prod.nombre }}</span>
-                  <span class="drop-precio txt-muted">${{ Number(prod.precio || 0).toFixed(2) }}</span>
+                  <span class="drop-precio txt-muted">${{ Number(prod.precio_referencial_usd || prod.precio_base_usd || 0).toFixed(2) }}</span>
                 </div>
               </div>
             </div>
@@ -343,7 +343,7 @@
           <div v-if="productoNuevoSeleccionado" class="prod-nuevo-info">
             <span class="prod-nv-nombre">{{ productoNuevoSeleccionado.nombre }}</span>
             <span class="txt-muted">Stock: {{ productoNuevoSeleccionado.stock }}</span>
-            <span class="txt-muted">${{ Number(productoNuevoSeleccionado.precio || 0).toFixed(2) }}</span>
+            <span class="txt-muted">${{ Number(productoNuevoSeleccionado.precio_referencial_usd || productoNuevoSeleccionado.precio_base_usd || 0).toFixed(2) }}</span>
           </div>
 
           <div v-if="productoNuevoSeleccionado">
@@ -488,7 +488,7 @@ export default {
     },
     diferenciaCambio() {
       if (!this.productoNuevoSeleccionado || !this.modalProducto) return 0
-      const nuevo    = Number(this.productoNuevoSeleccionado.precio || 0) * this.modalCantidad
+      const nuevo    = Number(this.productoNuevoSeleccionado.precio_referencial_usd || this.productoNuevoSeleccionado.precio_base_usd || 0) * this.modalCantidad
       const original = Number(this.modalProducto.precio_unitario || 0) * this.modalCantidad
       return nuevo - original
     },
