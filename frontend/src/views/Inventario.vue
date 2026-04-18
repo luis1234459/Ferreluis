@@ -296,14 +296,17 @@
               </div>
               <div class="field">
                 <label>Departamento</label>
-                <select v-model="form.departamento_id">
+                <select v-model="form.departamento_id" @change="form.categoria_id = null">
                   <option :value="null">— Sin departamento —</option>
                   <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Categoría</label>
-                <input v-model="form.categoria" placeholder="Ej: Herramientas" />
+                <select v-model="form.categoria_id">
+                  <option :value="null">— Sin categoría —</option>
+                  <option v-for="c in categoriasDelForm" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                </select>
               </div>
               <div class="field">
                 <label>Proveedor principal</label>
@@ -843,7 +846,7 @@ export default {
       guardando:   false,
       error:       '',
       form: {
-        id: null, nombre: '', categoria: '',
+        id: null, nombre: '', categoria: '', categoria_id: null,
         departamento_id: null, proveedor_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
@@ -924,6 +927,10 @@ export default {
     categoriasFiltradas() {
       if (!this.filtroDepartamento) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
+    },
+    categoriasDelForm() {
+      if (!this.form.departamento_id) return this.categorias
+      return this.categorias.filter(c => c.departamento_id === this.form.departamento_id)
     },
 
     productosFiltrados() {
@@ -1058,7 +1065,7 @@ export default {
       this.editando    = false
       this.error       = ''
       this.form = {
-        id: null, nombre: '', categoria: '', codigo: '',
+        id: null, nombre: '', categoria: '', categoria_id: null, codigo: '',
         departamento_id: null, proveedor_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
@@ -1071,6 +1078,7 @@ export default {
       this.form = {
         ...p,
         margen_pct:              Math.round(Number(p.margen) * 100),
+        categoria_id:            p.categoria_id            ?? null,
         departamento_id:         p.departamento_id         ?? null,
         proveedor_id:            p.proveedor_id            ?? null,
         es_producto_clave:       p.es_producto_clave       ?? false,
@@ -1087,7 +1095,7 @@ export default {
       try {
         const payload = {
           nombre:                  this.form.nombre,
-          categoria:               this.form.categoria      || null,
+          categoria_id:            this.form.categoria_id   || null,
           descripcion:             this.form.descripcion    || null,
           foto_url:                this.form.foto_url       || '',
           costo_usd:               Number(this.form.costo_usd),
