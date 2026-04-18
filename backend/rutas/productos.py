@@ -27,6 +27,7 @@ class ProductoSchema(BaseModel):
     costo_usd:   float          = 0.0
     margen:      float          = 0.30
 
+    categoria_id:            Optional[int]   = None
     departamento_id:         Optional[int]   = None
     proveedor_id:            Optional[int]   = None
     es_producto_clave:       bool            = False
