@@ -92,6 +92,28 @@
             </table>
           </div>
 
+          <!-- Devoluciones del período -->
+          <div class="devoluciones-card" v-if="resumen.devoluciones && resumen.devoluciones.cantidad > 0">
+            <div class="devoluciones-header">
+              <span class="devoluciones-titulo">⚠ Devoluciones del período</span>
+              <span class="devoluciones-cantidad">{{ resumen.devoluciones.cantidad }} devolución(es)</span>
+            </div>
+            <div class="devoluciones-body">
+              <div class="dev-fila">
+                <span>Total devuelto (egreso):</span>
+                <span class="dev-monto">${{ (resumen.devoluciones.total_usd || 0).toFixed(2) }}</span>
+              </div>
+              <div class="dev-fila" v-for="(monto, moneda) in resumen.devoluciones.por_moneda" :key="moneda">
+                <span>Devuelto en {{ moneda }}:</span>
+                <span class="dev-monto">{{ moneda === 'USD' ? '$' : 'Bs.' }} {{ monto.toFixed(2) }}</span>
+              </div>
+              <div class="dev-fila dev-neto">
+                <span>Neto del período (ventas − devoluciones):</span>
+                <span class="dev-monto-neto">${{ Math.max((resumen.total_usd || 0) - (resumen.devoluciones.total_usd || 0), 0).toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Observación y cierre -->
           <div class="cierre-footer">
             <div class="field">
@@ -303,4 +325,21 @@ export default {
 
 .historial { margin-top: 2rem; }
 .seccion-titulo { color: var(--texto-principal); font-size: 1.05rem; font-weight: 700; margin: 0 0 1rem; }
+
+.devoluciones-card {
+  background: #FFF7ED; border: 1px solid #F59E0B;
+  border-radius: 12px; padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.devoluciones-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 0.75rem;
+}
+.devoluciones-titulo { font-weight: 700; color: #92400E; font-size: 0.95rem; }
+.devoluciones-cantidad { color: #92400E; font-size: 0.85rem; }
+.devoluciones-body { display: flex; flex-direction: column; gap: 0.3rem; }
+.dev-fila { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--texto-sec); }
+.dev-monto { color: #DC2626; font-weight: 600; }
+.dev-neto { border-top: 1px solid #F59E0B; padding-top: 0.5rem; margin-top: 0.25rem; }
+.dev-monto-neto { color: #16A34A; font-weight: 700; font-size: 1rem; }
 </style>
