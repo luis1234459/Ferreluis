@@ -200,7 +200,7 @@
             <!-- Botones inferiores (siempre visibles) -->
             <div class="botones-carrito" v-if="carrito.length > 0">
               <button class="btn-guardar-presupuesto" @click="abrirModalPresupuesto">📋 Guardar como presupuesto</button>
-              <button class="btn-abrir-cobro" @click="modalCobro = true">✓ Registrar venta</button>
+              <button class="btn-abrir-cobro" @click="abrirModalCobro">✓ Registrar venta</button>
             </div>
 
             <!-- Éxito post-venta -->
@@ -416,26 +416,18 @@
           <strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong>
         </div>
 
+        <div class="modo-cobro-selector">
+          <button :class="['btn-modo', modoCobro === 'USD' ? 'activo' : '']" @click="modoCobro = 'USD'">💵 USD</button>
+          <button :class="['btn-modo', modoCobro === 'Bs' ? 'activo' : '']" @click="modoCobro = 'Bs'">🇻🇪 Bs</button>
+          <button :class="['btn-modo', modoCobro === 'mixto' ? 'activo' : '']" @click="modoCobro = 'mixto'">⚡ Mixto</button>
+        </div>
+
         <!-- Formulario de pago -->
         <div class="cobro-modal-body">
           <div class="form-pago">
             <div class="form-pago-row">
               <select v-model="nuevoMetodo" @change="onCambioMetodo">
-                <optgroup label="— USD —">
-                  <option value="efectivo_usd">Efectivo $</option>
-                  <option value="zelle">Zelle</option>
-                  <option value="binance">Binance</option>
-                </optgroup>
-                <optgroup label="— Bolívares —">
-                  <option value="efectivo_bs">Efectivo Bs</option>
-                  <option value="transferencia_bs">Transferencia Bs</option>
-                  <option value="pago_movil">Pago Móvil</option>
-                  <option value="punto_banesco">Punto Banesco</option>
-                  <option value="punto_provincial">Punto Provincial</option>
-                </optgroup>
-                <optgroup label="— Crédito —" v-if="clienteSeleccionado && clienteSeleccionado.tiene_credito">
-                  <option value="credito">A crédito</option>
-                </optgroup>
+                <option v-for="m in metodosDisponibles" :key="m.value" :value="m.value">{{ m.label }}</option>
               </select>
 
               <select v-if="cuentasDelMetodo.length > 1"
@@ -467,6 +459,9 @@
             <div class="equiv-preview" v-if="nuevoMonto > 0 && nuevoEquivalente !== null">
               <span class="equiv-label">Equivale en {{ monedaVenta }}:</span>
               <span class="equiv-valor">{{ formatMonto(nuevoEquivalente, monedaVenta) }}</span>
+              <span v-if="nuevoMonedaPago !== monedaVenta && tasaBcv" class="equiv-cruce">
+                {{ nuevoMonedaPago === 'USD' ? 'Bs. ' + (nuevoMonto * tasaBcv).toFixed(2) : '$' + (nuevoMonto / tasaBcv).toFixed(2) + ' USD' }}
+              </span>
               <span class="saldo-preview"
                 :class="nuevoEquivalente > saldoPendiente + 0.01 ? 'exceso' : ''">
                 (Saldo: {{ formatMonto(saldoPendiente, monedaVenta) }})
@@ -486,12 +481,21 @@
             </div>
           </div>
 
-          <div class="resumen-cobro" v-if="pagos.length > 0">
-            <div class="resumen-fila"><span>Total:</span><strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong></div>
-            <div class="resumen-fila"><span>Abonado:</span><strong class="txt-verde">{{ formatMonto(totalAbonado, monedaVenta) }}</strong></div>
-            <div class="resumen-fila" v-if="saldoPendiente > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(saldoPendiente, monedaVenta) }}</strong></div>
-            <div class="resumen-fila" v-if="exceso > 0.01"><span>Vuelto:</span><strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong></div>
-          </div>
+          <template v-if="pagos.length > 0">
+            <div class="resumen-cobro" v-if="modoCobro !== 'mixto'">
+              <div class="resumen-fila"><span>Total:</span><strong>{{ formatMonto(totalEnMoneda, monedaVenta) }}</strong></div>
+              <div class="resumen-fila"><span>Abonado:</span><strong class="txt-verde">{{ formatMonto(totalAbonado, monedaVenta) }}</strong></div>
+              <div class="resumen-fila" v-if="saldoPendiente > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(saldoPendiente, monedaVenta) }}</strong></div>
+              <div class="resumen-fila" v-if="exceso > 0.01"><span>Vuelto:</span><strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong></div>
+            </div>
+            <div class="resumen-mixto" v-else>
+              <div class="resumen-mixto-fila" v-if="totalAbonadoUSD > 0"><span>Abonado USD:</span><strong class="txt-verde">${{ totalAbonadoUSD.toFixed(2) }}</strong></div>
+              <div class="resumen-mixto-fila" v-if="totalAbonadoBs > 0"><span>Abonado Bs:</span><strong class="txt-verde">Bs. {{ totalAbonadoBs.toFixed(2) }}</strong></div>
+              <div class="resumen-mixto-fila"><span>Equivalente total:</span><strong>{{ formatMonto(totalAbonado, monedaVenta) }}</strong></div>
+              <div class="resumen-mixto-fila" v-if="saldoPendiente > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(saldoPendiente, monedaVenta) }}</strong></div>
+              <div class="resumen-mixto-fila" v-if="exceso > 0.01"><span>Vuelto:</span><strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong></div>
+            </div>
+          </template>
 
           <div v-if="requiereAutorizacion" class="autorizacion-box">
             <p class="aut-titulo">Se requiere autorización</p>
@@ -675,6 +679,7 @@ export default {
 
       // Modal cobro
       modalCobro: false,
+      modoCobro: 'USD',
 
       // Modal presupuesto
       modalPresupuesto: false,
@@ -774,8 +779,40 @@ export default {
       }
     },
     cuentasDelMetodo() { return this.cuentasPorMetodo[this.nuevoMetodo] || [] },
+    metodosDisponibles() {
+      const USD = [
+        { value: 'efectivo_usd',  label: 'Efectivo $' },
+        { value: 'zelle',         label: 'Zelle' },
+        { value: 'binance',       label: 'Binance' },
+      ]
+      const BS = [
+        { value: 'efectivo_bs',      label: 'Efectivo Bs' },
+        { value: 'transferencia_bs', label: 'Transferencia Bs' },
+        { value: 'pago_movil',       label: 'Pago Móvil' },
+        { value: 'punto_banesco',    label: 'Punto Banesco' },
+        { value: 'punto_provincial', label: 'Punto Provincial' },
+      ]
+      if (this.modoCobro === 'USD') return USD
+      if (this.modoCobro === 'Bs')  return BS
+      const all = [...USD, ...BS]
+      if (this.clienteSeleccionado?.tiene_credito)
+        all.push({ value: 'credito', label: 'A crédito' })
+      return all
+    },
+    totalAbonadoUSD() {
+      return this.pagos.filter(p => p.moneda_pago === 'USD').reduce((s, p) => s + p.monto_original, 0)
+    },
+    totalAbonadoBs() {
+      return this.pagos.filter(p => p.moneda_pago === 'Bs').reduce((s, p) => s + p.monto_original, 0)
+    },
   },
   watch: {
+    modoCobro() {
+      if (!this.metodosDisponibles.some(m => m.value === this.nuevoMetodo)) {
+        this.nuevoMetodo = this.metodosDisponibles[0]?.value || 'efectivo_usd'
+        this.onCambioMetodo()
+      }
+    },
     busqueda() {
       this.indiceResaltado = -1
       clearTimeout(this._busquedaTimer)
@@ -1045,6 +1082,10 @@ export default {
       finally { this.cargandoHistorial = false }
     },
 
+    abrirModalCobro() {
+      this.modoCobro = this.monedaVenta === 'Bs' ? 'Bs' : 'USD'
+      this.modalCobro = true
+    },
     async cobrar(accion = 'solo') {
       this.error = ''
       if (!this.pagoCompleto)       { this.error = 'El cobro no cubre el total'; return }
@@ -1364,12 +1405,11 @@ export default {
 .pi-precios {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
   flex-shrink: 0;
-  margin-left: auto;
 }
-.pi-bs    { color: #B08800; font-size: 0.85rem; white-space: nowrap; font-weight: 700; }
-.pi-ref   { color: #16A34A; font-size: 0.85rem; white-space: nowrap; font-weight: 700; }
+.pi-bs    { color: #B08800; font-size: 0.85rem; font-weight: 700; min-width: 90px; text-align: right; }
+.pi-ref   { color: #16A34A; font-size: 0.85rem; font-weight: 700; min-width: 70px; text-align: right; }
 .pi-stock { color: var(--texto-muted); font-size: 0.82rem; white-space: nowrap; background: var(--borde-suave); padding: 0.1rem 0.4rem; border-radius: 4px; }
 .pi-base   { color: var(--texto-muted); font-size: 0.75rem; display: none; white-space: nowrap; }
 
@@ -1698,4 +1738,12 @@ export default {
   .carrito-col { height: auto; position: static; }
   .carrito-box { flex: none; max-height: 50vh; }
 }
+
+.modo-cobro-selector { display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem; background: var(--borde-suave); border-bottom: 1px solid var(--borde); }
+.btn-modo { flex: 1; padding: 0.5rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--texto-sec); transition: all 0.15s; }
+.btn-modo:hover { border-color: #1A1A1A; color: var(--texto-principal); }
+.btn-modo.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.resumen-mixto { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; border: 1px solid var(--borde); display: flex; flex-direction: column; gap: 0.3rem; }
+.resumen-mixto-fila { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--texto-sec); }
+.equiv-cruce { color: var(--texto-muted); font-size: 0.82rem; background: var(--borde-suave); padding: 0.1rem 0.4rem; border-radius: 4px; }
 </style>
