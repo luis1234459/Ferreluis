@@ -620,6 +620,7 @@ export default {
     // ─── Cliente — paso 2: búsqueda de ventas ────────────────────────────────
 
     async buscarVentas() {
+      const expandidasAntes  = { ...this.ventasExpandidas }
       this.buscando          = true
       this.busqRealizada     = true
       this.ventasEncontradas = []
@@ -653,9 +654,13 @@ export default {
 
         const res = await axios.get('/devoluciones/buscar-ventas', { params })
         this.ventasEncontradas = res.data
-        if (res.data.length === 1) {
-          this.ventasExpandidas = { [res.data[0].venta_id]: true }
-        }
+
+        const nuevasExpandidas = {}
+        res.data.forEach(v => {
+          if (expandidasAntes[v.venta_id]) nuevasExpandidas[v.venta_id] = true
+        })
+        if (res.data.length === 1) nuevasExpandidas[res.data[0].venta_id] = true
+        this.ventasExpandidas = nuevasExpandidas
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al buscar ventas'
       } finally {
