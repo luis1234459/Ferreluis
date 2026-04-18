@@ -302,6 +302,13 @@
         <!-- Reembolso -->
         <div v-if="modalTipo === 'reembolso'" class="modal-sub">
           <div class="modal-field">
+            <label>Moneda</label>
+            <div class="btn-group">
+              <button :class="['btn-moneda', modalMoneda === 'USD' ? 'activo' : '']" @click="modalMoneda = 'USD'">USD</button>
+              <button :class="['btn-moneda', modalMoneda === 'Bs' ? 'activo' : '']" @click="modalMoneda = 'Bs'">Bs</button>
+            </div>
+          </div>
+          <div class="modal-field">
             <label>Método de devolución</label>
             <select v-model="modalMetodoPago">
               <option value="efectivo_usd">Efectivo USD</option>
@@ -312,7 +319,7 @@
             </select>
           </div>
           <div class="monto-preview-modal">
-            Monto a devolver: <strong>${{ montoDevolucion.toFixed(2) }}</strong>
+            Monto a devolver: <strong>{{ simboloMoneda }} {{ montoEnMoneda.toFixed(2) }}</strong>
           </div>
         </div>
 
@@ -363,15 +370,37 @@
             />
           </div>
 
-          <div v-if="productoNuevoSeleccionado" class="monto-info">
-            <div class="monto-fila"><span>Total devuelto:</span><span>${{ totalDevuelto.toFixed(2) }}</span></div>
-            <div class="monto-fila"><span>Total producto nuevo:</span><span>${{ totalNuevo.toFixed(2) }}</span></div>
-            <div v-if="diferenciaCambio > 0" class="monto-fila txt-verde"><span>Cliente paga:</span><strong>${{ diferenciaCambio.toFixed(2) }}</strong></div>
-            <div v-else-if="diferenciaCambio < 0" class="monto-fila txt-rojo"><span>Negocio devuelve:</span><strong>${{ Math.abs(diferenciaCambio).toFixed(2) }}</strong></div>
-            <div v-else class="monto-fila txt-muted"><span>Sin diferencia</span></div>
+          <div v-if="productoNuevoSeleccionado" class="cambio-resumen">
+            <div class="cambio-fila"><span>Total devuelto:</span><span>${{ totalDevuelto.toFixed(2) }}</span></div>
+            <div class="cambio-fila"><span>Total producto nuevo ({{ cantidadNueva }} u.):</span><span>${{ totalNuevo.toFixed(2) }}</span></div>
+            <div class="cambio-fila cambio-diff" v-if="diferenciaCambio > 0">
+              <span>Cliente paga:</span><span class="txt-verde">{{ simboloMoneda }} {{ montoEnMoneda.toFixed(2) }}</span>
+            </div>
+            <div class="cambio-fila cambio-diff" v-else-if="diferenciaCambio < 0">
+              <span>Negocio devuelve:</span><span class="txt-rojo">{{ simboloMoneda }} {{ montoEnMoneda.toFixed(2) }}</span>
+            </div>
+            <div class="cambio-fila" v-else><span>Sin diferencia</span></div>
           </div>
 
-          <div v-if="productoNuevoSeleccionado && diferenciaCambio !== 0"
+          <div v-if="productoNuevoSeleccionado && diferenciaCambio !== 0" class="modal-field mt-50">
+            <label>Moneda</label>
+            <div class="btn-group">
+              <button :class="['btn-moneda', modalMoneda === 'USD' ? 'activo' : '']" @click="modalMoneda = 'USD'">USD</button>
+              <button :class="['btn-moneda', modalMoneda === 'Bs' ? 'activo' : '']" @click="modalMoneda = 'Bs'">Bs</button>
+            </div>
+          </div>
+
+          <div v-if="productoNuevoSeleccionado && diferenciaCambio < 0" class="modal-field mt-50">
+            <label>¿Cómo recibe el cliente la diferencia?</label>
+            <div class="btn-group">
+              <button :class="['btn-opcion', resolucionDiferencia === 'devolver' ? 'activo' : '']"
+                @click="resolucionDiferencia = 'devolver'">💵 Devolver dinero</button>
+              <button :class="['btn-opcion', resolucionDiferencia === 'credito' ? 'activo' : '']"
+                @click="resolucionDiferencia = 'credito'">🏦 Saldo a favor</button>
+            </div>
+          </div>
+
+          <div v-if="productoNuevoSeleccionado && (diferenciaCambio > 0 || (diferenciaCambio < 0 && resolucionDiferencia === 'devolver'))"
                class="diferencia-box"
                :class="diferenciaCambio > 0 ? 'dif-cobrar' : 'dif-devolver'">
             <div class="modal-field">
@@ -478,6 +507,9 @@ export default {
       productoNuevoSeleccionado: null,
       indiceResaltadoCambio:     -1,
       cantidadNueva:             1,
+      modalMoneda:               'USD',
+      resolucionDiferencia:      'devolver',
+      tasaBcv:                   null,
       procesando:                false,
     }
   },
@@ -507,6 +539,12 @@ export default {
       if (!this.productoNuevoSeleccionado || !this.modalProducto) return 0
       return this.totalNuevo - this.totalDevuelto
     },
+    montoEnMoneda() {
+      const monto = this.modalTipo === 'cambio' ? Math.abs(this.diferenciaCambio) : this.totalDevuelto
+      if (this.modalMoneda === 'Bs' && this.tasaBcv) return monto * this.tasaBcv
+      return monto
+    },
+    simboloMoneda() { return this.modalMoneda === 'USD' ? '$' : 'Bs.' },
     puedeConfirmar() {
       if (!this.modalProducto) return false
       const maxDev = this.modalProducto.cantidad_disponible ?? this.modalProducto.cantidad
@@ -522,7 +560,7 @@ export default {
     },
   },
   async mounted() {
-    await this.cargarProveedores()
+    await Promise.all([this.cargarProveedores(), this.cargarTasa()])
   },
   methods: {
 
@@ -545,6 +583,13 @@ export default {
       try {
         const res = await axios.get('/compras/proveedores/')
         this.proveedores = res.data
+      } catch (_) {}
+    },
+
+    async cargarTasa() {
+      try {
+        const res = await axios.get('/tasa/')
+        this.tasaBcv = res.data.tasa || null
       } catch (_) {}
     },
 
@@ -704,6 +749,8 @@ export default {
       this.productoNuevoSeleccionado = null
       this.indiceResaltadoCambio     = -1
       this.cantidadNueva             = 1
+      this.modalMoneda               = 'USD'
+      this.resolucionDiferencia      = 'devolver'
       this.procesando                = false
       this.modalAbierto              = true
     },
@@ -770,11 +817,17 @@ export default {
           observacion:       this.modalObservacion || null,
           metodo_pago:       this.modalTipo !== 'credito' ? this.modalMetodoPago : null,
         }
+        payload.moneda   = this.modalMoneda
+        payload.tasa_bcv = this.tasaBcv
         if (this.modalTipo === 'cambio' && this.productoNuevoSeleccionado) {
           payload.producto_nuevo_id    = this.productoNuevoSeleccionado.id
           payload.cantidad_nueva       = this.cantidadNueva
           payload.monto_diferencia     = Math.abs(this.diferenciaCambio)
-          payload.direccion_diferencia = this.diferenciaCambio > 0 ? 'cobrar' : this.diferenciaCambio < 0 ? 'devolver' : 'ninguna'
+          payload.direccion_diferencia = this.diferenciaCambio > 0
+            ? 'cobrar'
+            : this.diferenciaCambio < 0
+              ? (this.resolucionDiferencia === 'credito' ? 'credito_cliente' : 'devolver')
+              : 'ninguna'
         }
         await axios.post('/devoluciones/cliente/procesar', payload)
         this.cerrarModal()
@@ -916,6 +969,14 @@ export default {
 
 .monto-info  { margin: 0.25rem 1.25rem 0.5rem; background: var(--borde-suave); border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem 0.85rem; display: flex; flex-direction: column; gap: 0.25rem; }
 .monto-fila  { display: flex; justify-content: space-between; font-size: 0.87rem; color: var(--texto-sec); }
+.cambio-resumen { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 1.25rem 0.5rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.cambio-fila { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--texto-sec); }
+.cambio-diff { font-weight: 700; font-size: 1rem; border-top: 1px solid var(--borde); padding-top: 0.4rem; margin-top: 0.2rem; }
+.btn-moneda { padding: 0.4rem 1rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--texto-sec); }
+.btn-moneda.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-opcion { padding: 0.5rem 1rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: var(--texto-sec); }
+.btn-opcion.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .diferencia-box { margin: 0.25rem 1.25rem 0.5rem; padding: 0.6rem 0.85rem; border-radius: 7px; font-size: 0.87rem; }
 .dif-cobrar     { background: #DCFCE7; border: 1px solid #16A34A33; }
 .dif-devolver   { background: #FEE2E2; border: 1px solid #DC262633; }
