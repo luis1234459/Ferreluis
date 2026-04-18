@@ -310,13 +310,22 @@
           </div>
           <div class="modal-field">
             <label>Método de devolución</label>
-            <select v-model="modalMetodoPago">
+            <select v-model="modalMetodoPago" @change="onCambioMetodoModal">
               <option value="efectivo_usd">Efectivo USD</option>
               <option value="efectivo_bs">Efectivo Bs</option>
               <option value="pago_movil">Pago Móvil</option>
               <option value="zelle">Zelle</option>
               <option value="transferencia">Transferencia</option>
             </select>
+            <select v-if="cuentasDelMetodoModal.length > 1" v-model="modalCuentaId" class="sel-cuenta">
+              <option :value="null">— Cuenta destino —</option>
+              <option v-for="c in cuentasDelMetodoModal" :key="c.id" :value="c.id">
+                {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+              </option>
+            </select>
+            <span v-else-if="cuentasDelMetodoModal.length === 1" class="cuenta-unica">
+              {{ cuentasDelMetodoModal[0].nombre }}
+            </span>
           </div>
           <div class="monto-preview-modal">
             Monto a devolver: <strong>{{ simboloMoneda }} {{ montoEnMoneda.toFixed(2) }}</strong>
@@ -405,13 +414,22 @@
                :class="diferenciaCambio > 0 ? 'dif-cobrar' : 'dif-devolver'">
             <div class="modal-field">
               <label>{{ diferenciaCambio > 0 ? 'Método de cobro' : 'Método de devolución' }}</label>
-              <select v-model="modalMetodoPago">
+              <select v-model="modalMetodoPago" @change="onCambioMetodoModal">
                 <option value="efectivo_usd">Efectivo USD</option>
                 <option value="efectivo_bs">Efectivo Bs</option>
                 <option value="pago_movil">Pago Móvil</option>
                 <option value="zelle">Zelle</option>
                 <option value="transferencia">Transferencia</option>
               </select>
+              <select v-if="cuentasDelMetodoModal.length > 1" v-model="modalCuentaId" class="sel-cuenta">
+                <option :value="null">— Cuenta destino —</option>
+                <option v-for="c in cuentasDelMetodoModal" :key="c.id" :value="c.id">
+                  {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+                </option>
+              </select>
+              <span v-else-if="cuentasDelMetodoModal.length === 1" class="cuenta-unica">
+                {{ cuentasDelMetodoModal[0].nombre }}
+              </span>
             </div>
           </div>
         </div>
@@ -510,6 +528,8 @@ export default {
       modalMoneda:               'USD',
       resolucionDiferencia:      'devolver',
       tasaBcv:                   null,
+      cuentasPorMetodo:          {},
+      modalCuentaId:             null,
       procesando:                false,
     }
   },
@@ -539,6 +559,9 @@ export default {
       if (!this.productoNuevoSeleccionado || !this.modalProducto) return 0
       return this.totalNuevo - this.totalDevuelto
     },
+    cuentasDelMetodoModal() {
+      return this.cuentasPorMetodo[this.modalMetodoPago] || []
+    },
     montoEnMoneda() {
       const monto = this.modalTipo === 'cambio' ? Math.abs(this.diferenciaCambio) : this.totalDevuelto
       if (this.modalMoneda === 'Bs' && this.tasaBcv) return monto * this.tasaBcv
@@ -560,7 +583,7 @@ export default {
     },
   },
   async mounted() {
-    await Promise.all([this.cargarProveedores(), this.cargarTasa()])
+    await Promise.all([this.cargarProveedores(), this.cargarTasa(), this.cargarCuentasPorMetodo()])
   },
   methods: {
 
@@ -591,6 +614,18 @@ export default {
         const res = await axios.get('/tasa/')
         this.tasaBcv = res.data.tasa || null
       } catch (_) {}
+    },
+
+    async cargarCuentasPorMetodo() {
+      try {
+        const r = await axios.get('/bancos/metodos-pago/cuentas')
+        this.cuentasPorMetodo = r.data
+      } catch (_) {}
+    },
+
+    onCambioMetodoModal() {
+      const cuentas = this.cuentasDelMetodoModal
+      this.modalCuentaId = cuentas.length === 1 ? cuentas[0].id : null
     },
 
     async cargarProductosProveedor() {
@@ -751,6 +786,7 @@ export default {
       this.cantidadNueva             = 1
       this.modalMoneda               = 'USD'
       this.resolucionDiferencia      = 'devolver'
+      this.modalCuentaId             = null
       this.procesando                = false
       this.modalAbierto              = true
     },
@@ -817,8 +853,9 @@ export default {
           observacion:       this.modalObservacion || null,
           metodo_pago:       this.modalTipo !== 'credito' ? this.modalMetodoPago : null,
         }
-        payload.moneda   = this.modalMoneda
-        payload.tasa_bcv = this.tasaBcv
+        payload.moneda    = this.modalMoneda
+        payload.tasa_bcv  = this.tasaBcv
+        payload.cuenta_id = this.modalCuentaId || (this.cuentasDelMetodoModal.length === 1 ? this.cuentasDelMetodoModal[0].id : null)
         if (this.modalTipo === 'cambio' && this.productoNuevoSeleccionado) {
           payload.producto_nuevo_id    = this.productoNuevoSeleccionado.id
           payload.cantidad_nueva       = this.cantidadNueva
@@ -977,6 +1014,8 @@ export default {
 .btn-opcion { padding: 0.5rem 1rem; background: #FFFFFF; border: 1px solid var(--borde); border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: var(--texto-sec); }
 .btn-opcion.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
 .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.sel-cuenta   { margin-top: 0.4rem; padding: 0.35rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; width: 100%; }
+.cuenta-unica { display: block; margin-top: 0.3rem; font-size: 0.82rem; color: var(--texto-muted); }
 .diferencia-box { margin: 0.25rem 1.25rem 0.5rem; padding: 0.6rem 0.85rem; border-radius: 7px; font-size: 0.87rem; }
 .dif-cobrar     { background: #DCFCE7; border: 1px solid #16A34A33; }
 .dif-devolver   { background: #FEE2E2; border: 1px solid #DC262633; }

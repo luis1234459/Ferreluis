@@ -70,8 +70,10 @@ def _serializar_dev_proveedor(d: DevolucionProveedor, db: Session) -> dict:
     }
 
 
-def _cuenta_para_metodo(db: Session, metodo_pago: str) -> Optional[int]:
-    """Devuelve el cuenta_id vinculado al método de pago, o None si no existe."""
+def _cuenta_para_metodo(db: Session, metodo_pago: str, cuenta_id_manual: int = None) -> Optional[int]:
+    """Devuelve el cuenta_id: usa cuenta_id_manual si viene, si no busca por método."""
+    if cuenta_id_manual:
+        return int(cuenta_id_manual)
     mc = db.query(MetodoPagoCuenta).filter(
         MetodoPagoCuenta.metodo_pago == metodo_pago,
         MetodoPagoCuenta.activo == True,
@@ -232,6 +234,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
     producto_nuevo_id = datos.get("producto_nuevo_id")
     cantidad_nueva    = int(datos.get("cantidad_nueva", 1) or 1)
     metodo_pago       = datos.get("metodo_pago", "efectivo_usd")
+    cuenta_id_manual  = datos.get("cuenta_id")
     usuario           = datos.get("usuario", "admin")
     observacion       = datos.get("observacion", "")
 
@@ -275,7 +278,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
 
     if tipo == "reembolso":
         # Egreso de caja — se devuelve dinero al cliente
-        cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+        cuenta_id = _cuenta_para_metodo(db, metodo_pago, cuenta_id_manual)
         moneda    = "USD" if metodo_pago in METODOS_USD_SET else "Bs"
         db.add(MovimientoBancario(
             fecha             = ahora,
@@ -309,7 +312,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
         )
 
         if dir_diferencia_real == "cobrar" and monto_diferencia_real > 0:
-            cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+            cuenta_id = _cuenta_para_metodo(db, metodo_pago, cuenta_id_manual)
             db.add(MovimientoBancario(
                 fecha              = ahora,
                 tipo               = "ingreso_venta",
@@ -322,7 +325,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
                 estado             = "registrado",
             ))
         elif dir_diferencia_real == "devolver" and monto_diferencia_real > 0:
-            cuenta_id = _cuenta_para_metodo(db, metodo_pago)
+            cuenta_id = _cuenta_para_metodo(db, metodo_pago, cuenta_id_manual)
             db.add(MovimientoBancario(
                 fecha             = ahora,
                 tipo              = "devolucion_cliente",
