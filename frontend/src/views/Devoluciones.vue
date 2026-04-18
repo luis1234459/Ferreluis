@@ -118,8 +118,14 @@
                     <span class="prod-nombre">{{ p.nombre }}</span>
                     <span class="prod-cant txt-muted">Cant: {{ p.cantidad }}</span>
                     <span class="prod-precio txt-muted">${{ Number(p.precio_unitario).toFixed(2) }} c/u</span>
+                    <span v-if="p.cantidad_disponible === 0" class="badge-devuelto">Ya devuelto</span>
+                    <span v-else-if="p.cantidad_devuelta > 0" class="badge-parcial">Parcial: {{ p.cantidad_devuelta }} devuelto(s)</span>
                   </div>
-                  <button class="btn-devolver" @click="abrirModal(v, p)">Devolver</button>
+                  <button
+                    v-if="p.cantidad_disponible > 0"
+                    class="btn-devolver"
+                    @click="abrirModal(v, p)"
+                  >Devolver</button>
                 </div>
               </div>
             </div>
@@ -251,10 +257,10 @@
               type="number"
               v-model.number="modalCantidad"
               min="1"
-              :max="modalProducto?.cantidad"
+              :max="modalProducto?.cantidad_disponible ?? modalProducto?.cantidad"
               class="inp-cant"
             />
-            <span class="txt-muted">/ {{ modalProducto?.cantidad }} disponibles</span>
+            <span class="txt-muted">/ {{ modalProducto?.cantidad_disponible ?? modalProducto?.cantidad }} disponibles</span>
           </div>
         </div>
 
@@ -494,7 +500,8 @@ export default {
     },
     puedeConfirmar() {
       if (!this.modalProducto) return false
-      if (this.modalCantidad < 1 || this.modalCantidad > this.modalProducto.cantidad) return false
+      const maxDev = this.modalProducto.cantidad_disponible ?? this.modalProducto.cantidad
+      if (this.modalCantidad < 1 || this.modalCantidad > maxDev) return false
       if (this.modalTipo === 'cambio' && !this.productoNuevoSeleccionado) return false
       return true
     },
@@ -846,6 +853,8 @@ export default {
 .prod-precio     { font-size: 0.8rem; }
 .btn-devolver    { background: #DC2626; color: #FFFFFF; border: none; padding: 0.3rem 0.7rem; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .btn-devolver:hover { background: #B91C1C; }
+.badge-devuelto  { background: #DC26261A; color: #DC2626; font-size: 0.73rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 20px; flex-shrink: 0; }
+.badge-parcial   { background: #FFCC0033; color: #996600; font-size: 0.73rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 20px; flex-shrink: 0; }
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }

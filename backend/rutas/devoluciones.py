@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db
 from models import (
@@ -182,12 +183,20 @@ def buscar_ventas(
         productos = []
         for d in detalles:
             prod  = db.query(Producto).filter(Producto.id == d.producto_id).first()
+            ya_devuelto = db.query(func.sum(DetalleDevolucionCliente.cantidad)).filter(
+                DetalleDevolucionCliente.producto_id == d.producto_id,
+                DetalleDevolucionCliente.devolucion_id.in_(
+                    db.query(DevolucionCliente.id).filter(DevolucionCliente.venta_id == v.id)
+                )
+            ).scalar() or 0
             productos.append({
-                "detalle_id":      d.id,
-                "producto_id":     d.producto_id,
-                "nombre":          prod.nombre if prod else f"Producto #{d.producto_id}",
-                "cantidad":        d.cantidad,
-                "precio_unitario": round(float(d.precio_unitario or 0), 2),
+                "detalle_id":         d.id,
+                "producto_id":        d.producto_id,
+                "nombre":             prod.nombre if prod else f"Producto #{d.producto_id}",
+                "cantidad":           d.cantidad,
+                "precio_unitario":    round(float(d.precio_unitario or 0), 2),
+                "cantidad_devuelta":  float(ya_devuelto),
+                "cantidad_disponible": max(float(d.cantidad or 0) - float(ya_devuelto), 0),
             })
 
         resultado.append({
