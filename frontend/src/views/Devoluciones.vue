@@ -352,35 +352,37 @@
             <span class="txt-muted">${{ Number(productoNuevoSeleccionado.precio_referencial_usd || productoNuevoSeleccionado.precio_base_usd || 0).toFixed(2) }}</span>
           </div>
 
-          <div v-if="productoNuevoSeleccionado">
-            <div v-if="diferenciaCambio > 0" class="diferencia-box dif-cobrar">
-              <div>Diferencia a <strong>cobrar</strong> al cliente: <strong class="txt-verde">${{ diferenciaCambio.toFixed(2) }}</strong></div>
-              <div class="modal-field mt-50">
-                <label>Método de cobro</label>
-                <select v-model="modalMetodoPago">
-                  <option value="efectivo_usd">Efectivo USD</option>
-                  <option value="efectivo_bs">Efectivo Bs</option>
-                  <option value="pago_movil">Pago Móvil</option>
-                  <option value="zelle">Zelle</option>
-                  <option value="transferencia">Transferencia</option>
-                </select>
-              </div>
-            </div>
-            <div v-else-if="diferenciaCambio < 0" class="diferencia-box dif-devolver">
-              <div>Diferencia a <strong>devolver</strong> al cliente: <strong class="txt-rojo">${{ Math.abs(diferenciaCambio).toFixed(2) }}</strong></div>
-              <div class="modal-field mt-50">
-                <label>Método de devolución</label>
-                <select v-model="modalMetodoPago">
-                  <option value="efectivo_usd">Efectivo USD</option>
-                  <option value="efectivo_bs">Efectivo Bs</option>
-                  <option value="pago_movil">Pago Móvil</option>
-                  <option value="zelle">Zelle</option>
-                  <option value="transferencia">Transferencia</option>
-                </select>
-              </div>
-            </div>
-            <div v-else class="diferencia-box dif-igual">
-              Sin diferencia de precio
+          <div v-if="productoNuevoSeleccionado" class="modal-field mt-50">
+            <label>Cantidad del producto nuevo</label>
+            <input
+              v-model.number="cantidadNueva"
+              type="number" min="1"
+              :max="productoNuevoSeleccionado.stock"
+              placeholder="1"
+              class="inp-cant"
+            />
+          </div>
+
+          <div v-if="productoNuevoSeleccionado" class="monto-info">
+            <div class="monto-fila"><span>Total devuelto:</span><span>${{ totalDevuelto.toFixed(2) }}</span></div>
+            <div class="monto-fila"><span>Total producto nuevo:</span><span>${{ totalNuevo.toFixed(2) }}</span></div>
+            <div v-if="diferenciaCambio > 0" class="monto-fila txt-verde"><span>Cliente paga:</span><strong>${{ diferenciaCambio.toFixed(2) }}</strong></div>
+            <div v-else-if="diferenciaCambio < 0" class="monto-fila txt-rojo"><span>Negocio devuelve:</span><strong>${{ Math.abs(diferenciaCambio).toFixed(2) }}</strong></div>
+            <div v-else class="monto-fila txt-muted"><span>Sin diferencia</span></div>
+          </div>
+
+          <div v-if="productoNuevoSeleccionado && diferenciaCambio !== 0"
+               class="diferencia-box"
+               :class="diferenciaCambio > 0 ? 'dif-cobrar' : 'dif-devolver'">
+            <div class="modal-field">
+              <label>{{ diferenciaCambio > 0 ? 'Método de cobro' : 'Método de devolución' }}</label>
+              <select v-model="modalMetodoPago">
+                <option value="efectivo_usd">Efectivo USD</option>
+                <option value="efectivo_bs">Efectivo Bs</option>
+                <option value="pago_movil">Pago Móvil</option>
+                <option value="zelle">Zelle</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
             </div>
           </div>
         </div>
@@ -475,6 +477,7 @@ export default {
       productosNuevoResultados:  [],
       productoNuevoSeleccionado: null,
       indiceResaltadoCambio:     -1,
+      cantidadNueva:             1,
       procesando:                false,
     }
   },
@@ -492,11 +495,17 @@ export default {
       if (!this.modalProducto) return 0
       return this.modalCantidad * Number(this.modalProducto.precio_unitario || 0)
     },
+    totalDevuelto() {
+      if (!this.modalProducto) return 0
+      return this.modalCantidad * Number(this.modalProducto.precio_unitario || 0)
+    },
+    totalNuevo() {
+      if (!this.productoNuevoSeleccionado) return 0
+      return this.cantidadNueva * Number(this.productoNuevoSeleccionado.precio_referencial_usd || this.productoNuevoSeleccionado.precio_base_usd || 0)
+    },
     diferenciaCambio() {
       if (!this.productoNuevoSeleccionado || !this.modalProducto) return 0
-      const nuevo    = Number(this.productoNuevoSeleccionado.precio_referencial_usd || this.productoNuevoSeleccionado.precio_base_usd || 0) * this.modalCantidad
-      const original = Number(this.modalProducto.precio_unitario || 0) * this.modalCantidad
-      return nuevo - original
+      return this.totalNuevo - this.totalDevuelto
     },
     puedeConfirmar() {
       if (!this.modalProducto) return false
@@ -694,6 +703,7 @@ export default {
       this.productosNuevoResultados  = []
       this.productoNuevoSeleccionado = null
       this.indiceResaltadoCambio     = -1
+      this.cantidadNueva             = 1
       this.procesando                = false
       this.modalAbierto              = true
     },
@@ -761,11 +771,10 @@ export default {
           metodo_pago:       this.modalTipo !== 'credito' ? this.modalMetodoPago : null,
         }
         if (this.modalTipo === 'cambio' && this.productoNuevoSeleccionado) {
-          payload.producto_nuevo_id = this.productoNuevoSeleccionado.id
-          if (this.diferenciaCambio !== 0) {
-            payload.monto_diferencia     = Math.abs(this.diferenciaCambio)
-            payload.direccion_diferencia = this.diferenciaCambio > 0 ? 'cobrar' : 'devolver'
-          }
+          payload.producto_nuevo_id    = this.productoNuevoSeleccionado.id
+          payload.cantidad_nueva       = this.cantidadNueva
+          payload.monto_diferencia     = Math.abs(this.diferenciaCambio)
+          payload.direccion_diferencia = this.diferenciaCambio > 0 ? 'cobrar' : this.diferenciaCambio < 0 ? 'devolver' : 'ninguna'
         }
         await axios.post('/devoluciones/cliente/procesar', payload)
         this.cerrarModal()
@@ -905,6 +914,8 @@ export default {
 .prod-nuevo-info { display: flex; gap: 0.75rem; align-items: center; margin: 0.25rem 1.25rem 0.5rem; padding: 0.5rem 0.75rem; background: #FAFAF7; border: 1px solid var(--borde); border-radius: 7px; font-size: 0.85rem; flex-wrap: wrap; }
 .prod-nv-nombre  { font-weight: 600; color: #1A1A1A; }
 
+.monto-info  { margin: 0.25rem 1.25rem 0.5rem; background: var(--borde-suave); border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem 0.85rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.monto-fila  { display: flex; justify-content: space-between; font-size: 0.87rem; color: var(--texto-sec); }
 .diferencia-box { margin: 0.25rem 1.25rem 0.5rem; padding: 0.6rem 0.85rem; border-radius: 7px; font-size: 0.87rem; }
 .dif-cobrar     { background: #DCFCE7; border: 1px solid #16A34A33; }
 .dif-devolver   { background: #FEE2E2; border: 1px solid #DC262633; }

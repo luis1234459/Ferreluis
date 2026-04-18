@@ -230,8 +230,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
     cantidad_dev      = float(datos.get("cantidad_devuelta", 1) or 1)
     tipo              = datos.get("tipo", "reembolso")
     producto_nuevo_id = datos.get("producto_nuevo_id")
-    monto_diferencia  = float(datos.get("monto_diferencia", 0) or 0)
-    dir_diferencia    = datos.get("direccion_diferencia", "ninguna")
+    cantidad_nueva    = int(datos.get("cantidad_nueva", 1) or 1)
     metodo_pago       = datos.get("metodo_pago", "efectivo_usd")
     usuario           = datos.get("usuario", "admin")
     observacion       = datos.get("observacion", "")
@@ -291,35 +290,44 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
         ))
 
     elif tipo == "cambio":
-        # Descontar stock del producto nuevo
+        # Descontar stock del producto nuevo usando cantidad_nueva
+        prod_nuevo = None
         if producto_nuevo_id:
             prod_nuevo = db.query(Producto).filter(Producto.id == producto_nuevo_id).first()
             if prod_nuevo:
-                prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - int(cantidad_dev))
+                prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - cantidad_nueva)
 
-        # Diferencia de precio
-        if dir_diferencia == "cobrar" and monto_diferencia > 0:
-            # Cliente paga la diferencia → ingreso de caja
+        # Recalcular diferencia en el backend
+        precio_nuevo          = float(getattr(prod_nuevo, 'precio_referencial_usd', None) or getattr(prod_nuevo, 'precio_base_usd', None) or 0) if prod_nuevo else 0
+        total_devuelto        = cantidad_dev * precio_unitario
+        total_nuevo           = cantidad_nueva * precio_nuevo
+        monto_diferencia_real = round(abs(total_nuevo - total_devuelto), 2)
+        dir_diferencia_real   = (
+            "cobrar"   if total_nuevo > total_devuelto else
+            "devolver" if total_nuevo < total_devuelto else
+            "ninguna"
+        )
+
+        if dir_diferencia_real == "cobrar" and monto_diferencia_real > 0:
             cuenta_id = _cuenta_para_metodo(db, metodo_pago)
             db.add(MovimientoBancario(
                 fecha              = ahora,
                 tipo               = "ingreso_venta",
                 cuenta_destino_id  = cuenta_id,
-                monto              = round(monto_diferencia, 2),
+                monto              = monto_diferencia_real,
                 moneda             = "USD",
                 concepto           = f"Cobro diferencia cambio venta #{detalle.venta_id}",
                 categoria          = "ventas",
                 registrado_por     = usuario,
                 estado             = "registrado",
             ))
-        elif dir_diferencia == "devolver" and monto_diferencia > 0:
-            # Negocio devuelve diferencia → egreso de caja
+        elif dir_diferencia_real == "devolver" and monto_diferencia_real > 0:
             cuenta_id = _cuenta_para_metodo(db, metodo_pago)
             db.add(MovimientoBancario(
                 fecha             = ahora,
                 tipo              = "devolucion_cliente",
                 cuenta_origen_id  = cuenta_id,
-                monto             = round(monto_diferencia, 2),
+                monto             = monto_diferencia_real,
                 moneda            = "USD",
                 concepto          = f"Vuelto cambio devolución venta #{detalle.venta_id}",
                 categoria         = "devoluciones",
