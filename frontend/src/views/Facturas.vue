@@ -168,6 +168,39 @@
                 </div>
               </div>
 
+              <!-- Modal producto nuevo -->
+              <div v-if="modalNuevoProd" class="modal-overlay" @click.self="modalNuevoProd = false">
+                <div class="modal-box">
+                  <div class="modal-header">
+                    <h3>Producto nuevo</h3>
+                    <button class="btn-cerrar-modal" @click="modalNuevoProd = false">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <p style="color:var(--texto-sec);font-size:0.88rem;margin:0 0 0.75rem">
+                      Este producto no existe en inventario. ¿Con qué nombre lo guardamos?
+                    </p>
+                    <div class="field-group">
+                      <label class="field-label">Nombre en factura (IA)</label>
+                      <div class="renombrar-valor txt-amarillo" style="padding:0.4rem 0">
+                        {{ lineaPendiente?.nombre_ia }}
+                      </div>
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">Nombre a guardar en inventario *</label>
+                      <input v-model="nombreNuevoProd" class="input-field" placeholder="Nombre del producto..." />
+                      <small class="txt-muted">El código del proveedor quedará fijo automáticamente.</small>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn-condicion" @click="modalNuevoProd = false">Cancelar</button>
+                    <button class="btn-confirmar" style="width:auto;padding:0.6rem 1.5rem"
+                      @click="confirmarNuevoProducto" :disabled="!nombreNuevoProd.trim()">
+                      Guardar como nuevo
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="field-group">
                 <label class="field-label">Nº Factura</label>
                 <input v-model="numeroFactura" class="input-field" placeholder="FAC-001" />
@@ -236,20 +269,36 @@
                   <tr v-for="(linea, idx) in lineas" :key="idx">
                     <td class="tc dim">{{ idx + 1 }}</td>
                     <td><span class="nombre-ia">{{ linea.nombre_ia || '—' }}</span></td>
-                    <td style="position:relative">
-                      <div class="match-estado">
-                        <span v-if="linea.buscandoMatch" class="match-buscando">⏳ buscando...</span>
-                        <template v-else>
-                          <span
-                            v-if="linea.match"
-                            class="match-ok"
-                            @click="limpiarMatch(linea)"
-                            title="Clic para desvincular"
-                          >✓ {{ linea.match.nombre }}</span>
-                          <span v-else class="match-sin">Sin match</span>
-                        </template>
+                    <td style="position:relative; min-width:240px">
+                      <!-- Buscando automatch -->
+                      <span v-if="linea.buscandoMatch" class="match-buscando">⏳ buscando...</span>
+
+                      <!-- Match vinculado -->
+                      <div v-if="linea.match && !linea.buscandoMatch">
+                        <span class="match-ok" @click="limpiarMatch(linea)" title="Clic para desvincular">
+                          ✓ {{ linea.match.nombre }}
+                        </span>
+                        <small v-if="linea.match.match_exacto" class="match-codigo-tag">por código</small>
                       </div>
-                      <div style="position:relative; margin-top:4px">
+
+                      <!-- Sin decidir -->
+                      <div v-if="!linea.match && !linea.esNuevo && !linea.buscandoMatch" class="match-pendiente">
+                        <button class="btn-match-opcion" @mousedown.prevent="abrirBusquedaLinea(linea)">
+                          🔍 Buscar en inventario
+                        </button>
+                        <button class="btn-match-nuevo" @mousedown.prevent="abrirModalNuevoProducto(linea)">
+                          ✚ Producto nuevo
+                        </button>
+                      </div>
+
+                      <!-- Marcado como nuevo -->
+                      <div v-if="linea.esNuevo && !linea.match" class="match-nuevo-tag">
+                        ✚ {{ linea.nombreFinal || linea.nombre_ia }}
+                        <span class="prov-desvincular" @click="linea.esNuevo = false; linea.nombreFinal = ''">✕</span>
+                      </div>
+
+                      <!-- Buscador inline -->
+                      <div v-if="!linea.match && !linea.esNuevo && linea._busqVisible" style="position:relative; margin-top:4px">
                         <input
                           v-model="linea._busqTexto"
                           class="input-field input-sm"
@@ -258,17 +307,14 @@
                           @focus="abrirLineaDropdown(linea)"
                           @blur="cerrarLineaDropdown(linea)"
                         />
-                        <ul
-                          v-if="linea._busqAbierta && linea._busqResultados.length"
-                          class="dropdown-list dropdown-sm"
-                        >
+                        <ul v-if="linea._busqAbierta && linea._busqResultados.length" class="dropdown-list dropdown-sm">
                           <li
                             v-for="prod in linea._busqResultados"
                             :key="prod.id"
                             @mousedown="seleccionarMatch(linea, prod)"
                           >
                             {{ prod.nombre }}
-                            <small v-if="prod.codigo"> ({{ prod.codigo }})</small>
+                            <small v-if="prod.codigo_proveedor" class="stock-hint"> · Cód: {{ prod.codigo_proveedor }}</small>
                             <small class="stock-hint"> · Stock: {{ prod.stock }}</small>
                           </li>
                         </ul>
@@ -447,6 +493,9 @@
                   <span>{{ saldoPendiente > 0.01 ? fmtUSD(saldoPendiente) : '✓ Pagado' }}</span>
                 </div>
               </div>
+              <p v-if="lineasSinDecidir > 0" class="aviso-pendientes">
+                ⚠ {{ lineasSinDecidir }} producto(s) pendiente(s) de vincular.
+              </p>
               <button
                 class="btn-confirmar"
                 :disabled="!puedeConfirmar || confirmando"
@@ -539,6 +588,10 @@ export default {
       // Selector OC existente
       ordenesDisponibles: [],
       ordenSeleccionada: null,
+      // Modal producto nuevo
+      modalNuevoProd:  false,
+      lineaPendiente:  null,
+      nombreNuevoProd: '',
     }
   },
 
@@ -571,7 +624,11 @@ export default {
       return Math.max(this.totalCalculado - this.totalPagado, 0)
     },
     puedeConfirmar() {
-      return this.lineas.length > 0 && this.totalCalculado > 0
+      if (this.lineas.length === 0 || this.totalCalculado <= 0) return false
+      return this.lineas.every(l => l.match || l.esNuevo)
+    },
+    lineasSinDecidir() {
+      return this.lineas.filter(l => !l.match && !l.esNuevo).length
     },
     metodosDisponiblesPago() {
       const USD = [
@@ -654,10 +711,13 @@ export default {
         precio_unitario:  Number(p.precio_unitario) || 0,
         actualizar_costo: true,
         match:            null,
+        esNuevo:          false,
+        nombreFinal:      '',
         buscandoMatch:    false,
         _busqTexto:       '',
         _busqResultados:  [],
         _busqAbierta:     false,
+        _busqVisible:     false,
       }))
 
       this.lineas.forEach(l => this.autoMatchProducto(l))
@@ -752,16 +812,20 @@ export default {
 
     // ── Auto-match ────────────────────────────────────────────────────
     async autoMatchProducto(linea) {
-      const texto = (linea.codigo_proveedor || linea.nombre_ia || '').trim()
-      if (texto.length < 2) return
+      const codigo = (linea.codigo_proveedor || '').trim()
+      const nombre = (linea.nombre_ia || '').trim()
+      if (!codigo && nombre.length < 2) return
       linea.buscandoMatch = true
       try {
-        const params = { nombre: texto }
+        const params = {}
+        if (codigo) params.codigo = codigo
+        if (nombre) params.nombre = nombre
         if (this.proveedorId) params.proveedor_id = this.proveedorId
         const { data } = await axios.get('/facturas/buscar-producto', { params })
-        if (data.length > 0) {
+        if (data.length > 0 && data[0].match_exacto) {
           linea.match      = data[0]
           linea._busqTexto = data[0].nombre
+          linea.esNuevo    = false
         }
       } catch {}
       finally { linea.buscandoMatch = false }
@@ -797,13 +861,33 @@ export default {
       setTimeout(() => { linea._busqAbierta = false }, 200)
     },
 
+    abrirBusquedaLinea(linea) {
+      linea._busqVisible = true
+      linea._busqAbierta = true
+    },
+    abrirModalNuevoProducto(linea) {
+      this.lineaPendiente  = linea
+      this.nombreNuevoProd = linea.nombre_ia
+      this.modalNuevoProd  = true
+    },
+    confirmarNuevoProducto() {
+      if (!this.lineaPendiente) return
+      this.lineaPendiente.esNuevo     = true
+      this.lineaPendiente.match       = null
+      this.lineaPendiente.nombreFinal = this.nombreNuevoProd.trim() || this.lineaPendiente.nombre_ia
+      this.modalNuevoProd  = false
+      this.lineaPendiente  = null
+      this.nombreNuevoProd = ''
+    },
+
     // ── Tabla ─────────────────────────────────────────────────────────
     agregarLinea() {
       this.lineas.push({
         nombre_ia: '', codigo_proveedor: '', cantidad: 1, precio_unitario: 0,
         actualizar_costo: true,
-        match: null, buscandoMatch: false,
-        _busqTexto: '', _busqResultados: [], _busqAbierta: false,
+        match: null, esNuevo: false, nombreFinal: '',
+        buscandoMatch: false,
+        _busqTexto: '', _busqResultados: [], _busqAbierta: false, _busqVisible: false,
       })
     },
 
@@ -861,12 +945,14 @@ export default {
         })),
         productos: this.lineas.map(l => ({
           producto_id:         l.match?.id        || null,
-          nombre_producto:     l.match?.nombre    || l.nombre_ia,
+          nombre_producto:     l.nombreFinal || l.match?.nombre || l.nombre_ia,
+          nombre_ia:           l.nombre_ia,
           codigo_proveedor:    l.codigo_proveedor || '',
           cantidad:            Number(l.cantidad) || 0,
           precio_unitario_usd: Number(l.precio_unitario) || 0,
           subtotal:            Math.round((Number(l.cantidad) * Number(l.precio_unitario)) * 100) / 100,
           actualizar_costo:    l.actualizar_costo && !!l.match,
+          es_nuevo:            l.esNuevo && !l.match,
         })),
       }
 
@@ -1217,6 +1303,37 @@ select.input-field { cursor: pointer; }
 .oc-badge.nuevo     { background: #E0F2FE; color: #0369A1; }
 .oc-badge.aprobada  { background: #DCFCE7; color: #15803D; }
 .oc-badge.parcial   { background: #FEF9C3; color: #854D0E; }
+
+.match-pendiente { display: flex; flex-direction: column; gap: 0.35rem; }
+.btn-match-opcion {
+  background: #F1F5F9; border: 1px solid var(--borde);
+  border-radius: 5px; padding: 0.25rem 0.6rem;
+  font-size: 0.78rem; cursor: pointer; color: var(--texto-sec);
+  text-align: left; width: 100%;
+}
+.btn-match-opcion:hover { background: #FFFDF0; border-color: #FFCC00; }
+.btn-match-nuevo {
+  background: #F0FDF4; border: 1px solid #16A34A;
+  border-radius: 5px; padding: 0.25rem 0.6rem;
+  font-size: 0.78rem; cursor: pointer; color: #15803D;
+  text-align: left; width: 100%;
+}
+.btn-match-nuevo:hover { background: #DCFCE7; }
+.match-nuevo-tag {
+  background: #F0FDF4; color: #15803D;
+  font-size: 0.78rem; padding: 0.15rem 0.5rem;
+  border-radius: 4px; display: inline-flex;
+  align-items: center; gap: 0.35rem; font-weight: 600;
+}
+.match-codigo-tag {
+  font-size: 0.7rem; color: #16A34A;
+  background: #DCFCE7; padding: 0.1rem 0.4rem;
+  border-radius: 3px; margin-left: 0.3rem;
+}
+.aviso-pendientes {
+  color: #996600; font-size: 0.85rem;
+  margin-bottom: 0.5rem; font-weight: 600;
+}
 
 .renombrar-comparacion {
   background: var(--fondo-sidebar, #F8F8F8);

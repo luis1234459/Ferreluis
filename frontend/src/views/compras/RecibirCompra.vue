@@ -45,12 +45,31 @@
               <span class="tag-nuevo" v-if="item.es_producto_nuevo">NUEVO</span>
             </div>
 
-            <div class="field" v-if="item.es_producto_nuevo">
+            <div class="field" v-if="!item.producto_id">
               <label>Vincular con producto en inventario</label>
-              <select v-model="item.producto_id">
-                <option value="">— Sin vincular (bloqueará recepción) —</option>
-                <option v-for="p in productosInventario" :key="p.id" :value="p.id">{{ p.nombre }}</option>
-              </select>
+              <div v-if="!item._busqVisible && !item.esNuevo" class="match-pendiente" style="display:flex;gap:0.5rem">
+                <button class="btn-match-opcion" @click="item._busqVisible = true">🔍 Buscar</button>
+                <button class="btn-match-nuevo" @click="item.esNuevo = true">✚ Nuevo</button>
+              </div>
+              <div v-if="item._busqVisible && !item.producto_id" style="position:relative">
+                <input
+                  v-model="item._busqTexto"
+                  class="input-sm"
+                  placeholder="Buscar producto..."
+                  @input="buscarProductoItem(item)"
+                  @blur="setTimeout(() => item._busqAbierta = false, 200)"
+                />
+                <ul v-if="item._busqAbierta && item._busqResultados.length" class="dropdown-list dropdown-sm">
+                  <li v-for="prod in item._busqResultados" :key="prod.id"
+                    @mousedown="item.producto_id = prod.id; item._busqVisible = false; item._busqTexto = prod.nombre">
+                    {{ prod.nombre }} · Stock: {{ prod.stock }}
+                  </li>
+                </ul>
+              </div>
+              <div v-if="item.esNuevo" class="match-nuevo-tag">
+                ✚ Se creará como producto nuevo
+                <span class="prov-desvincular" @click="item.esNuevo = false">✕</span>
+              </div>
             </div>
 
             <div class="linea-inputs">
@@ -236,6 +255,13 @@ export default {
         producto_id:           d.producto_id || '',
         cantidad_recibida:     d.cantidad_pedida,
         precio_unitario_real_usd: d.precio_unitario_usd,
+        // match inline
+        esNuevo:         false,
+        nombreFinal:     '',
+        _busqVisible:    false,
+        _busqTexto:      '',
+        _busqResultados: [],
+        _busqAbierta:    false,
         // ubicación
         _mostrarUbic: false,
         _area_id:     '',
@@ -310,6 +336,15 @@ export default {
       } finally {
         this.confirmando = false
       }
+    },
+    async buscarProductoItem(item) {
+      const q = item._busqTexto.trim()
+      if (q.length < 2) { item._busqResultados = []; item._busqAbierta = false; return }
+      try {
+        const { data } = await axios.get('/facturas/buscar-producto', { params: { nombre: q } })
+        item._busqResultados = data
+        item._busqAbierta    = data.length > 0
+      } catch {}
     },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },

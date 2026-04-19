@@ -223,17 +223,36 @@ def guardar_alias(datos: dict, db: Session = Depends(get_db)):
 @router.get("/buscar-producto")
 def buscar_producto(
     nombre: str = "",
+    codigo: str = "",
     proveedor_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     resultados = []
     ids_ya: set[int] = set()
 
-    # Prioridad: buscar por código en catálogo del proveedor
-    if proveedor_id and nombre:
+    # Prioridad 1: match exacto por código en catálogo del proveedor
+    if proveedor_id and codigo:
         cats = db.query(CatalogoProveedor).filter(
             CatalogoProveedor.proveedor_id == proveedor_id,
-            CatalogoProveedor.codigo_proveedor.ilike(f"%{nombre}%"),
+            CatalogoProveedor.codigo_proveedor == codigo.strip(),
+        ).all()
+        for c in cats:
+            if c.producto_id:
+                p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+                if p and p.id not in ids_ya:
+                    resultados.append({
+                        "id": p.id, "nombre": p.nombre,
+                        "codigo_proveedor": c.codigo_proveedor,
+                        "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
+                        "match_exacto": True,
+                    })
+                    ids_ya.add(p.id)
+
+    # Prioridad 2: match parcial por código en catálogo
+    if proveedor_id and codigo and not resultados:
+        cats = db.query(CatalogoProveedor).filter(
+            CatalogoProveedor.proveedor_id == proveedor_id,
+            CatalogoProveedor.codigo_proveedor.ilike(f"%{codigo}%"),
         ).limit(5).all()
         for c in cats:
             if c.producto_id:
@@ -241,20 +260,25 @@ def buscar_producto(
                 if p and p.id not in ids_ya:
                     resultados.append({
                         "id": p.id, "nombre": p.nombre,
+                        "codigo_proveedor": c.codigo_proveedor,
                         "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
+                        "match_exacto": False,
                     })
                     ids_ya.add(p.id)
 
-    # Buscar por nombre en inventario
-    if len(nombre) >= 2:
+    # Prioridad 3: buscar por nombre en inventario
+    busq = nombre or codigo
+    if len(busq) >= 2:
         prods = db.query(Producto).filter(
-            Producto.nombre.ilike(f"%{nombre}%")
+            Producto.nombre.ilike(f"%{busq}%")
         ).limit(10).all()
         for p in prods:
             if p.id not in ids_ya:
                 resultados.append({
                     "id": p.id, "nombre": p.nombre,
+                    "codigo_proveedor": "",
                     "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
+                    "match_exacto": False,
                 })
                 ids_ya.add(p.id)
 
@@ -407,11 +431,29 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
 
     # ── Detalles de recepción + stock + costo ─────────────────────────────────
     for p in productos_data:
-        prod_id    = p.get("producto_id")
-        cantidad   = float(p.get("cantidad", 0))
-        precio     = float(p.get("precio_unitario_usd", 0))
-        actualizar = bool(p.get("actualizar_costo", False))
-        costo_ant  = None
+        prod_id     = p.get("producto_id")
+        cantidad    = float(p.get("cantidad", 0))
+        precio      = float(p.get("precio_unitario_usd", 0))
+        actualizar  = bool(p.get("actualizar_costo", False))
+        es_nuevo    = bool(p.get("es_nuevo", False))
+        codigo_prov = (p.get("codigo_proveedor") or "").strip()
+        nombre_prod = p.get("nombre_producto") or p.get("nombre_ia") or ""
+        costo_ant   = None
+
+        # Si es producto nuevo, crearlo en inventario
+        if es_nuevo and not prod_id:
+            nuevo_prod = Producto(
+                nombre       = nombre_prod,
+                descripcion  = f"Creado desde factura IA — {numero_factura}",
+                stock        = 0,
+                costo_usd    = precio,
+                margen       = 0.30,
+                proveedor_id = proveedor_id,
+                activo       = True,
+            )
+            db.add(nuevo_prod)
+            db.flush()
+            prod_id = nuevo_prod.id
 
         if prod_id:
             prod = db.query(Producto).filter(Producto.id == prod_id).first()
@@ -432,10 +474,8 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             costo_anterior           = costo_ant,
         ))
 
-        # ── Actualizar catálogo proveedor ─────────────────────────────
+        # ── Vincular código en catálogo (inamovible una vez guardado) ─────────
         if prod_id and proveedor_id:
-            codigo_prov = p.get("codigo_proveedor", "").strip()
-            nombre_prod = p.get("nombre_producto", "")
             existente_catalogo = db.query(CatalogoProveedor).filter(
                 CatalogoProveedor.proveedor_id == proveedor_id,
                 CatalogoProveedor.producto_id  == prod_id,
@@ -450,6 +490,8 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 ))
             else:
                 existente_catalogo.precio_referencia_usd = precio
+                if not existente_catalogo.codigo_proveedor and codigo_prov:
+                    existente_catalogo.codigo_proveedor = codigo_prov
 
     # ── Movimientos bancarios por cada pago ──────────────────────────────────
     pagos_data = datos.get("pagos", [])
