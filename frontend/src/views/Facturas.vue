@@ -130,6 +130,44 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Modal renombrar proveedor -->
+              <div v-if="modalRenombrar && proveedorPendiente" class="modal-overlay" @click.self="modalRenombrar = false">
+                <div class="modal-box">
+                  <div class="modal-header">
+                    <h3>Nombre del proveedor</h3>
+                    <button class="btn-cerrar-modal" @click="modalRenombrar = false">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <p style="color:var(--texto-sec);font-size:0.9rem;margin:0 0 0.75rem">
+                      La factura indica un nombre diferente al registrado en el sistema:
+                    </p>
+                    <div class="renombrar-comparacion">
+                      <div class="renombrar-fila">
+                        <span class="renombrar-etiqueta">En factura</span>
+                        <span class="renombrar-valor txt-amarillo">{{ proveedorNombreIA }}</span>
+                      </div>
+                      <div class="renombrar-fila">
+                        <span class="renombrar-etiqueta">En sistema</span>
+                        <span class="renombrar-valor">{{ proveedorPendiente.nombre }}</span>
+                      </div>
+                    </div>
+                    <p style="color:var(--texto-sec);font-size:0.88rem;margin:0.75rem 0 0">
+                      ¿Deseas actualizar el nombre oficial del proveedor al de la factura?
+                    </p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn-condicion" @click="_confirmarProveedor(proveedorPendiente, false)">
+                      No, mantener "{{ proveedorPendiente.nombre }}"
+                    </button>
+                    <button class="btn-confirmar" style="width:auto;padding:0.6rem 1.5rem"
+                      @click="renombrarYConfirmar">
+                      Sí, usar "{{ proveedorNombreIA }}"
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="field-group">
                 <label class="field-label">Nº Factura</label>
                 <input v-model="numeroFactura" class="input-field" placeholder="FAC-001" />
@@ -494,6 +532,10 @@ export default {
       nuevoProv: { nombre: '', rif: '', telefono: '', contacto: '' },
       errorNuevoProv: '',
       creandoProv: false,
+      // Renombrar proveedor
+      proveedorNombreIA:  '',
+      modalRenombrar:     false,
+      proveedorPendiente: null,
       // Selector OC existente
       ordenesDisponibles: [],
       ordenSeleccionada: null,
@@ -601,10 +643,9 @@ export default {
       this.fechaFactura   = data.fecha || new Date().toISOString().slice(0, 10)
       this.tieneDescuento = false
       this.descuentoPct   = 0
-      this.proveedorBusq  = data.proveedor || ''
-      this.proveedorId    = null
-
-      if (data.proveedor) this.buscarProveedorInicial(data.proveedor)
+      this.proveedorBusq     = data.proveedor || ''
+      this.proveedorId       = null
+      this.proveedorNombreIA = data.proveedor || ''
 
       this.lineas = (data.productos || []).map(p => ({
         nombre_ia:        p.nombre           || '',
@@ -655,26 +696,52 @@ export default {
       } catch {}
     },
     seleccionarProveedor(p) {
-      const busqueda = this.proveedorBusq.trim()
+      this.provAbierta = false
+      const nombreIA      = (this.proveedorNombreIA || '').trim()
+      const nombreSistema = (p.nombre || '').trim()
+      const sonDiferentes = nombreIA && nombreIA.toLowerCase() !== nombreSistema.toLowerCase()
+
+      if (sonDiferentes) {
+        this.proveedorPendiente = p
+        this.modalRenombrar     = true
+      } else {
+        this._confirmarProveedor(p, false)
+      }
+    },
+
+    _confirmarProveedor(p, renombrar) {
       this.proveedorId        = p.id
-      this.proveedorBusq      = p.nombre
-      this.provAbierta        = false
+      this.proveedorBusq      = renombrar ? this.proveedorNombreIA : p.nombre
+      this.proveedorPendiente = null
+      this.modalRenombrar     = false
       this.ordenSeleccionada  = null
       this.ordenesDisponibles = []
 
-      // Cargar OC pendientes de este proveedor
-      this.cargarOrdenesPendientes(p.id)
-
-      // Si el nombre buscado difiere del nombre oficial, guardar alias
-      const nombreOficial = p.nombre.trim()
-      if (busqueda && busqueda.toLowerCase() !== nombreOficial.toLowerCase()) {
+      const nombreIA = (this.proveedorNombreIA || '').trim()
+      if (nombreIA && nombreIA.toLowerCase() !== p.nombre.toLowerCase()) {
         const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
         axios.post('/facturas/guardar-alias', {
-          alias:        busqueda,
+          alias:        nombreIA,
           proveedor_id: p.id,
           usuario,
         }).catch(() => {})
       }
+
+      this.cargarOrdenesPendientes(p.id)
+    },
+
+    async renombrarYConfirmar() {
+      const p = this.proveedorPendiente
+      if (!p) return
+      try {
+        await axios.put(`/compras/proveedores/${p.id}`, {
+          nombre: this.proveedorNombreIA.trim()
+        }, {
+          headers: { 'x-usuario-rol': 'admin' }
+        })
+        p.nombre = this.proveedorNombreIA.trim()
+      } catch { /* si falla el renombrado, continuar igual */ }
+      this._confirmarProveedor(p, true)
     },
     abrirProvDropdown() {
       if (this.provResultados.length) this.provAbierta = true
@@ -1150,6 +1217,19 @@ select.input-field { cursor: pointer; }
 .oc-badge.nuevo     { background: #E0F2FE; color: #0369A1; }
 .oc-badge.aprobada  { background: #DCFCE7; color: #15803D; }
 .oc-badge.parcial   { background: #FEF9C3; color: #854D0E; }
+
+.renombrar-comparacion {
+  background: var(--fondo-sidebar, #F8F8F8);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.renombrar-fila { display: flex; align-items: center; gap: 0.75rem; }
+.renombrar-etiqueta {
+  font-size: 0.75rem; font-weight: 700; color: var(--texto-muted);
+  text-transform: uppercase; min-width: 80px;
+}
+.renombrar-valor { font-size: 0.9rem; color: var(--texto-principal); font-weight: 600; }
+.txt-amarillo { color: #996600; }
 
 /* Shared */
 .msg-error { color: #DC2626; font-size: 0.875rem; margin-top: 0.5rem; }
