@@ -693,3 +693,14 @@ class UbicacionProducto(Base):
     nivel       = Column(Integer)
     cantidad    = Column(Float, default=0)
     activa      = Column(Boolean, default=True)
+
+
+class AliasProveedor(Base):
+    __tablename__ = "alias_proveedores"
+
+    id                = Column(Integer,  primary_key=True, index=True)
+    proveedor_id      = Column(Integer,  nullable=False, index=True)
+    alias             = Column(String,   nullable=False)
+    alias_normalizado = Column(String,   nullable=False, index=True)
+    fecha_creacion    = Column(DateTime, default=datetime.now)
+    creado_por        = Column(String,   nullable=True)

@@ -572,9 +572,21 @@ export default {
       } catch {}
     },
     seleccionarProveedor(p) {
+      const busqueda = this.proveedorBusq.trim()
       this.proveedorId   = p.id
       this.proveedorBusq = p.nombre
       this.provAbierta   = false
+
+      // Si el nombre buscado difiere del nombre oficial, guardar alias
+      const nombreOficial = p.nombre.trim()
+      if (busqueda && busqueda.toLowerCase() !== nombreOficial.toLowerCase()) {
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
+        axios.post('/facturas/guardar-alias', {
+          alias:        busqueda,
+          proveedor_id: p.id,
+          usuario,
+        }).catch(() => {})
+      }
     },
     abrirProvDropdown() {
       if (this.provResultados.length) this.provAbierta = true

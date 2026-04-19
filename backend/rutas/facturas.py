@@ -11,7 +11,7 @@ from database import get_db
 from models import (
     OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion,
-    Producto, Proveedor, CatalogoProveedor,
+    Producto, Proveedor, CatalogoProveedor, AliasProveedor,
     MovimientoBancario, TasaCambio,
 )
 
@@ -50,6 +50,16 @@ def _next_oc_numero(db: Session) -> str:
     ultimo = db.query(OrdenCompra).order_by(OrdenCompra.id.desc()).first()
     n = (ultimo.id + 1) if ultimo else 1
     return f"OC-{n:04d}"
+
+
+def _normalizar(texto: str) -> str:
+    import re
+    texto = texto.upper().strip()
+    texto = re.sub(r'\s+', ' ', texto)
+    for palabra in ['C.A', 'C.A.', 'S.A', 'S.A.', 'CA', 'SA', 'COMPANIA', 'EMPRESA', 'GRUPO', 'COMERCIAL']:
+        texto = texto.replace(palabra, '')
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    return texto
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +143,77 @@ async def escanear_factura(archivo: UploadFile = File(...)):
 def buscar_proveedor(nombre: str = "", db: Session = Depends(get_db)):
     if len(nombre) < 2:
         return []
-    q = db.query(Proveedor).filter(
+
+    nombre_norm = _normalizar(nombre)
+
+    # 1. Buscar en alias_proveedores (aprendizaje previo)
+    alias_matches = db.query(AliasProveedor).filter(
+        AliasProveedor.alias_normalizado.ilike(f"%{nombre_norm}%")
+    ).limit(5).all()
+
+    ids_ya: set[int] = set()
+    resultados = []
+
+    for a in alias_matches:
+        p = db.query(Proveedor).filter(
+            Proveedor.id == a.proveedor_id,
+            Proveedor.activo == True,
+        ).first()
+        if p and p.id not in ids_ya:
+            resultados.append({
+                "id": p.id,
+                "nombre": p.nombre,
+                "rif": p.rif or "",
+                "via_alias": True,
+            })
+            ids_ya.add(p.id)
+
+    # 2. Buscar por nombre directo (ilike normal)
+    directos = db.query(Proveedor).filter(
         Proveedor.nombre.ilike(f"%{nombre}%"),
         Proveedor.activo == True,
     ).limit(10).all()
-    return [{"id": p.id, "nombre": p.nombre, "rif": p.rif or ""} for p in q]
+
+    for p in directos:
+        if p.id not in ids_ya:
+            resultados.append({
+                "id": p.id,
+                "nombre": p.nombre,
+                "rif": p.rif or "",
+                "via_alias": False,
+            })
+            ids_ya.add(p.id)
+
+    return resultados[:10]
+
+
+@router.post("/guardar-alias")
+def guardar_alias(datos: dict, db: Session = Depends(get_db)):
+    alias        = datos.get("alias", "").strip()
+    proveedor_id = datos.get("proveedor_id")
+    creado_por   = datos.get("usuario", "")
+
+    if not alias or not proveedor_id:
+        raise HTTPException(status_code=400, detail="alias y proveedor_id son obligatorios")
+
+    alias_norm = _normalizar(alias)
+
+    existente = db.query(AliasProveedor).filter(
+        AliasProveedor.alias_normalizado == alias_norm,
+        AliasProveedor.proveedor_id == proveedor_id,
+    ).first()
+
+    if not existente:
+        db.add(AliasProveedor(
+            proveedor_id      = proveedor_id,
+            alias             = alias,
+            alias_normalizado = alias_norm,
+            creado_por        = creado_por,
+        ))
+        db.commit()
+        return {"guardado": True}
+
+    return {"guardado": False, "razon": "alias ya existe"}
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +371,25 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             actualizo_costo          = actualizar,
             costo_anterior           = costo_ant,
         ))
+
+        # ── Actualizar catálogo proveedor ─────────────────────────────
+        if prod_id and proveedor_id:
+            codigo_prov = p.get("codigo_proveedor", "").strip()
+            nombre_prod = p.get("nombre_producto", "")
+            existente_catalogo = db.query(CatalogoProveedor).filter(
+                CatalogoProveedor.proveedor_id == proveedor_id,
+                CatalogoProveedor.producto_id  == prod_id,
+            ).first()
+            if not existente_catalogo:
+                db.add(CatalogoProveedor(
+                    proveedor_id          = proveedor_id,
+                    producto_id           = prod_id,
+                    nombre_producto       = nombre_prod,
+                    codigo_proveedor      = codigo_prov if codigo_prov else None,
+                    precio_referencia_usd = precio,
+                ))
+            else:
+                existente_catalogo.precio_referencia_usd = precio
 
     # ── Movimientos bancarios por cada pago ──────────────────────────────────
     pagos_data = datos.get("pagos", [])
