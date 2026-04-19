@@ -141,6 +141,38 @@
             </div>
           </div>
 
+          <!-- Selector OC existente -->
+          <div v-if="ordenesDisponibles.length" class="card-seccion oc-selector-card">
+            <h3 class="seccion-titulo">¿Vincular a orden de compra existente?</h3>
+            <div class="oc-opciones">
+              <div
+                class="oc-opcion"
+                :class="{ 'oc-opcion-activa': ordenSeleccionada === null }"
+                @click="desvincularOrden"
+              >
+                <span class="oc-badge nuevo">Nueva</span>
+                <span class="oc-label">Crear OC nueva</span>
+              </div>
+              <div
+                v-for="oc in ordenesDisponibles"
+                :key="oc.id"
+                class="oc-opcion"
+                :class="{ 'oc-opcion-activa': ordenSeleccionada && ordenSeleccionada.id === oc.id }"
+                @click="seleccionarOrden(oc)"
+              >
+                <span class="oc-badge" :class="oc.estado === 'aprobada' ? 'aprobada' : 'parcial'">
+                  {{ oc.estado === 'aprobada' ? 'Aprobada' : 'Parcial' }}
+                </span>
+                <span class="oc-label">{{ oc.numero }}</span>
+                <span class="oc-total">${{ oc.total.toFixed(2) }}</span>
+                <span class="oc-items">{{ oc.detalles.length }} ítem{{ oc.detalles.length !== 1 ? 's' : '' }}</span>
+              </div>
+            </div>
+            <small v-if="ordenSeleccionada" class="txt-muted" style="margin-top:0.5rem;display:block">
+              Productos pre-cargados desde {{ ordenSeleccionada.numero }}. Puedes ajustar cantidades y precios.
+            </small>
+          </div>
+
           <!-- Tabla de productos -->
           <div class="card-seccion">
             <h3 class="seccion-titulo">
@@ -462,6 +494,9 @@ export default {
       nuevoProv: { nombre: '', rif: '', telefono: '', contacto: '' },
       errorNuevoProv: '',
       creandoProv: false,
+      // Selector OC existente
+      ordenesDisponibles: [],
+      ordenSeleccionada: null,
     }
   },
 
@@ -621,9 +656,14 @@ export default {
     },
     seleccionarProveedor(p) {
       const busqueda = this.proveedorBusq.trim()
-      this.proveedorId   = p.id
-      this.proveedorBusq = p.nombre
-      this.provAbierta   = false
+      this.proveedorId        = p.id
+      this.proveedorBusq      = p.nombre
+      this.provAbierta        = false
+      this.ordenSeleccionada  = null
+      this.ordenesDisponibles = []
+
+      // Cargar OC pendientes de este proveedor
+      this.cargarOrdenesPendientes(p.id)
 
       // Si el nombre buscado difiere del nombre oficial, guardar alias
       const nombreOficial = p.nombre.trim()
@@ -735,10 +775,11 @@ export default {
       const abonadoReal = this.condicionPago === 'credito_completo' ? 0 : this.totalPagado
 
       const payload = {
-        proveedor_id:   this.proveedorId,
-        numero_factura: this.numeroFactura,
-        fecha:          this.fechaFactura || new Date().toISOString().slice(0, 10),
-        descuento:      0,
+        proveedor_id:        this.proveedorId,
+        numero_factura:      this.numeroFactura,
+        fecha:               this.fechaFactura || new Date().toISOString().slice(0, 10),
+        descuento:           0,
+        orden_id_existente:  this.ordenSeleccionada ? this.ordenSeleccionada.id : null,
         total_factura:  this.totalCalculado,
         condicion_pago: this.condicionPago,
         monto_abonado:  abonadoReal,
@@ -796,13 +837,48 @@ export default {
       this.nuevoPagoMetodo     = 'efectivo_usd'
       this.nuevoPagoCuentaId   = null
       this.errorConfirmar      = ''
+      this.ordenesDisponibles  = []
+      this.ordenSeleccionada   = null
       if (this.$refs.fileInput) this.$refs.fileInput.value = ''
     },
 
     limpiarProveedor() {
-      this.proveedorId    = null
-      this.proveedorBusq  = ''
-      this.provResultados = []
+      this.proveedorId        = null
+      this.proveedorBusq      = ''
+      this.provResultados     = []
+      this.ordenesDisponibles = []
+      this.ordenSeleccionada  = null
+    },
+
+    // ── OC existentes ─────────────────────────────────────────────────────────
+    async cargarOrdenesPendientes(proveedorId) {
+      try {
+        const { data } = await axios.get('/facturas/ordenes-pendientes', {
+          params: { proveedor_id: proveedorId }
+        })
+        this.ordenesDisponibles = data
+      } catch {
+        this.ordenesDisponibles = []
+      }
+    },
+    seleccionarOrden(oc) {
+      this.ordenSeleccionada = oc
+      this.lineas = oc.detalles.map(d => ({
+        nombre_ia:        d.nombre_producto || '',
+        codigo_proveedor: d.codigo_proveedor || '',
+        cantidad:         d.cantidad_pedida,
+        precio_unitario:  d.precio_unitario_usd,
+        actualizar_costo: true,
+        match:            d.producto_id ? { id: d.producto_id, nombre: d.nombre_producto } : null,
+        buscandoMatch:    false,
+        _busqTexto:       d.nombre_producto || '',
+        _busqResultados:  [],
+        _busqAbierta:     false,
+      }))
+    },
+    desvincularOrden() {
+      this.ordenSeleccionada = null
+      this.lineas            = []
     },
     abrirModalProveedor() {
       this.nuevoProv = {
@@ -1049,6 +1125,31 @@ select.input-field { cursor: pointer; }
 .toast-body strong { display: block; color: #FFCC00; font-size: 0.95rem; margin-bottom: 0.3rem; }
 .toast-body p      { margin: 0.15rem 0; font-size: 0.83rem; color: #ccc; }
 .toast-body small  { font-size: 0.75rem; color: #888; }
+
+/* OC selector */
+.oc-selector-card { padding-bottom: 1rem; }
+.oc-opciones { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.oc-opcion {
+  display: flex; align-items: center; gap: 0.5rem;
+  border: 1px solid var(--borde); border-radius: 8px;
+  padding: 0.5rem 0.9rem; cursor: pointer;
+  background: #FFFFFF; transition: all 0.15s;
+}
+.oc-opcion:hover { border-color: #FFCC00; background: #FFFDF0; }
+.oc-opcion-activa { border-color: #1A1A1A; background: #1A1A1A; }
+.oc-opcion-activa .oc-label,
+.oc-opcion-activa .oc-total,
+.oc-opcion-activa .oc-items { color: #FFCC00 !important; }
+.oc-label { font-size: 0.85rem; font-weight: 600; color: var(--texto-principal); }
+.oc-total { font-size: 0.82rem; color: #15803D; font-weight: 600; }
+.oc-items { font-size: 0.78rem; color: var(--texto-muted); }
+.oc-badge {
+  font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.oc-badge.nuevo     { background: #E0F2FE; color: #0369A1; }
+.oc-badge.aprobada  { background: #DCFCE7; color: #15803D; }
+.oc-badge.parcial   { background: #FEF9C3; color: #854D0E; }
 
 /* Shared */
 .msg-error { color: #DC2626; font-size: 0.875rem; margin-top: 0.5rem; }

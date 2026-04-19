@@ -262,20 +262,62 @@ def buscar_producto(
 
 
 # ---------------------------------------------------------------------------
+# GET /facturas/ordenes-pendientes
+# ---------------------------------------------------------------------------
+
+@router.get("/ordenes-pendientes")
+def ordenes_pendientes(proveedor_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """Devuelve OC en estado aprobada o recibida_parcial, opcionalmente filtradas por proveedor."""
+    q = db.query(OrdenCompra).filter(
+        OrdenCompra.estado.in_(["aprobada", "recibida_parcial"])
+    )
+    if proveedor_id:
+        q = q.filter(OrdenCompra.proveedor_id == proveedor_id)
+    ordenes = q.order_by(OrdenCompra.fecha_creacion.desc()).limit(30).all()
+
+    resultado = []
+    for o in ordenes:
+        prov = db.query(Proveedor).filter(Proveedor.id == o.proveedor_id).first()
+        detalles = db.query(DetalleOrdenCompra).filter(DetalleOrdenCompra.orden_id == o.id).all()
+        resultado.append({
+            "id":               o.id,
+            "numero":           o.numero,
+            "estado":           o.estado,
+            "fecha_creacion":   o.fecha_creacion.isoformat() if o.fecha_creacion else None,
+            "total":            round(o.total, 2),
+            "proveedor_id":     o.proveedor_id,
+            "proveedor_nombre": prov.nombre if prov else "",
+            "detalles": [
+                {
+                    "id":                  d.id,
+                    "producto_id":         d.producto_id,
+                    "nombre_producto":     d.nombre_producto,
+                    "codigo_proveedor":    d.codigo_proveedor or "",
+                    "cantidad_pedida":     d.cantidad_pedida,
+                    "precio_unitario_usd": d.precio_unitario_usd,
+                }
+                for d in detalles
+            ],
+        })
+    return resultado
+
+
+# ---------------------------------------------------------------------------
 # POST /facturas/confirmar-compra
 # ---------------------------------------------------------------------------
 
 @router.post("/confirmar-compra")
 def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
-    proveedor_id   = datos.get("proveedor_id")
-    numero_factura = datos.get("numero_factura", "")
-    fecha_str      = datos.get("fecha")
-    productos_data = datos.get("productos", [])
-    descuento      = float(datos.get("descuento", 0))
-    total_factura  = float(datos.get("total_factura", 0))
-    condicion_pago = datos.get("condicion_pago", "credito_completo")
-    monto_abonado  = float(datos.get("monto_abonado", 0))
-    usuario        = datos.get("usuario", "admin")
+    proveedor_id        = datos.get("proveedor_id")
+    numero_factura      = datos.get("numero_factura", "")
+    fecha_str           = datos.get("fecha")
+    productos_data      = datos.get("productos", [])
+    descuento           = float(datos.get("descuento", 0))
+    total_factura       = float(datos.get("total_factura", 0))
+    condicion_pago      = datos.get("condicion_pago", "credito_completo")
+    monto_abonado       = float(datos.get("monto_abonado", 0))
+    usuario             = datos.get("usuario", "admin")
+    orden_id_existente  = datos.get("orden_id_existente")  # None = crear nueva OC
 
     try:
         fecha = datetime.fromisoformat(fecha_str) if fecha_str else datetime.now()
@@ -287,35 +329,45 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         for p in productos_data
     )
 
-    # ── Orden de compra cerrada directamente ──────────────────────────────────
-    orden = OrdenCompra(
-        numero           = _next_oc_numero(db),
-        proveedor_id     = proveedor_id,
-        fecha_creacion   = fecha,
-        fecha_aprobacion = fecha,
-        estado           = "cerrada",
-        creado_por       = usuario,
-        aprobado_por     = usuario,
-        moneda           = "USD",
-        subtotal         = round(subtotal, 2),
-        descuento        = round(descuento, 2),
-        total            = round(total_factura, 2),
-        observacion      = f"Factura IA: {numero_factura}",
-    )
-    db.add(orden)
-    db.flush()
+    # ── Orden de compra ───────────────────────────────────────────────────────
+    if orden_id_existente:
+        # Vincular a OC existente (aprobada o recibida_parcial)
+        orden = db.query(OrdenCompra).filter(OrdenCompra.id == orden_id_existente).first()
+        if not orden:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+        if orden.estado not in ("aprobada", "recibida_parcial"):
+            raise HTTPException(status_code=400, detail=f"La orden está en estado '{orden.estado}' y no puede recibirse")
+        orden.observacion = f"{orden.observacion or ''} | Factura IA: {numero_factura}".strip(" |")
+    else:
+        # Crear OC nueva cerrada directamente
+        orden = OrdenCompra(
+            numero           = _next_oc_numero(db),
+            proveedor_id     = proveedor_id,
+            fecha_creacion   = fecha,
+            fecha_aprobacion = fecha,
+            estado           = "cerrada",
+            creado_por       = usuario,
+            aprobado_por     = usuario,
+            moneda           = "USD",
+            subtotal         = round(subtotal, 2),
+            descuento        = round(descuento, 2),
+            total            = round(total_factura, 2),
+            observacion      = f"Factura IA: {numero_factura}",
+        )
+        db.add(orden)
+        db.flush()
 
-    for p in productos_data:
-        db.add(DetalleOrdenCompra(
-            orden_id            = orden.id,
-            producto_id         = p.get("producto_id"),
-            nombre_producto     = p.get("nombre_producto", ""),
-            codigo_proveedor    = p.get("codigo_proveedor", ""),
-            cantidad_pedida     = float(p.get("cantidad", 0)),
-            precio_unitario_usd = float(p.get("precio_unitario_usd", 0)),
-            subtotal            = float(p.get("subtotal", 0)),
-            es_producto_nuevo   = False,
-        ))
+        for p in productos_data:
+            db.add(DetalleOrdenCompra(
+                orden_id            = orden.id,
+                producto_id         = p.get("producto_id"),
+                nombre_producto     = p.get("nombre_producto", ""),
+                codigo_proveedor    = p.get("codigo_proveedor", ""),
+                cantidad_pedida     = float(p.get("cantidad", 0)),
+                precio_unitario_usd = float(p.get("precio_unitario_usd", 0)),
+                subtotal            = float(p.get("subtotal", 0)),
+                es_producto_nuevo   = False,
+            ))
 
     # ── Estado de pago ────────────────────────────────────────────────────────
     if condicion_pago == "contado":
@@ -426,6 +478,14 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 orden_compra_id  = orden.id,
                 registrado_por   = usuario,
             ))
+
+    # ── Si era OC existente, actualizar su estado ─────────────────────────────
+    if orden_id_existente:
+        todas_recepciones = db.query(RecepcionCompra).filter(
+            RecepcionCompra.orden_id == orden.id
+        ).all()
+        total_recibido_acum = sum(r.total_recibido or 0 for r in todas_recepciones)
+        orden.estado = "cerrada" if total_recibido_acum >= orden.total * 0.99 else "recibida_parcial"
 
     db.commit()
     return {
