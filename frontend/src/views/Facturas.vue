@@ -493,6 +493,9 @@
                   <span>{{ saldoPendiente > 0.01 ? fmtUSD(saldoPendiente) : '✓ Pagado' }}</span>
                 </div>
               </div>
+              <p v-if="!proveedorId" class="aviso-pendientes">
+                ⚠ Debes seleccionar el proveedor antes de confirmar.
+              </p>
               <p v-if="lineasSinDecidir > 0" class="aviso-pendientes">
                 ⚠ {{ lineasSinDecidir }} producto(s) pendiente(s) de vincular.
               </p>
@@ -624,6 +627,7 @@ export default {
       return Math.max(this.totalCalculado - this.totalPagado, 0)
     },
     puedeConfirmar() {
+      if (!this.proveedorId) return false
       if (this.lineas.length === 0 || this.totalCalculado <= 0) return false
       return this.lineas.every(l => l.match || l.esNuevo)
     },
