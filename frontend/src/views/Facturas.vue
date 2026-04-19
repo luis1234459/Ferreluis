@@ -85,6 +85,49 @@
                       <small v-if="p.rif"> · {{ p.rif }}</small>
                     </li>
                   </ul>
+                  <div v-if="provAbierta && !provResultados.length && proveedorBusq.length >= 2" class="dropdown-vacio">
+                    <span>Sin resultados</span>
+                    <button class="btn-crear-prov" @mousedown.prevent="abrirModalProveedor">+ Crear proveedor</button>
+                  </div>
+                </div>
+                <div v-if="proveedorId" class="prov-seleccionado">
+                  ✓ {{ proveedorBusq }}
+                  <span class="prov-desvincular" @click="limpiarProveedor">✕</span>
+                </div>
+              </div>
+
+              <!-- Modal crear proveedor -->
+              <div v-if="modalProveedor" class="modal-overlay" @click.self="modalProveedor = false">
+                <div class="modal-box">
+                  <div class="modal-header">
+                    <h3>Nuevo proveedor</h3>
+                    <button class="btn-cerrar-modal" @click="modalProveedor = false">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="field-group">
+                      <label class="field-label">Nombre *</label>
+                      <input v-model="nuevoProv.nombre" class="input-field" placeholder="Nombre del proveedor" />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">RIF</label>
+                      <input v-model="nuevoProv.rif" class="input-field" placeholder="J-12345678-9" />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">Teléfono</label>
+                      <input v-model="nuevoProv.telefono" class="input-field" placeholder="04XX-XXXXXXX" />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">Contacto</label>
+                      <input v-model="nuevoProv.contacto" class="input-field" placeholder="Nombre del contacto" />
+                    </div>
+                    <p v-if="errorNuevoProv" class="msg-error">{{ errorNuevoProv }}</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn-condicion" @click="modalProveedor = false">Cancelar</button>
+                    <button class="btn-confirmar" style="width:auto;padding:0.6rem 1.5rem" @click="crearProveedor" :disabled="creandoProv">
+                      {{ creandoProv ? 'Guardando...' : 'Guardar proveedor' }}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="field-group">
@@ -414,6 +457,11 @@ export default {
       errorConfirmar: '',
       confirmadoOk: false,
       resultadoConfirmar: {},
+      // Modal nuevo proveedor
+      modalProveedor: false,
+      nuevoProv: { nombre: '', rif: '', telefono: '', contacto: '' },
+      errorNuevoProv: '',
+      creandoProv: false,
     }
   },
 
@@ -751,6 +799,48 @@ export default {
       if (this.$refs.fileInput) this.$refs.fileInput.value = ''
     },
 
+    limpiarProveedor() {
+      this.proveedorId    = null
+      this.proveedorBusq  = ''
+      this.provResultados = []
+    },
+    abrirModalProveedor() {
+      this.nuevoProv = {
+        nombre:   this.proveedorBusq,
+        rif:      '',
+        telefono: '',
+        contacto: '',
+      }
+      this.errorNuevoProv = ''
+      this.modalProveedor = true
+      this.provAbierta    = false
+    },
+    async crearProveedor() {
+      if (!this.nuevoProv.nombre.trim()) {
+        this.errorNuevoProv = 'El nombre es obligatorio'
+        return
+      }
+      this.creandoProv    = true
+      this.errorNuevoProv = ''
+      try {
+        const { data } = await axios.post('/compras/proveedores/', {
+          nombre:   this.nuevoProv.nombre.trim(),
+          rif:      this.nuevoProv.rif.trim(),
+          telefono: this.nuevoProv.telefono.trim(),
+          contacto: this.nuevoProv.contacto.trim(),
+        }, {
+          headers: { 'x-usuario-rol': 'admin' }
+        })
+        this.seleccionarProveedor(data)
+        this.modalProveedor = false
+        this.nuevoProv = { nombre: '', rif: '', telefono: '', contacto: '' }
+      } catch (e) {
+        this.errorNuevoProv = e?.response?.data?.detail || 'Error al crear proveedor'
+      } finally {
+        this.creandoProv = false
+      }
+    },
+
     fmtUSD(v) {
       return '$' + (Number(v) || 0).toLocaleString('en-US', {
         minimumFractionDigits: 2,
@@ -962,4 +1052,53 @@ select.input-field { cursor: pointer; }
 
 /* Shared */
 .msg-error { color: #DC2626; font-size: 0.875rem; margin-top: 0.5rem; }
+
+.dropdown-vacio {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 999;
+  background: #FFFFFF; border: 1px solid var(--borde);
+  border-radius: 6px; padding: 0.6rem 0.75rem;
+  display: flex; justify-content: space-between; align-items: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  font-size: 0.85rem; color: var(--texto-muted);
+}
+.btn-crear-prov {
+  background: #1A1A1A; color: #FFCC00; border: none;
+  border-radius: 6px; padding: 0.3rem 0.75rem;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.prov-seleccionado {
+  margin-top: 0.4rem; font-size: 0.82rem; color: #15803D;
+  font-weight: 600; display: flex; align-items: center; gap: 0.4rem;
+}
+.prov-desvincular {
+  cursor: pointer; color: #DC2626; font-size: 0.8rem;
+  padding: 0.1rem 0.3rem; border-radius: 3px;
+}
+.prov-desvincular:hover { background: #FEE2E2; }
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 9999; display: flex; align-items: center; justify-content: center;
+}
+.modal-box {
+  background: #FFFFFF; border-radius: 12px;
+  width: 100%; max-width: 440px; padding: 0;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--borde);
+}
+.modal-header h3 { margin: 0; font-size: 1rem; color: var(--texto-principal); }
+.btn-cerrar-modal {
+  background: none; border: none; font-size: 1.1rem;
+  cursor: pointer; color: var(--texto-muted); padding: 0.2rem 0.4rem;
+}
+.modal-body {
+  padding: 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.modal-footer {
+  padding: 1rem 1.5rem; border-top: 1px solid var(--borde);
+  display: flex; justify-content: flex-end; gap: 0.75rem;
+}
 </style>
