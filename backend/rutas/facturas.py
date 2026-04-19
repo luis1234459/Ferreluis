@@ -100,6 +100,7 @@ async def escanear_factura(archivo: UploadFile = File(...)):
                         "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
                         "{\n"
                         '  "proveedor": "nombre del proveedor o vacío",\n'
+                        '  "rif_proveedor": "RIF o NIT del proveedor si aparece, o vacío",\n'
                         '  "numero_factura": "número de factura o vacío",\n'
                         '  "fecha": "fecha en formato YYYY-MM-DD o vacío",\n'
                         '  "subtotal": numero o null,\n'
@@ -214,6 +215,78 @@ def guardar_alias(datos: dict, db: Session = Depends(get_db)):
         return {"guardado": True}
 
     return {"guardado": False, "razon": "alias ya existe"}
+
+
+@router.post("/resolver-proveedor")
+def resolver_proveedor(datos: dict, db: Session = Depends(get_db)):
+    """
+    Busca proveedor por RIF exacto.
+    Si encuentra → devuelve el proveedor y actualiza nombre si cambió.
+    Si no encuentra → crea proveedor nuevo y lo devuelve.
+    """
+    nombre  = (datos.get("nombre") or "").strip()
+    rif     = (datos.get("rif") or "").strip()
+    usuario = datos.get("usuario", "")
+
+    if not nombre and not rif:
+        raise HTTPException(status_code=400, detail="Se requiere nombre o RIF")
+
+    proveedor = None
+
+    # Buscar por RIF exacto primero
+    if rif:
+        proveedor = db.query(Proveedor).filter(
+            Proveedor.rif == rif,
+            Proveedor.activo == True,
+        ).first()
+
+    # Si encontró por RIF, actualizar nombre si cambió
+    if proveedor and nombre and proveedor.nombre != nombre:
+        nombre_anterior  = proveedor.nombre
+        proveedor.nombre = nombre
+        db.commit()
+        db.refresh(proveedor)
+        return {
+            "id":               proveedor.id,
+            "nombre":           proveedor.nombre,
+            "rif":              proveedor.rif or "",
+            "es_nuevo":         False,
+            "nombre_anterior":  nombre_anterior,
+            "actualizo_nombre": True,
+        }
+
+    # Si encontró sin cambio de nombre
+    if proveedor:
+        return {
+            "id":               proveedor.id,
+            "nombre":           proveedor.nombre,
+            "rif":              proveedor.rif or "",
+            "es_nuevo":         False,
+            "actualizo_nombre": False,
+        }
+
+    # No encontró → crear proveedor nuevo
+    nuevo = Proveedor(
+        nombre         = nombre or f"Proveedor {rif}",
+        rif            = rif or None,
+        activo         = True,
+        fecha_registro = datetime.now(),
+    )
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    if not nuevo.codigo:
+        nuevo.codigo = f"PRV-{nuevo.id:04d}"
+        db.commit()
+        db.refresh(nuevo)
+
+    return {
+        "id":               nuevo.id,
+        "nombre":           nuevo.nombre,
+        "rif":              nuevo.rif or "",
+        "es_nuevo":         True,
+        "actualizo_nombre": False,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -586,6 +586,7 @@ export default {
       creandoProv: false,
       // Renombrar proveedor
       proveedorNombreIA:  '',
+      rifProveedorIA:     '',
       modalRenombrar:     false,
       proveedorPendiente: null,
       // Selector OC existente
@@ -707,6 +708,12 @@ export default {
       this.proveedorBusq     = data.proveedor || ''
       this.proveedorId       = null
       this.proveedorNombreIA = data.proveedor || ''
+      this.rifProveedorIA    = data.rif_proveedor || ''
+
+      // Resolver proveedor automáticamente si hay nombre o RIF
+      if (data.proveedor || data.rif_proveedor) {
+        this.resolverProveedorAutomatico(data.proveedor, data.rif_proveedor)
+      }
 
       this.lineas = (data.productos || []).map(p => ({
         nombre_ia:        p.nombre           || '',
@@ -812,6 +819,27 @@ export default {
     },
     cerrarProvDropdown() {
       setTimeout(() => { this.provAbierta = false }, 200)
+    },
+
+    async resolverProveedorAutomatico(nombre, rif) {
+      try {
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
+        const { data } = await axios.post('/facturas/resolver-proveedor', {
+          nombre, rif, usuario
+        })
+        this.proveedorId   = data.id
+        this.proveedorBusq = data.nombre
+
+        if (data.es_nuevo) {
+          this.proveedorBusq = data.nombre
+        } else if (data.actualizo_nombre) {
+          this.proveedorBusq = data.nombre
+        }
+
+        this.cargarOrdenesPendientes(data.id)
+      } catch {
+        // Si falla, dejar campo manual como estaba
+      }
     },
 
     // ── Auto-match ────────────────────────────────────────────────────
