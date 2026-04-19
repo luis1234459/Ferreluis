@@ -4,7 +4,7 @@ import base64
 import json
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
@@ -319,28 +319,36 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
 
     # ── Estado de pago ────────────────────────────────────────────────────────
     if condicion_pago == "contado":
-        estado_pago  = "pagado"
-        abonado_real = total_factura
-        saldo_pend   = 0.0
+        estado_pago       = "pagado"
+        abonado_real      = total_factura
+        saldo_pend        = 0.0
+        fecha_vencimiento = None
     elif condicion_pago == "credito_parcial":
         estado_pago  = "pendiente"
         abonado_real = monto_abonado
         saldo_pend   = round(total_factura - monto_abonado, 2)
+        prov_obj     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
+        dias         = (prov_obj.dias_credito or 30) if prov_obj else 30
+        fecha_vencimiento = (fecha + timedelta(days=dias)).date()
     else:  # credito_completo
         estado_pago  = "pendiente"
         abonado_real = 0.0
         saldo_pend   = total_factura
+        prov_obj     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
+        dias         = (prov_obj.dias_credito or 30) if prov_obj else 30
+        fecha_vencimiento = (fecha + timedelta(days=dias)).date()
 
     # ── Recepción ─────────────────────────────────────────────────────────────
     recepcion = RecepcionCompra(
-        orden_id          = orden.id,
-        fecha_recepcion   = fecha,
-        recibido_por      = usuario,
-        observacion       = f"Factura: {numero_factura}",
-        total_recibido    = round(subtotal, 2),
-        monto_factura     = round(total_factura, 2),
-        estado_pago       = estado_pago,
-        numero_factura    = numero_factura,
+        orden_id                = orden.id,
+        fecha_recepcion         = fecha,
+        recibido_por            = usuario,
+        observacion             = f"Factura: {numero_factura}",
+        total_recibido          = round(subtotal, 2),
+        monto_factura           = round(total_factura, 2),
+        estado_pago             = estado_pago,
+        numero_factura          = numero_factura,
+        fecha_vencimiento_pago  = fecha_vencimiento,
     )
     db.add(recepcion)
     db.flush()
