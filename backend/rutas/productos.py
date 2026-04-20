@@ -155,7 +155,7 @@ def generar_codigo(nombre: str, db: Session) -> str:
 
 @router.get("/departamentos")
 def listar_departamentos(db: Session = Depends(get_db)):
-    return db.query(Departamento).all()
+    return db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
 
 
 @router.post("/departamentos")

@@ -1418,7 +1418,7 @@ export default {
 
     async cargarDepartamentos() {
       try {
-        const r = await axios.get('/productos/departamentos/')
+        const r = await axios.get('/productos/departamentos')
         this.departamentos = r.data
       } catch { this.departamentos = [] }
     },
