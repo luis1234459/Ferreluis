@@ -531,7 +531,7 @@
 </template>
 
 <script>
-import AppSidebar from '../components/AppSidebar.vue'
+import AppSidebar from '../../components/AppSidebar.vue'
 import axios from 'axios'
 
 export default {

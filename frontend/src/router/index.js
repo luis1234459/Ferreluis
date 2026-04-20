@@ -5,7 +5,6 @@ import Dashboard from '../views/Dashboard.vue'
 import Inventario from '../views/Inventario.vue'
 import Ventas    from '../views/Ventas.vue'
 import CierreCaja from '../views/CierreCaja.vue'
-import Facturas  from '../views/Facturas.vue'
 import Tasa      from '../views/Tasa.vue'
 import Depositos from '../views/Depositos.vue'
 import Reportes       from '../views/Reportes.vue'
@@ -37,7 +36,18 @@ const routes = [
   { path: '/cierre',    name: 'CierreCaja',component: CierreCaja,meta: { permiso: 'cierre' } },
   { path: '/tasa',      name: 'Tasa',      component: Tasa,      meta: { permiso: 'tasa' } },
   { path: '/depositos', name: 'Depositos', component: Depositos, meta: { permiso: 'depositos' } },
-  { path: '/facturas',  name: 'Facturas',  component: Facturas,  meta: { permiso: 'facturas' } },
+  {
+    path: '/compras',
+    name: 'ComprasHub',
+    component: () => import('../views/compras/ComprasHub.vue'),
+    meta: { requiresAuth: true, permiso: 'compras' }
+  },
+  {
+    path: '/compras/escanear',
+    name: 'FacturasIA',
+    component: () => import('../views/compras/FacturasIA.vue'),
+    meta: { requiresAuth: true, permiso: 'compras' }
+  },
   { path: '/reportes',  name: 'Reportes',  component: Reportes,  meta: { permiso: 'reportes' } },
   { path: '/clientes',  name: 'Clientes',  component: Clientes,  meta: { permiso: 'clientes' } },
   { path: '/fidelidad', name: 'Fidelidad', component: Fidelidad, meta: { permiso: 'fidelidad' } },

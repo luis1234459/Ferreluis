@@ -64,13 +64,12 @@ const GRUPOS = [
     ],
   },
   {
-    key: 'facturacion',
+    key: 'depositos',
     icono: '🧾',
     nombre: 'Facturación',
-    rutas: ['/facturas', '/depositos'],
+    rutas: ['/depositos'],
     items: [
-      { ruta: '/facturas',  label: 'Facturas IA', permiso: 'facturas' },
-      { ruta: '/depositos', label: 'Depósitos',   soloAdmin: true },
+      { ruta: '/depositos', label: 'Depósitos', soloAdmin: true },
     ],
   },
   {
@@ -88,11 +87,13 @@ const GRUPOS = [
     key: 'compras',
     icono: '🛒',
     nombre: 'Compras',
-    rutas: ['/compras/ordenes', '/compras/recibir', '/compras/proveedores'],
+    rutas: ['/compras', '/compras/escanear', '/compras/ordenes', '/compras/recibir', '/compras/proveedores'],
     items: [
-      { ruta: '/compras/ordenes',     label: 'Órdenes',     permiso: 'compras' },
-      { ruta: '/compras/recibir',     label: 'Recibir',     permiso: 'compras' },
-      { ruta: '/compras/proveedores', label: 'Proveedores', permiso: 'proveedores' },
+      { ruta: '/compras',              label: 'Compras',     permiso: 'compras'      },
+      { ruta: '/compras/escanear',     label: 'Factura IA',  permiso: 'compras'      },
+      { ruta: '/compras/ordenes',      label: 'Órdenes',     permiso: 'compras'      },
+      { ruta: '/compras/recibir',      label: 'Recibir',     permiso: 'compras'      },
+      { ruta: '/compras/proveedores',  label: 'Proveedores', permiso: 'proveedores'  },
     ],
   },
   {
