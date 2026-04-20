@@ -217,12 +217,20 @@ def eliminar_departamento(
 @router.get("/categorias")
 def listar_categorias(
     departamento_id: Optional[int] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db)
 ):
     q = db.query(Categoria)
-    if departamento_id is not None:
+    if departamento_id:
         q = q.filter(Categoria.departamento_id == departamento_id)
-    return q.order_by(Categoria.nombre).all()
+    cats = q.order_by(Categoria.nombre).all()
+    return [
+        {
+            "id":              c.id,
+            "nombre":          c.nombre,
+            "departamento_id": c.departamento_id,
+        }
+        for c in cats
+    ]
 
 
 @router.post("/categorias")

@@ -1424,7 +1424,7 @@ export default {
     },
     async cargarCategorias() {
       try {
-        const r = await axios.get('/productos/categorias/')
+        const r = await axios.get('/productos/categorias')
         this.categorias = r.data
       } catch { this.categorias = [] }
     },
