@@ -26,7 +26,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from datetime import datetime, date
-
 from database import get_db
 from models import (
     Producto, Venta, PagoVenta, DetalleVenta,
@@ -595,3 +594,21 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         "exceso":           exceso,
         "pagos":            pagos_procesados,
     }
+
+
+@router.get("/productos-frecuentes")
+def productos_frecuentes(n: int = 10, db: Session = Depends(get_db)):
+    """Top N productos más vendidos por cantidad. Sin restricción de rol."""
+    rows = (
+        db.query(DetalleVenta.producto_id, sqlfunc.sum(DetalleVenta.cantidad).label("total"))
+        .group_by(DetalleVenta.producto_id)
+        .order_by(sqlfunc.sum(DetalleVenta.cantidad).desc())
+        .limit(n)
+        .all()
+    )
+    resultado = []
+    for r in rows:
+        p = db.query(Producto).filter(Producto.id == r.producto_id, Producto.activo == True).first()
+        if p:
+            resultado.append({"id": p.id, "nombre": p.nombre, "codigo": p.codigo or ""})
+    return resultado

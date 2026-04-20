@@ -417,6 +417,8 @@ def listar_productos(
     limit: int = 100,
     busqueda: str = "",
     departamento_id: Optional[int] = None,
+    categoria_id: Optional[int] = None,
+    proveedor_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Producto)
@@ -426,6 +428,10 @@ def listar_productos(
         q = q.filter(Producto.nombre.ilike(f"%{busqueda}%"))
     if departamento_id is not None:
         q = q.filter(Producto.departamento_id == departamento_id)
+    if categoria_id is not None:
+        q = q.filter(Producto.categoria_id == categoria_id)
+    if proveedor_id is not None:
+        q = q.filter(Producto.proveedor_id == proveedor_id)
     total = q.count()
     bcv, binance = _tasas_actuales(db)
     q = q.order_by(func.length(Producto.nombre), Producto.nombre)

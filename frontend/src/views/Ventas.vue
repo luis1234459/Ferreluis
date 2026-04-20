@@ -112,17 +112,68 @@
 
           <!-- ── Columna izq: Catálogo ── -->
           <div class="catalogo" style="width:100%;min-width:0;overflow:hidden;">
-            <input
-              v-model="busqueda"
-              ref="inputBuscador"
-              placeholder="Buscar producto..."
-              class="buscador"
-              autocomplete="off"
-              @keydown.down.prevent="moverAbajo"
-              @keydown.up.prevent="moverArriba"
-              @keydown.enter.prevent="seleccionarResaltado"
-              @keydown.escape="cerrarDropdown"
-            />
+
+            <!-- Buscador + botón filtros -->
+            <div class="buscador-wrap">
+              <input
+                v-model="busqueda"
+                ref="inputBuscador"
+                placeholder="Buscar producto..."
+                class="buscador"
+                autocomplete="off"
+                @keydown.down.prevent="moverAbajo"
+                @keydown.up.prevent="moverArriba"
+                @keydown.enter.prevent="seleccionarResaltado"
+                @keydown.escape="cerrarDropdown"
+              />
+              <button
+                class="btn-filtros-toggle"
+                :class="{ active: filtrosAbiertos }"
+                @click="filtrosAbiertos = !filtrosAbiertos"
+                title="Filtros"
+              >⚙ Filtros</button>
+            </div>
+
+            <!-- Panel de filtros colapsable -->
+            <div v-if="filtrosAbiertos" class="filtros-panel">
+              <select v-model="filtroDepartamento" class="filtro-sel" @change="filtroCategoria = null; cargarProductos()">
+                <option :value="null">Todos los dept.</option>
+                <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+              </select>
+              <select v-model="filtroCategoria" class="filtro-sel" @change="cargarProductos()">
+                <option :value="null">Todas las cat.</option>
+                <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+              </select>
+              <select v-model="filtroProveedor" class="filtro-sel" @change="cargarProductos()">
+                <option :value="null">Todos los prov.</option>
+                <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+              </select>
+              <button v-if="filtroDepartamento || filtroCategoria || filtroProveedor" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
+            </div>
+
+            <!-- Acceso rápido -->
+            <div v-if="!busqueda && !filtroDepartamento && !filtroCategoria && !filtroProveedor" class="acceso-rapido">
+              <div v-if="ultimosVendidos.length" class="ar-grupo">
+                <span class="ar-titulo">Últimos vendidos</span>
+                <div class="ar-chips">
+                  <button
+                    v-for="p in ultimosVendidos" :key="p.id"
+                    class="ar-chip"
+                    @click="agregarPorId(p.id)"
+                  >{{ p.nombre }}</button>
+                </div>
+              </div>
+              <div v-if="masVendidos.length" class="ar-grupo">
+                <span class="ar-titulo">Más vendidos</span>
+                <div class="ar-chips">
+                  <button
+                    v-for="p in masVendidos" :key="p.id"
+                    class="ar-chip"
+                    @click="agregarPorId(p.id)"
+                  >{{ p.nombre }}</button>
+                </div>
+              </div>
+            </div>
 
             <!-- Lista compacta de productos -->
             <div class="prod-list" ref="tbodyCatalogo">
@@ -145,7 +196,8 @@
                   <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
                 </span>
               </div>
-              <div v-if="productosFiltrados.length === 0" class="prod-sin-res">{{ busqueda.length < 2 ? 'Escribe 2+ caracteres para buscar' : 'Sin resultados' }}</div>
+              <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroProveedor)" class="prod-sin-res">Sin resultados</div>
+              <div v-else-if="productosFiltrados.length === 0" class="prod-sin-res">Escribe 2+ caracteres para buscar</div>
             </div>
           </div>
 
@@ -674,6 +726,16 @@ export default {
       busqueda:        '',
       indiceResaltado: -1,
 
+      filtrosAbiertos:    false,
+      departamentos:      [],
+      categorias:         [],
+      proveedores:        [],
+      filtroDepartamento: null,
+      filtroCategoria:    null,
+      filtroProveedor:    null,
+      masVendidos:        [],
+      ultimosVendidos:    [],
+
       monedaVenta:    'USD',
       tipoPrecio:     'referencial',
       carrito:        [],
@@ -752,11 +814,15 @@ export default {
     },
     productosFiltrados() {
       const q = this.busqueda.trim().toLowerCase()
-      if (q.length < 2) return []
-      const exactCodigo = this.productos.filter(p =>
-        p.codigo && p.codigo.toLowerCase() === q
-      )
-      return exactCodigo.length ? exactCodigo : this.productos
+      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor
+      if (q.length < 2 && !tienesFiltro) return []
+      if (q.length >= 2) {
+        const exactCodigo = this.productos.filter(p =>
+          p.codigo && p.codigo.toLowerCase() === q
+        )
+        return exactCodigo.length ? exactCodigo : this.productos
+      }
+      return this.productos
     },
     subtotalUSD() {
       return this.carrito.reduce(
@@ -795,6 +861,10 @@ export default {
     requiereAutorizacion() { return this.motivosAutorizacion.length > 0 },
     nuevoMonedaPago()      { return METODOS_USD.includes(this.nuevoMetodo) ? 'USD' : 'Bs' },
     esAdmin()              { return this.usuario.rol === 'admin' },
+    categoriasDeFiltro() {
+      if (!this.filtroDepartamento) return this.categorias
+      return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
+    },
     tienePermiso() {
       return (modulo) => {
         if (this.usuario.rol === 'admin') return true
@@ -876,12 +946,20 @@ export default {
       this.cargarProductos(),
       this.cargarTasa(),
       this.cargarCuentasPorMetodo(),
+      this.cargarDepartamentos(),
+      this.cargarCategorias(),
+      this.cargarProveedores(),
+      this.cargarMasVendidos(),
     ])
+    this.cargarUltimosVendidos()
   },
   methods: {
     async cargarProductos() {
       const params = { limit: 100 }
-      if (this.busqueda) params.busqueda = this.busqueda
+      if (this.busqueda)          params.busqueda       = this.busqueda
+      if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
+      if (this.filtroCategoria)   params.categoria_id   = this.filtroCategoria
+      if (this.filtroProveedor)   params.proveedor_id   = this.filtroProveedor
       const r = await axios.get('/productos/', { params })
       this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
     },
@@ -1181,6 +1259,7 @@ export default {
         const snapshotTotalBs = this.subtotalUSD * (this.tasaBcv || 1)
         const snapshotVentaId = res.data.venta_id
 
+        this.guardarUltimosVendidos(this.carrito)
         this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
         this.autorizacionClave = ''; this.observacion = ''
         this.clienteSeleccionado = null; this.nuevoMonto = ''
@@ -1335,6 +1414,58 @@ export default {
     verPresupuesto() {
       this.$router.push('/presupuestos')
       this.continuarVenta()
+    },
+
+    async cargarDepartamentos() {
+      try {
+        const r = await axios.get('/productos/departamentos/')
+        this.departamentos = r.data
+      } catch { this.departamentos = [] }
+    },
+    async cargarCategorias() {
+      try {
+        const r = await axios.get('/productos/categorias/')
+        this.categorias = r.data
+      } catch { this.categorias = [] }
+    },
+    async cargarProveedores() {
+      try {
+        const r = await axios.get('/compras/proveedores/')
+        this.proveedores = r.data
+      } catch { this.proveedores = [] }
+    },
+    async cargarMasVendidos() {
+      try {
+        const r = await axios.get('/ventas/productos-frecuentes', { params: { n: 8 } })
+        this.masVendidos = r.data
+      } catch { this.masVendidos = [] }
+    },
+    cargarUltimosVendidos() {
+      try {
+        const raw = localStorage.getItem('ultimos_vendidos')
+        this.ultimosVendidos = raw ? JSON.parse(raw) : []
+      } catch { this.ultimosVendidos = [] }
+    },
+    guardarUltimosVendidos(carritoSnapshot) {
+      const nuevos  = carritoSnapshot.map(i => ({ id: i.id, nombre: i.nombre }))
+      const previos = this.ultimosVendidos.filter(p => !nuevos.some(n => n.id === p.id))
+      const lista   = [...nuevos, ...previos].slice(0, 10)
+      this.ultimosVendidos = lista
+      localStorage.setItem('ultimos_vendidos', JSON.stringify(lista))
+    },
+    async agregarPorId(id) {
+      const p = this.productos.find(x => x.id === id)
+      if (p) { this.agregar(p); return }
+      try {
+        const r = await axios.get(`/productos/${id}`)
+        if (r.data) this.agregar(r.data)
+      } catch { /* producto no disponible */ }
+    },
+    limpiarFiltros() {
+      this.filtroDepartamento = null
+      this.filtroCategoria    = null
+      this.filtroProveedor    = null
+      this.cargarProductos()
     },
 
     salir() {
@@ -1798,4 +1929,23 @@ export default {
 .resumen-mixto { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; border: 1px solid var(--borde); display: flex; flex-direction: column; gap: 0.3rem; }
 .resumen-mixto-fila { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--texto-sec); }
 .equiv-cruce { color: var(--texto-muted); font-size: 0.82rem; background: var(--borde-suave); padding: 0.1rem 0.4rem; border-radius: 4px; }
+
+/* ── Buscador + filtros ── */
+.buscador-wrap { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.buscador-wrap .buscador { flex: 1; margin-bottom: 0; }
+.btn-filtros-toggle { padding: 0.45rem 0.85rem; background: #FFFFFF; border: 1px solid var(--borde); color: var(--texto-sec); border-radius: 8px; cursor: pointer; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+.btn-filtros-toggle:hover, .btn-filtros-toggle.active { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+
+.filtros-panel { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; padding: 0.55rem 0.65rem; background: var(--fondo-tabla-alt); border: 1px solid var(--borde); border-radius: 8px; }
+.filtro-sel { flex: 1; min-width: 130px; padding: 0.4rem 0.55rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; font-size: 0.82rem; }
+.btn-limpiar-filtros { padding: 0.35rem 0.75rem; background: transparent; border: 1px solid #DC2626; color: #DC2626; border-radius: 6px; cursor: pointer; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
+.btn-limpiar-filtros:hover { background: #DC26261A; }
+
+/* ── Acceso rápido ── */
+.acceso-rapido { margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.ar-grupo { display: flex; flex-direction: column; gap: 0.25rem; }
+.ar-titulo { font-size: 0.72rem; font-weight: 700; color: var(--texto-muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 0 0.1rem; }
+.ar-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.ar-chip { padding: 0.25rem 0.65rem; background: #FFCC0022; border: 1px solid #FFCC0077; color: #7A6000; border-radius: 20px; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.12s; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.ar-chip:hover { background: #FFCC00; color: #1A1A1A; border-color: #FFCC00; }
 </style>
