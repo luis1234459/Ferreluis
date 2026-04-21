@@ -191,6 +191,7 @@ class Usuario(Base):
     password = Column(String)
     rol      = Column(String, default="vendedor")
     permisos = Column(String, nullable=True)   # JSON string: ["ventas","clientes",...]
+    activo   = Column(Boolean, default=True)
 
 
 class Configuracion(Base):

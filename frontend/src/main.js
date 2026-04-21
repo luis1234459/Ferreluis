@@ -15,9 +15,14 @@ axios.interceptors.request.use(config => {
   if (raw) {
     try {
       const u = JSON.parse(raw)
-      if (u.rol)     config.headers['X-Usuario-Rol']     = u.rol
-      if (u.id)      config.headers['X-Usuario-Id']      = u.id
-      if (u.usuario) config.headers['X-Usuario-Nombre']  = u.usuario
+      // JWT nuevo
+      if (u.token) {
+        config.headers['Authorization'] = `Bearer ${u.token}`
+      }
+      // Headers legacy — mantener por compatibilidad durante transición
+      if (u.rol)     config.headers['X-Usuario-Rol']    = u.rol
+      if (u.id)      config.headers['X-Usuario-Id']     = String(u.id)
+      if (u.usuario) config.headers['X-Usuario-Nombre'] = u.usuario
     } catch { /* ignorar */ }
   }
   return config

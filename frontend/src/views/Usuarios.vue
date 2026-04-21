@@ -22,7 +22,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="u in usuarios" :key="u.id">
+              <tr v-for="u in usuarios" :key="u.id" :class="{ 'fila-inactiva': !u.activo }">
                 <td class="txt-muted">#{{ u.id }}</td>
                 <td>{{ u.nombre }}</td>
                 <td class="txt-muted">{{ u.email }}</td>
@@ -33,9 +33,16 @@
                   <span v-else-if="u.permisos.length === 0" class="txt-warn">Sin acceso</span>
                   <span v-else class="permisos-lista">{{ u.permisos.join(', ') }}</span>
                 </td>
-                <td>
+                <td class="acciones-celda">
                   <button class="btn-edit" @click="abrirEditar(u)">Editar</button>
-                  <button class="btn-del" @click="eliminarUsuario(u)" :disabled="u.id === usuario.id">Eliminar</button>
+                  <button
+                    class="btn-toggle"
+                    :class="u.activo ? 'btn-desactivar' : 'btn-activar'"
+                    @click="toggleActivo(u)"
+                    :disabled="u.id === usuario.id"
+                  >{{ u.activo ? 'Desactivar' : 'Activar' }}</button>
+                  <button class="btn-del" @click="eliminarUsuario(u)"
+                    :disabled="u.id === usuario.id">Eliminar</button>
                 </td>
               </tr>
               <tr v-if="usuarios.length === 0">
@@ -104,14 +111,13 @@ import axios from 'axios'
 const MODULOS = [
   { key: 'ventas',      label: 'Ventas' },
   { key: 'cierre',      label: 'Cierre de Caja' },
-  { key: 'facturas',    label: 'Facturas IA' },
+  { key: 'compras',     label: 'Compras / Facturas IA' },
   { key: 'tasa',        label: 'Tasa BCV' },
   { key: 'depositos',   label: 'Depósitos' },
   { key: 'reportes',    label: 'Reportes' },
   { key: 'clientes',    label: 'Clientes' },
   { key: 'fidelidad',   label: 'Fidelidad' },
   { key: 'mi_comision', label: 'Mi Comisión' },
-  { key: 'compras',     label: 'Compras (Órdenes / Recibir)' },
   { key: 'proveedores', label: 'Proveedores (Compras)' },
 ]
 
@@ -230,6 +236,14 @@ export default {
         this.guardando = false
       }
     },
+    async toggleActivo(u) {
+      try {
+        await axios.patch(`/usuarios/${u.id}/activo`, { activo: !u.activo })
+        u.activo = !u.activo
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al cambiar estado')
+      }
+    },
     async eliminarUsuario(u) {
       if (u.id === this.usuario.id) return
       if (!confirm(`¿Eliminar al usuario "${u.nombre}"?`)) return
@@ -271,4 +285,10 @@ export default {
 .badge-rol-admin      { background: #c0392b22; color: #c0392b; }
 .badge-rol-vendedor   { background: #27ae6022; color: #27ae60; }
 .badge-rol-gestionador{ background: #2980b922; color: #2980b9; }
+
+.fila-inactiva td { opacity: 0.45; }
+.btn-toggle { border: none; border-radius: 5px; padding: 0.25rem 0.6rem; font-size: 0.78rem; cursor: pointer; font-weight: 600; }
+.btn-activar    { background: #DCFCE7; color: #15803D; }
+.btn-desactivar { background: #FEF9C3; color: #854D0E; }
+.acciones-celda { display: flex; gap: 0.4rem; align-items: center; }
 </style>
