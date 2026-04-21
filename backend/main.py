@@ -91,8 +91,10 @@ def inicializar_datos():
 
         # ── usuarios ─────────────────────────────────────────────────────────
         migrar(
-            ["ALTER TABLE usuarios ADD COLUMN permisos TEXT DEFAULT NULL"],
-            ["ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos TEXT DEFAULT NULL"],
+            ["ALTER TABLE usuarios ADD COLUMN permisos TEXT DEFAULT NULL",
+             "ALTER TABLE usuarios ADD COLUMN activo BOOLEAN DEFAULT 1"],
+            ["ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos TEXT DEFAULT NULL",
+             "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE"],
         )
 
         # ── productos ────────────────────────────────────────────────────────
