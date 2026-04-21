@@ -31,6 +31,23 @@
             </div>
           </div>
 
+          <!-- Comisiones del día -->
+          <div class="comision-card" v-if="!esAdmin && (resumen.comision_hoy > 0 || resumen.comision_periodo > 0)">
+            <div class="comision-header">
+              <span class="comision-titulo">💰 Tus comisiones</span>
+            </div>
+            <div class="comision-body">
+              <div class="comision-fila grande">
+                <span>Comisión generada hoy</span>
+                <span class="comision-monto-grande">${{ (resumen.comision_hoy || 0).toFixed(2) }}</span>
+              </div>
+              <div class="comision-fila">
+                <span>Acumulado del período</span>
+                <span class="comision-monto">${{ (resumen.comision_periodo || 0).toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Tabla de formas de pago -->
           <div class="tabla-cierre tabla-container">
             <table>
@@ -248,11 +265,15 @@ export default {
   },
   methods: {
     async cargarResumen() {
-      const res = await axios.get('/cierres/resumen')
+      const nombre = this.usuario.usuario || ''
+      const params = this.esAdmin ? {} : { usuario: nombre }
+      const res = await axios.get('/cierres/resumen', { params })
       this.resumen = res.data
     },
     async cargarHistorial() {
-      const res = await axios.get('/cierres/')
+      const nombre = this.usuario.usuario || ''
+      const params = this.esAdmin ? {} : { usuario: nombre }
+      const res = await axios.get('/cierres/', { params })
       this.historial = res.data
     },
     diferencia(key, moneda) {
@@ -380,4 +401,19 @@ export default {
 .tabla-dev-detalle th { background: #F59E0B22; color: #92400E; padding: 0.35rem 0.6rem; text-align: left; font-weight: 700; font-size: 0.78rem; }
 .tabla-dev-detalle td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #F59E0B33; color: var(--texto-principal); vertical-align: top; }
 .txt-rojo { color: #DC2626; font-weight: 600; }
+
+.comision-card {
+  background: linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #FFCC0044;
+}
+.comision-header { margin-bottom: 0.75rem; }
+.comision-titulo { color: #FFCC00; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.comision-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.comision-fila { display: flex; justify-content: space-between; align-items: center; color: #CCCCCC; font-size: 0.9rem; }
+.comision-fila.grande { font-size: 1rem; font-weight: 600; color: #FFFFFF; }
+.comision-monto-grande { color: #FFCC00; font-size: 1.75rem; font-weight: 800; line-height: 1; }
+.comision-monto { color: #16A34A; font-weight: 700; font-size: 1rem; }
 </style>

@@ -55,14 +55,22 @@ def _total_ventas_en_usd(ventas: list) -> float:
 
 
 @router.get("/resumen")
-def resumen_caja(db: Session = Depends(get_db)):
-    ultimo  = db.query(CierreCaja).order_by(CierreCaja.id.desc()).first()
-    desde   = ultimo.fecha_hasta if ultimo else None
-    ahora   = datetime.now()
+def resumen_caja(usuario: Optional[str] = None, db: Session = Depends(get_db)):
+    ahora = datetime.now()
 
+    # Buscar el último cierre del usuario específico (o global si no hay usuario)
+    q_ultimo = db.query(CierreCaja)
+    if usuario:
+        q_ultimo = q_ultimo.filter(CierreCaja.usuario == usuario)
+    ultimo = q_ultimo.order_by(CierreCaja.id.desc()).first()
+    desde  = ultimo.fecha_hasta if ultimo else None
+
+    # Filtrar ventas por usuario y período
     q = db.query(Venta)
     if desde:
         q = q.filter(Venta.fecha > desde)
+    if usuario:
+        q = q.filter(Venta.usuario == usuario)
     ventas = q.all()
 
     venta_ids = [v.id for v in ventas]
@@ -70,13 +78,15 @@ def resumen_caja(db: Session = Depends(get_db)):
         PagoVenta.venta_id.in_(venta_ids)
     ).all() if venta_ids else []
 
-    # Devoluciones del período (egresos por reembolsos a clientes)
+    # Devoluciones del período filtradas por usuario
     dev_q = db.query(MovimientoBancario).filter(
         MovimientoBancario.tipo == "devolucion_cliente",
         MovimientoBancario.estado == "registrado",
     )
     if desde:
         dev_q = dev_q.filter(MovimientoBancario.fecha >= desde)
+    if usuario:
+        dev_q = dev_q.filter(MovimientoBancario.registrado_por == usuario)
     dev_q = dev_q.filter(MovimientoBancario.fecha <= ahora)
     devoluciones = dev_q.all()
 
@@ -94,10 +104,11 @@ def resumen_caja(db: Session = Depends(get_db)):
             devoluciones_por_moneda.get(moneda, 0) + monto, 2
         )
 
-    # Detalle individual de devoluciones — consulta directa a DevolucionCliente
     devs_q = db.query(DevolucionCliente)
     if desde:
         devs_q = devs_q.filter(DevolucionCliente.fecha >= desde)
+    if usuario:
+        devs_q = devs_q.filter(DevolucionCliente.usuario == usuario)
     devs_q = devs_q.filter(DevolucionCliente.fecha <= ahora)
     devs_clientes = devs_q.order_by(DevolucionCliente.fecha.asc()).all()
 
@@ -128,12 +139,42 @@ def resumen_caja(db: Session = Depends(get_db)):
             "usuario": dev.usuario,
         })
 
+    # Comisiones del día para el vendedor
+    comision_hoy = 0.0
+    comision_periodo = 0.0
+    if usuario:
+        from models import ComisionVenta, VendedorPerfil, Usuario as UsuarioModel
+        from datetime import date
+        hoy_inicio = datetime.combine(date.today(), datetime.min.time())
+
+        perfil = db.query(VendedorPerfil).join(
+            UsuarioModel,
+            VendedorPerfil.usuario_id == UsuarioModel.id
+        ).filter(UsuarioModel.nombre == usuario).first()
+
+        if perfil:
+            coms_hoy = db.query(ComisionVenta).filter(
+                ComisionVenta.vendedor_id == perfil.id,
+                ComisionVenta.fecha >= hoy_inicio,
+            ).all()
+            comision_hoy = round(sum(float(c.monto_comision or 0) for c in coms_hoy), 2)
+
+            q_periodo = db.query(ComisionVenta).filter(
+                ComisionVenta.vendedor_id == perfil.id,
+            )
+            if desde:
+                q_periodo = q_periodo.filter(ComisionVenta.fecha >= desde)
+            coms_periodo = q_periodo.all()
+            comision_periodo = round(sum(float(c.monto_comision or 0) for c in coms_periodo), 2)
+
     return {
-        "totales":         _calcular_totales_por_metodo(pagos),
-        "cantidad_ventas": len(ventas),
-        "total_usd":       _total_ventas_en_usd(ventas),
-        "desde":           desde.isoformat() if desde else None,
-        "hasta":           ahora.isoformat(),
+        "totales":          _calcular_totales_por_metodo(pagos),
+        "cantidad_ventas":  len(ventas),
+        "total_usd":        _total_ventas_en_usd(ventas),
+        "desde":            desde.isoformat() if desde else None,
+        "hasta":            ahora.isoformat(),
+        "comision_hoy":     comision_hoy,
+        "comision_periodo": comision_periodo,
         "devoluciones": {
             "total_usd":  round(total_devoluciones_usd, 2),
             "por_moneda": devoluciones_por_moneda,
@@ -145,13 +186,22 @@ def resumen_caja(db: Session = Depends(get_db)):
 
 @router.post("/")
 def cerrar_caja(data: dict, db: Session = Depends(get_db)):
-    ultimo  = db.query(CierreCaja).order_by(CierreCaja.id.desc()).first()
-    desde   = ultimo.fecha_hasta if ultimo else None
-    ahora   = datetime.now()
+    usuario_nombre = data.get("usuario", "")
+    ahora = datetime.now()
 
+    # Último cierre del usuario
+    q_ultimo = db.query(CierreCaja)
+    if usuario_nombre:
+        q_ultimo = q_ultimo.filter(CierreCaja.usuario == usuario_nombre)
+    ultimo = q_ultimo.order_by(CierreCaja.id.desc()).first()
+    desde  = ultimo.fecha_hasta if ultimo else None
+
+    # Ventas del usuario en el período
     q = db.query(Venta)
     if desde:
         q = q.filter(Venta.fecha > desde)
+    if usuario_nombre:
+        q = q.filter(Venta.usuario == usuario_nombre)
     ventas = q.all()
 
     if not ventas:
@@ -166,13 +216,14 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
     esperados = _calcular_totales_por_metodo(pagos)
     contados  = data.get("contados", {})
 
-    # Devoluciones del período (egresos por reembolsos a clientes)
     dev_q = db.query(MovimientoBancario).filter(
         MovimientoBancario.tipo == "devolucion_cliente",
         MovimientoBancario.estado == "registrado",
     )
     if desde:
         dev_q = dev_q.filter(MovimientoBancario.fecha >= desde)
+    if usuario_nombre:
+        dev_q = dev_q.filter(MovimientoBancario.registrado_por == usuario_nombre)
     dev_q = dev_q.filter(MovimientoBancario.fecha <= ahora)
     devoluciones = dev_q.all()
 
@@ -190,63 +241,49 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
     )
 
     cierre = CierreCaja(
-        fecha               = ahora,
-        usuario             = data.get("usuario", ""),
-        fecha_desde         = desde,
-        fecha_hasta         = ahora,
-        cantidad_ventas     = len(ventas),
-        total_ventas_usd    = total_ventas_usd_neto,
-
-        esp_efectivo_usd    = esperados["efectivo_usd"],
-        esp_zelle           = esperados["zelle"],
-        esp_binance         = esperados["binance"],
-        esp_efectivo_bs     = esperados["efectivo_bs"],
-        esp_transferencia_bs= esperados["transferencia_bs"],
-        esp_pago_movil      = esperados["pago_movil"],
-        esp_punto_banesco   = esperados["punto_banesco"],
-        esp_punto_provincial= esperados["punto_provincial"],
-
-        cnt_efectivo_usd    = float(contados.get("efectivo_usd")    or 0),
-        cnt_zelle           = float(contados.get("zelle")           or 0),
-        cnt_binance         = float(contados.get("binance")         or 0),
-        cnt_efectivo_bs     = float(contados.get("efectivo_bs")     or 0),
-        cnt_transferencia_bs= float(contados.get("transferencia_bs")or 0),
-        cnt_pago_movil      = float(contados.get("pago_movil")      or 0),
-        cnt_punto_banesco   = float(contados.get("punto_banesco")   or 0),
-        cnt_punto_provincial= float(contados.get("punto_provincial")or 0),
-
-        observacion         = data.get("observacion", ""),
+        fecha                = ahora,
+        usuario              = usuario_nombre,
+        fecha_desde          = desde,
+        fecha_hasta          = ahora,
+        cantidad_ventas      = len(ventas),
+        total_ventas_usd     = total_ventas_usd_neto,
+        esp_efectivo_usd     = esperados["efectivo_usd"],
+        esp_zelle            = esperados["zelle"],
+        esp_binance          = esperados["binance"],
+        esp_efectivo_bs      = esperados["efectivo_bs"],
+        esp_transferencia_bs = esperados["transferencia_bs"],
+        esp_pago_movil       = esperados["pago_movil"],
+        esp_punto_banesco    = esperados["punto_banesco"],
+        esp_punto_provincial = esperados["punto_provincial"],
+        cnt_efectivo_usd     = float(contados.get("efectivo_usd")     or 0),
+        cnt_zelle            = float(contados.get("zelle")            or 0),
+        cnt_binance          = float(contados.get("binance")          or 0),
+        cnt_efectivo_bs      = float(contados.get("efectivo_bs")      or 0),
+        cnt_transferencia_bs = float(contados.get("transferencia_bs") or 0),
+        cnt_pago_movil       = float(contados.get("pago_movil")       or 0),
+        cnt_punto_banesco    = float(contados.get("punto_banesco")    or 0),
+        cnt_punto_provincial = float(contados.get("punto_provincial") or 0),
+        observacion          = data.get("observacion", ""),
     )
     db.add(cierre)
-    db.flush()  # obtener cierre.id antes del commit
+    db.flush()
 
-    # -----------------------------------------------------------------------
-    # Crear movimientos bancarios por cuenta destino
-    # Agrupa los pagos por cuenta_destino_id y crea un ingreso_venta por cuenta
-    # -----------------------------------------------------------------------
-    acumulado = {}  # {cuenta_id: {monto, moneda, metodo_pago}}
-
+    acumulado = {}
     for p in pagos:
         cid = p.cuenta_destino_id
         if not cid:
-            # Si el pago no tiene cuenta asignada, buscar la cuenta por defecto del método
             link = db.query(MetodoPagoCuenta).filter(
                 MetodoPagoCuenta.metodo_pago == p.metodo_pago,
                 MetodoPagoCuenta.activo == True,
             ).first()
             cid = link.cuenta_id if link else None
-
         if not cid:
             continue
-
         monto = float(p.monto_original or 0)
         if monto <= 0:
             continue
-
-        # Determinar moneda del pago
         from models import METODOS_USD
         moneda = "USD" if p.metodo_pago in METODOS_USD else "Bs"
-
         if cid not in acumulado:
             acumulado[cid] = {"monto": 0.0, "moneda": moneda, "metodo": p.metodo_pago}
         acumulado[cid]["monto"] = round(acumulado[cid]["monto"] + monto, 2)
@@ -254,22 +291,21 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
     for cid, info in acumulado.items():
         if info["monto"] <= 0:
             continue
-        mov = MovimientoBancario(
+        db.add(MovimientoBancario(
             fecha             = ahora,
             tipo              = "ingreso_venta",
             cuenta_origen_id  = None,
             cuenta_destino_id = cid,
             monto             = info["monto"],
             moneda            = info["moneda"],
-            concepto          = f"Cierre de caja #{cierre.id} - {info['metodo']}",
+            concepto          = f"Cierre de caja #{cierre.id} — {usuario_nombre} — {info['metodo']}",
             categoria         = "ventas",
             referencia        = f"cierre_{cierre.id}",
-        )
-        db.add(mov)
+            registrado_por    = usuario_nombre,
+        ))
 
     db.commit()
     db.refresh(cierre)
-
     return {"ok": True, "cierre_id": cierre.id}
 
 
@@ -300,8 +336,14 @@ def revisar_cierre(cierre_id: int, datos: dict, db: Session = Depends(get_db)):
 
 
 @router.get("/")
-def listar_cierres(db: Session = Depends(get_db)):
-    cierres = db.query(CierreCaja).order_by(CierreCaja.id.desc()).all()
+def listar_cierres(
+    usuario: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    q = db.query(CierreCaja)
+    if usuario:
+        q = q.filter(CierreCaja.usuario == usuario)
+    cierres = q.order_by(CierreCaja.id.desc()).all()
     return [_serializar_cierre(c, db) for c in cierres]
 
 
