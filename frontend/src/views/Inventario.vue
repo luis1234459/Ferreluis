@@ -1013,6 +1013,7 @@ export default {
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       if (this.busqueda)           params.busqueda        = this.busqueda
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
+      if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
       const res = await axios.get('/productos/', { params })
       this.productos      = res.data.productos
       this.totalProductos = res.data.total
