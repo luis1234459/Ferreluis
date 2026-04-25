@@ -1387,13 +1387,11 @@ export default {
     async setEsquemaVariante(esquema) {
       try {
         await axios.put(`/productos/${this.modalVariantes.id}/esquema-variante`, { esquema_variante: esquema })
-        this.$set(this.modalVariantes, 'esquema_variante', esquema)
+        this.modalVariantes.esquema_variante = esquema
         const idx = this.productos.findIndex(p => p.id === this.modalVariantes.id)
-        if (idx !== -1) this.$set(this.productos[idx], 'esquema_variante', esquema)
+        if (idx !== -1) this.productos[idx].esquema_variante = esquema
       } catch (e) {
-        const status  = e?.response?.status || 'sin respuesta'
-        const detalle = e?.response?.data?.detail || e?.message || 'desconocido'
-        alert(`Error ${status}: ${detalle}`)
+        alert(e?.response?.data?.detail || 'Error al actualizar esquema')
       }
     },
 
