@@ -497,12 +497,21 @@
                 <div class="field">
                   <label>Costo USD <small>(vacío = hereda del producto)</small></label>
                   <input v-model="formVariante.costo_usd_str" type="number" min="0" step="0.0001"
-                    :placeholder="'Heredado: $' + modalVariantes.costo_usd_padre" />
+                    :placeholder="'Heredado: $' + modalVariantes.costo_usd_padre"
+                    @input="recalcVariante('costo')" />
                 </div>
                 <div class="field">
                   <label>Margen % <small>(vacío = hereda del producto)</small></label>
                   <input v-model="formVariante.margen_pct_str" type="number" min="0" step="0.1"
-                    :placeholder="'Heredado: ' + (modalVariantes.margen_padre * 100).toFixed(2) + '%'" />
+                    :placeholder="'Heredado: ' + (modalVariantes.margen_padre * 100).toFixed(2) + '%'"
+                    @input="recalcVariante('margen')" />
+                </div>
+                <div class="field">
+                  <label>Precio base USD <small>(ajusta costo, margen fijo)</small></label>
+                  <input v-model="formVariante.precio_str" type="number" min="0" step="0.0001"
+                    class="input-precio-directo"
+                    :placeholder="'Calculado: $' + precioEfectivoVariante"
+                    @input="recalcVariante('precio')" />
                 </div>
               </div>
               <label class="check-opt" style="margin-top:0.5rem">
@@ -928,7 +937,7 @@ export default {
       variantes:           [],
       mostrarFormVariante: false,
       editandoVarianteId:  null,
-      formVariante: { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', activo: true },
+      formVariante: { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', precio_str: '', activo: true },
 
       // Modal componentes
       modalComponentes: null,
@@ -984,6 +993,17 @@ export default {
 
   computed: {
     esAdmin() { return this.usuario.rol === 'admin' },
+
+    precioEfectivoVariante() {
+      if (!this.modalVariantes) return '0.0000'
+      const costo  = this.formVariante.costo_usd_str  !== ''
+        ? parseFloat(this.formVariante.costo_usd_str)
+        : parseFloat(this.modalVariantes.costo_usd_padre || 0)
+      const margen = this.formVariante.margen_pct_str !== ''
+        ? parseFloat(this.formVariante.margen_pct_str) / 100
+        : parseFloat(this.modalVariantes.margen_padre || 0)
+      return (costo * (1 + margen)).toFixed(4)
+    },
     tienePermiso() {
       return (modulo) => {
         if (this.usuario.rol === 'admin') return true
@@ -1350,7 +1370,7 @@ export default {
     },
     abrirFormVariante() {
       this.editandoVarianteId = null
-      this.formVariante = { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', activo: true }
+      this.formVariante = { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', precio_str: '', activo: true }
       this.mostrarFormVariante = true
     },
     editarVariante(v) {
@@ -1359,8 +1379,9 @@ export default {
         clase:          v.clase,
         color:          v.color || '',
         stock:          v.stock,
-        costo_usd_str:  v.costo_usd  != null ? String(v.costo_usd)                    : '',
-        margen_pct_str: v.margen     != null ? String((v.margen * 100).toFixed(4))    : '',
+        costo_usd_str:  v.costo_usd != null ? String(v.costo_usd)                 : '',
+        margen_pct_str: v.margen    != null ? String((v.margen * 100).toFixed(4)) : '',
+        precio_str:     '',
         activo:         v.activo,
       }
       this.mostrarFormVariante = true
@@ -1368,6 +1389,24 @@ export default {
     cancelarVariante() {
       this.mostrarFormVariante = false
       this.editandoVarianteId  = null
+    },
+    recalcVariante(campo) {
+      const costoEf  = this.formVariante.costo_usd_str  !== ''
+        ? parseFloat(this.formVariante.costo_usd_str)
+        : parseFloat(this.modalVariantes.costo_usd_padre || 0)
+      const margenEf = this.formVariante.margen_pct_str !== ''
+        ? parseFloat(this.formVariante.margen_pct_str) / 100
+        : parseFloat(this.modalVariantes.margen_padre  || 0)
+      if (campo === 'costo' || campo === 'margen') {
+        const precio = costoEf * (1 + margenEf)
+        this.formVariante.precio_str = precio > 0 ? precio.toFixed(4) : ''
+      } else if (campo === 'precio') {
+        const precio = parseFloat(this.formVariante.precio_str)
+        if (!isNaN(precio) && precio > 0 && (1 + margenEf) > 0) {
+          const nuevoCosto = precio / (1 + margenEf)
+          this.formVariante.costo_usd_str = nuevoCosto.toFixed(4)
+        }
+      }
     },
     async guardarVariante() {
       if (!this.formVariante.clase.trim()) return
@@ -1847,6 +1886,8 @@ export default {
 .badge-activa  { background: #16A34A1A; color: #16A34A;  font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 10px; }
 .badge-inactiva{ background: #8888881A; color: #555555;  font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 10px; }
 .badge-heredado{ font-size: 0.65rem; color: #9CA3AF; cursor: help; margin-left: 2px; }
+.input-precio-directo { border-color: #16A34A55 !important; background: #F0FDF4 !important; color: #15803D !important; font-weight: 600; }
+.input-precio-directo:focus { border-color: #16A34A !important; outline: none; }
 
 .btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.75rem; font-size: 0.88rem; width: 100%; }
 .btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; }
