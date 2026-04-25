@@ -184,10 +184,19 @@
                 @mouseleave="indiceResaltado = -1"
                 @click="agregar(p); $refs.inputBuscador.focus()"
               >
-                <span class="pi-nombre">
-                  {{ p.nombre }}
-                  <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
-                </span>
+                <div class="pi-nombre">
+                  <span class="pi-nombre-texto">
+                    {{ p.nombre }}
+                    <span v-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
+                  </span>
+                  <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo && v.codigo)" class="pi-vcods">
+                    <span
+                      v-for="v in (p.variantes_resumen || []).filter(v => v.activo && v.codigo)"
+                      :key="v.id"
+                      class="pi-vcod"
+                    >{{ v.codigo }}</span>
+                  </div>
+                </div>
                 <span class="pi-precios">
                   <template v-if="!p.tiene_variantes">
                     <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
@@ -1704,11 +1713,35 @@ export default {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pi-nombre-texto {
   font-weight: 600;
   color: var(--texto-principal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.pi-vcods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.pi-vcod {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5B21B6;
+  background: #EDE9FE;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.prod-item:hover .pi-nombre-texto,
+.prod-item-resaltado .pi-nombre-texto { color: #1A1A1A; }
+.prod-item:hover .pi-vcod,
+.prod-item-resaltado .pi-vcod { background: #7c3aed; color: #fff; }
 .pi-precios {
   display: flex;
   align-items: center;
