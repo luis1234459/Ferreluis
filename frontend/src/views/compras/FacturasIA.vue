@@ -244,126 +244,87 @@
             </small>
           </div>
 
-          <!-- Tabla de productos -->
+          <!-- Lista de productos (tarjetas verticales) -->
           <div class="card-seccion">
             <h3 class="seccion-titulo">
               Productos
               <span class="badge-count">{{ lineas.length }}</span>
             </h3>
-            <div class="tabla-scroll">
-              <table class="tabla-productos">
-                <thead>
-                  <tr>
-                    <th class="th-num">#</th>
-                    <th style="min-width:140px">Nombre detectado</th>
-                    <th style="min-width:210px">Producto en inventario</th>
-                    <th style="min-width:110px">Cod. proveedor</th>
-                    <th style="min-width:80px; text-align:right">Cantidad</th>
-                    <th style="min-width:100px; text-align:right">Precio USD</th>
-                    <th style="min-width:90px; text-align:right">Subtotal</th>
-                    <th class="th-num" style="min-width:60px">Act. costo</th>
-                    <th class="th-num"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(linea, idx) in lineas" :key="idx">
-                    <td class="tc dim">{{ idx + 1 }}</td>
-                    <td><span class="nombre-ia">{{ linea.nombre_ia || '—' }}</span></td>
-                    <td style="position:relative; min-width:240px">
-                      <!-- Buscando automatch -->
-                      <span v-if="linea.buscandoMatch" class="match-buscando">⏳ buscando...</span>
 
-                      <!-- Match vinculado -->
-                      <div v-if="linea.match && !linea.buscandoMatch">
-                        <span class="match-ok" @click="limpiarMatch(linea)" title="Clic para desvincular">
-                          ✓ {{ linea.match.nombre }}
-                        </span>
-                        <small v-if="linea.match.variante_codigo" class="match-codigo-tag">[{{ linea.match.variante_codigo }}]</small>
-                        <small v-else-if="linea.match.match_exacto" class="match-codigo-tag">por código</small>
-                      </div>
+            <!-- Cabecera de columnas -->
+            <div class="lia-head">
+              <span class="lia-h-inv">Producto en inventario</span>
+              <span class="lia-h-campos">
+                <span class="lia-h-cod">Cód. prov.</span>
+                <span class="lia-h-cant">Cant.</span>
+                <span class="lia-h-precio">Precio $</span>
+                <span class="lia-h-sub">Subtotal</span>
+                <span class="lia-h-act" title="Actualizar costo">Act.</span>
+              </span>
+            </div>
 
-                      <!-- Sin decidir -->
-                      <div v-if="!linea.match && !linea.esNuevo && !linea.buscandoMatch" class="match-pendiente">
-                        <button class="btn-match-opcion" @mousedown.prevent="abrirBusquedaLinea(linea)">
-                          🔍 Buscar en inventario
-                        </button>
-                        <button class="btn-match-nuevo" @mousedown.prevent="abrirModalNuevoProducto(linea)">
-                          ✚ Producto nuevo
-                        </button>
-                      </div>
-
-                      <!-- Marcado como nuevo -->
-                      <div v-if="linea.esNuevo && !linea.match" class="match-nuevo-tag">
-                        ✚ {{ linea.nombreFinal || linea.nombre_ia }}
-                        <span class="prov-desvincular" @click="linea.esNuevo = false; linea.nombreFinal = ''">✕</span>
-                      </div>
-
-                      <!-- Buscador inline -->
-                      <div v-if="!linea.match && !linea.esNuevo && linea._busqVisible" style="position:relative; margin-top:4px">
-                        <input
-                          v-model="linea._busqTexto"
-                          class="input-field input-sm"
-                          placeholder="Buscar en inventario..."
-                          @input="buscarProductoLinea(linea)"
-                          @focus="abrirLineaDropdown(linea)"
-                          @blur="cerrarLineaDropdown(linea)"
-                        />
-                        <ul v-if="linea._busqAbierta && linea._busqResultados.length" class="dropdown-list dropdown-sm">
-                          <li
-                            v-for="prod in linea._busqResultados"
-                            :key="`${prod.id}_${prod.variante_id||''}`"
-                            @mousedown="seleccionarMatch(linea, prod)"
-                          >
-                            {{ prod.nombre }}
-                            <small v-if="prod.codigo_proveedor" class="stock-hint"> · Cód: {{ prod.codigo_proveedor }}</small>
-                            <small class="stock-hint"> · Stock: {{ prod.stock }}</small>
-                          </li>
-                        </ul>
-                      </div>
-                    </td>
-                    <td>
+            <!-- Líneas -->
+            <div class="lineas-ia">
+              <div v-for="(linea, idx) in lineas" :key="idx" class="lia-card">
+                <!-- Fila 1: número + nombre IA + quitar -->
+                <div class="lia-row1">
+                  <span class="lia-idx">{{ idx + 1 }}</span>
+                  <span class="lia-nombre-ia">{{ linea.nombre_ia || '—' }}</span>
+                  <button class="btn-del-lia" @click="lineas.splice(idx, 1)" title="Eliminar">✕</button>
+                </div>
+                <!-- Fila 2: vinculación + campos -->
+                <div class="lia-row2">
+                  <!-- Inventario -->
+                  <div class="lia-inv" style="position:relative">
+                    <span v-if="linea.buscandoMatch" class="match-buscando">⏳ buscando...</span>
+                    <div v-if="linea.match && !linea.buscandoMatch">
+                      <span class="match-ok" @click="limpiarMatch(linea)" title="Clic para desvincular">
+                        ✓ {{ linea.match.nombre }}
+                      </span>
+                      <small v-if="linea.match.variante_codigo" class="match-codigo-tag">[{{ linea.match.variante_codigo }}]</small>
+                      <small v-else-if="linea.match.match_exacto" class="match-codigo-tag">por código</small>
+                    </div>
+                    <div v-if="!linea.match && !linea.esNuevo && !linea.buscandoMatch" class="match-pendiente">
+                      <button class="btn-match-opcion" @mousedown.prevent="abrirBusquedaLinea(linea)">🔍 Buscar</button>
+                      <button class="btn-match-nuevo" @mousedown.prevent="abrirModalNuevoProducto(linea)">✚ Nuevo</button>
+                    </div>
+                    <div v-if="linea.esNuevo && !linea.match" class="match-nuevo-tag">
+                      ✚ {{ linea.nombreFinal || linea.nombre_ia }}
+                      <span class="prov-desvincular" @click="linea.esNuevo = false; linea.nombreFinal = ''">✕</span>
+                    </div>
+                    <div v-if="!linea.match && !linea.esNuevo && linea._busqVisible" style="position:relative; margin-top:4px">
                       <input
-                        v-model="linea.codigo_proveedor"
+                        v-model="linea._busqTexto"
                         class="input-field input-sm"
-                        placeholder="—"
+                        placeholder="Buscar en inventario..."
+                        @input="buscarProductoLinea(linea)"
+                        @focus="abrirLineaDropdown(linea)"
+                        @blur="cerrarLineaDropdown(linea)"
                       />
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="linea.cantidad"
-                        type="number"
-                        min="1"
-                        class="input-field input-sm tr"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="linea.precio_unitario"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        class="input-field input-sm tr"
-                      />
-                    </td>
-                    <td class="tr dim">{{ fmtUSD(linea.cantidad * linea.precio_unitario) }}</td>
-                    <td class="tc">
-                      <input
-                        type="checkbox"
-                        v-model="linea.actualizar_costo"
-                        :disabled="!linea.match"
-                        title="Actualizar costo en inventario"
-                      />
-                    </td>
-                    <td class="tc">
-                      <button
-                        class="btn-del-linea"
-                        @click="lineas.splice(idx, 1)"
-                        title="Eliminar línea"
-                      >✕</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      <ul v-if="linea._busqAbierta && linea._busqResultados.length" class="dropdown-list dropdown-sm">
+                        <li
+                          v-for="prod in linea._busqResultados"
+                          :key="`${prod.id}_${prod.variante_id||''}`"
+                          @mousedown="seleccionarMatch(linea, prod)"
+                        >
+                          {{ prod.nombre }}
+                          <small v-if="prod.codigo_proveedor" class="stock-hint"> · Cód: {{ prod.codigo_proveedor }}</small>
+                          <small class="stock-hint"> · Stock: {{ prod.stock }}</small>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <!-- Campos numéricos -->
+                  <div class="lia-campos">
+                    <input v-model="linea.codigo_proveedor" class="input-field input-sm lia-cod" placeholder="Cód. prov." title="Código proveedor" />
+                    <input v-model.number="linea.cantidad" type="number" min="1" class="input-field input-sm lia-cant" title="Cantidad" />
+                    <input v-model.number="linea.precio_unitario" type="number" step="0.01" min="0" class="input-field input-sm lia-precio" title="Precio USD" />
+                    <span class="lia-sub">{{ fmtUSD(linea.cantidad * linea.precio_unitario) }}</span>
+                    <input type="checkbox" v-model="linea.actualizar_costo" :disabled="!linea.match" title="Actualizar costo en inventario" class="lia-check" />
+                  </div>
+                </div>
+              </div>
+              <div v-if="lineas.length === 0" class="lia-vacia">Sin líneas — agrega una abajo</div>
             </div>
             <button class="btn-add-linea" @click="agregarLinea">+ Agregar línea</button>
           </div>
@@ -1204,23 +1165,85 @@ select.input-field { cursor: pointer; }
 .dropdown-sm li { font-size: 0.8rem; padding: 0.35rem 0.6rem; }
 .stock-hint { color: var(--texto-muted); font-size: 0.75rem; }
 
-/* Tabla */
-.tabla-scroll { overflow-x: auto; }
-.tabla-productos { width: 100%; border-collapse: collapse; }
-.tabla-productos th, .tabla-productos td {
-  padding: 0.5rem 0.6rem;
+/* ─── Líneas verticales (card layout) ─── */
+.lia-head {
+  display: flex; align-items: center;
+  padding: 0.25rem 0.5rem 0.25rem 2rem;
   border-bottom: 1px solid var(--borde);
-  vertical-align: top;
-  font-size: 0.85rem;
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  color: var(--texto-muted); letter-spacing: 0.04em;
+  gap: 0;
 }
-.tabla-productos th {
-  font-size: 0.72rem; text-transform: uppercase;
-  color: var(--texto-muted); font-weight: 600; white-space: nowrap;
+.lia-h-inv  { flex: 1; }
+.lia-h-campos {
+  display: flex; gap: 0; align-items: center;
 }
-.th-num { text-align: center; }
+.lia-h-cod   { width: 88px;  text-align: center; }
+.lia-h-cant  { width: 64px;  text-align: center; }
+.lia-h-precio{ width: 80px;  text-align: center; }
+.lia-h-sub   { width: 74px;  text-align: right; }
+.lia-h-act   { width: 36px;  text-align: center; }
+
+.lineas-ia {
+  display: flex; flex-direction: column;
+  max-height: 440px; overflow-y: auto;
+}
+.lia-card {
+  border-bottom: 1px solid var(--borde-suave);
+  padding: 0.3rem 0.5rem;
+}
+.lia-card:last-child { border-bottom: none; }
+.lia-card:nth-child(even) { background: #FAFAF7; }
+
+.lia-row1 {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding-bottom: 0.2rem;
+}
+.lia-idx {
+  width: 1.25rem; text-align: center;
+  font-size: 0.72rem; color: var(--texto-muted);
+  font-weight: 700; flex-shrink: 0;
+}
+.lia-nombre-ia {
+  flex: 1; font-size: 0.8rem; color: var(--texto-sec);
+  font-style: italic; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.btn-del-lia {
+  background: none; border: none; color: #DC2626;
+  cursor: pointer; font-size: 0.8rem;
+  padding: 0.1rem 0.25rem; border-radius: 3px;
+  line-height: 1; flex-shrink: 0;
+}
+.btn-del-lia:hover { background: #FEE2E2; }
+
+.lia-row2 {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  padding-left: 1.65rem;
+}
+.lia-inv {
+  flex: 1; min-width: 0;
+  font-size: 0.82rem;
+}
+.lia-campos {
+  display: flex; align-items: center; gap: 0; flex-shrink: 0;
+}
+.lia-cod   { width: 88px;  box-sizing: border-box; }
+.lia-cant  { width: 64px;  box-sizing: border-box; }
+.lia-precio{ width: 80px;  box-sizing: border-box; }
+.lia-sub {
+  width: 74px; text-align: right; font-size: 0.82rem;
+  font-weight: 600; color: #16A34A; padding: 0 0.3rem;
+}
+.lia-check { width: 36px; display: flex; justify-content: center; margin: 0 auto; }
+
+.lia-vacia {
+  text-align: center; padding: 1.5rem;
+  color: var(--texto-muted); font-size: 0.875rem;
+}
+
 .tc  { text-align: center; }
 .dim { color: var(--texto-muted); }
-.nombre-ia { font-size: 0.82rem; color: var(--texto-sec); }
 .match-estado { min-height: 22px; }
 .match-buscando { font-size: 0.75rem; color: var(--texto-muted); }
 .match-ok {
