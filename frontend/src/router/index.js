@@ -25,6 +25,7 @@ import Devoluciones        from '../views/Devoluciones.vue'
 import ImportarInventario  from '../views/ImportarInventario.vue'
 import Creditos           from '../views/Creditos.vue'
 import Claves             from '../views/Configuracion/Claves.vue'
+import Garantias          from '../views/Configuracion/Garantias.vue'
 
 const routes = [
   { path: '/',          redirect: '/login' },
@@ -68,7 +69,8 @@ const routes = [
   { path: '/bancos/movimientos',   name: 'MovimientosBancarios',component: MovimientosBancarios,meta: { soloAdmin: true } },
   { path: '/bancos/proveedores',   name: 'PagosProveedores',    component: PagosProveedores,    meta: { soloAdmin: true } },
   { path: '/usuarios',               name: 'Usuarios',   component: Usuarios,   meta: { soloAdmin: true } },
-  { path: '/configuracion/claves',  name: 'Claves',     component: Claves,     meta: { soloAdmin: true } },
+  { path: '/configuracion/claves',     name: 'Claves',     component: Claves,     meta: { soloAdmin: true } },
+  { path: '/configuracion/garantias', name: 'Garantias',  component: Garantias,  meta: { soloAdmin: true } },
 ]
 
 const router = createRouter({

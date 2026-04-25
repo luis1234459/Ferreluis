@@ -132,8 +132,9 @@ const GRUPOS = [
     nombre: 'Admin',
     rutas: ['/usuarios', '/configuracion'],
     items: [
-      { ruta: '/usuarios',              label: 'Usuarios',      soloAdmin: true },
-      { ruta: '/configuracion/claves',  label: 'Claves Auth',   soloAdmin: true },
+      { ruta: '/usuarios',                 label: 'Usuarios',      soloAdmin: true },
+      { ruta: '/configuracion/claves',    label: 'Claves Auth',   soloAdmin: true },
+      { ruta: '/configuracion/garantias', label: 'Garantías',     soloAdmin: true },
     ],
   },
 ]
