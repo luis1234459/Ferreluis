@@ -421,14 +421,41 @@
               <button class="btn-cerrar-modal" @click="cerrarVariantes">✕</button>
             </div>
 
+            <!-- Selector de esquema -->
+            <div class="esquema-row">
+              <span class="esquema-label">Esquema:</span>
+              <div class="esquema-btns">
+                <button
+                  :class="['btn-esquema-opt', modalVariantes.esquema_variante === 'clase' ? 'esq-activo' : '']"
+                  @click="setEsquemaVariante('clase')"
+                >Solo clase</button>
+                <button
+                  :class="['btn-esquema-opt', modalVariantes.esquema_variante === 'clase_color' ? 'esq-activo' : '']"
+                  @click="setEsquemaVariante('clase_color')"
+                >Clase + color</button>
+              </div>
+              <span v-if="!modalVariantes.esquema_variante" class="esquema-aviso-inline">
+                ← Define el esquema antes de agregar variantes
+              </span>
+            </div>
+
             <table v-if="variantes.length > 0">
               <thead>
-                <tr><th>Clase</th><th>Color</th><th>Stock</th><th>Precio override</th><th>Estado</th><th></th></tr>
+                <tr>
+                  <th>Código</th>
+                  <th>Clase</th>
+                  <th v-if="modalVariantes.esquema_variante !== 'clase'">Color</th>
+                  <th>Stock</th>
+                  <th>Precio override</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody>
                 <tr v-for="v in variantes" :key="v.id">
+                  <td class="txt-muted" style="font-size:0.8rem">{{ v.codigo || '—' }}</td>
                   <td style="font-weight:600">{{ v.clase }}</td>
-                  <td>{{ v.color || '—' }}</td>
+                  <td v-if="modalVariantes.esquema_variante !== 'clase'">{{ v.color || '—' }}</td>
                   <td>{{ v.stock }}</td>
                   <td>{{ v.precio_override_usd != null ? '$' + Number(v.precio_override_usd).toFixed(2) : 'Del producto' }}</td>
                   <td><span :class="v.activo ? 'badge-activa' : 'badge-inactiva'">{{ v.activo ? 'Activa' : 'Inactiva' }}</span></td>
@@ -449,7 +476,7 @@
                   <label>Clase *</label>
                   <input v-model="formVariante.clase" placeholder="Ej: Clase A" />
                 </div>
-                <div class="field">
+                <div class="field" v-if="modalVariantes.esquema_variante !== 'clase'">
                   <label>Color</label>
                   <input v-model="formVariante.color" placeholder="Ej: Rojo" />
                 </div>
@@ -475,7 +502,7 @@
               </div>
             </div>
 
-            <button v-if="!mostrarFormVariante" class="btn-agregar-linea" @click="abrirFormVariante">
+            <button v-if="!mostrarFormVariante && modalVariantes.esquema_variante" class="btn-agregar-linea" @click="abrirFormVariante">
               + Agregar variante
             </button>
           </div>
@@ -1357,6 +1384,16 @@ export default {
       const res = await axios.get(`/productos/${this.modalVariantes.id}/variantes`)
       this.variantes = res.data
     },
+    async setEsquemaVariante(esquema) {
+      try {
+        await axios.put(`/productos/${this.modalVariantes.id}/esquema-variante`, { esquema_variante: esquema })
+        this.$set(this.modalVariantes, 'esquema_variante', esquema)
+        const idx = this.productos.findIndex(p => p.id === this.modalVariantes.id)
+        if (idx !== -1) this.$set(this.productos[idx], 'esquema_variante', esquema)
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al actualizar esquema')
+      }
+    },
 
     // ── CRUD Componentes ──────────────────────────────────────────────────────
     async abrirComponentes(p) {
@@ -1829,4 +1866,17 @@ export default {
 
 .estructura-seccion { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--borde-suave); }
 .estructura-seccion:last-child { border-bottom: none; margin-bottom: 0; }
+
+/* ── Esquema de variantes ── */
+.esquema-row  { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.esquema-label { font-size: 0.85rem; color: var(--texto-sec); font-weight: 600; }
+.esquema-btns { display: flex; gap: 0.35rem; }
+.btn-esquema-opt {
+  padding: 0.3rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600;
+  background: var(--borde-suave); color: var(--texto-sec); border: 1px solid var(--borde);
+  transition: background 0.15s, color 0.15s;
+}
+.btn-esquema-opt:hover { border-color: var(--amarillo); color: var(--texto-principal); }
+.btn-esquema-opt.esq-activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.esquema-aviso-inline { font-size: 0.8rem; color: var(--danger); font-style: italic; }
 </style>

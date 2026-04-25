@@ -816,6 +816,24 @@ def eliminar_producto(
 # Registrados después de /{producto_id} para no ocultar rutas literales
 # ============================================================================
 
+@router.put("/{producto_id}/esquema-variante")
+def actualizar_esquema_variante(
+    producto_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    esquema = datos.get("esquema_variante")
+    if esquema not in ("clase", "clase_color"):
+        raise HTTPException(status_code=400, detail="esquema_variante debe ser 'clase' o 'clase_color'")
+    p.esquema_variante = esquema
+    db.commit()
+    return {"esquema_variante": p.esquema_variante}
+
+
 @router.get("/{producto_id}/variantes")
 def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
     p = db.query(Producto).filter(Producto.id == producto_id).first()
@@ -862,6 +880,13 @@ def crear_variante(
                     numeros.append(int(m.group(1)))
         siguiente = max(numeros) + 1 if numeros else 1
         datos_dict["codigo"] = f"{prefijo}{siguiente:02d}"
+
+    # Aplicar restricciones del esquema
+    esquema = p.esquema_variante or "clase"
+    if esquema == "clase":
+        datos_dict["color"] = None
+    elif esquema == "clase_color" and not datos_dict.get("color"):
+        raise HTTPException(status_code=400, detail="Este esquema requiere color en cada variante")
 
     nueva = VarianteProducto(producto_id=producto_id, **datos_dict)
     db.add(nueva)

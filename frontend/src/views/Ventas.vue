@@ -189,12 +189,12 @@
                     {{ p.nombre }}
                     <span v-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
                   </span>
-                  <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo && v.codigo)" class="pi-vcods">
+                  <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo)" class="pi-vcods">
                     <span
-                      v-for="v in (p.variantes_resumen || []).filter(v => v.activo && v.codigo)"
+                      v-for="v in (p.variantes_resumen || []).filter(v => v.activo)"
                       :key="v.id"
                       class="pi-vcod"
-                    >{{ v.codigo }}</span>
+                    ><template v-if="v.codigo">{{ v.codigo }} · </template>{{ v.color && p.esquema_variante !== 'clase' ? v.clase + '/' + v.color : v.clase }}</span>
                   </div>
                 </div>
                 <span class="pi-precios">
