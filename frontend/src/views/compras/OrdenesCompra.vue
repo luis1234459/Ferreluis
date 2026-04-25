@@ -122,16 +122,18 @@
             <h3 class="subtitulo">Productos</h3>
             <div v-for="(linea, i) in form.detalles" :key="i" class="linea-producto">
               <div class="linea-grid">
-                <div class="field">
-                  <label>Producto</label>
-                  <select v-model="linea.producto_id" @change="llenarDesdeInventario(linea)">
+                <div class="field field-selector">
+                  <label>Producto / Variante</label>
+                  <select v-model="linea._key" @change="llenarDesdeInventario(linea)">
                     <option value="">— Nuevo producto —</option>
-                    <option v-for="p in productosInventario" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                    <option v-for="op in opcionesProductos" :key="op.key" :value="op.key">
+                      {{ op.label }}{{ op.stock_label }}
+                    </option>
                   </select>
                 </div>
                 <div class="field">
                   <label>Nombre</label>
-                  <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea.producto_id" />
+                  <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea._key" />
                 </div>
                 <div class="field">
                   <label>Cantidad</label>
@@ -181,7 +183,7 @@ export default {
       usuario:            JSON.parse(localStorage.getItem('usuario') || '{}'),
       ordenes:            [],
       proveedores:        [],
-      productosInventario:[],
+      productosRaw:       [],
       filtroEstado:       '',
       filtroProveedor:    '',
       ordenDetalle:       null,
@@ -210,6 +212,40 @@ export default {
     totalForm() {
       return this.form.detalles.reduce((s, l) => s + this.subtotalLinea(l), 0)
     },
+    opcionesProductos() {
+      const lista = []
+      for (const p of this.productosRaw) {
+        const variantes = (p.variantes_resumen || []).filter(v => v.activo)
+        if (variantes.length > 0) {
+          for (const v of variantes) {
+            const costo = v.costo_usd != null ? v.costo_usd : (p.costo_usd || 0)
+            const label = v.color
+              ? `${p.nombre} (${v.clase} / ${v.color})`
+              : `${p.nombre} (${v.clase})`
+            lista.push({
+              key:         `${p.id}_${v.id}`,
+              producto_id: p.id,
+              variante_id: v.id,
+              label,
+              costo,
+              stock:       v.stock || 0,
+              stock_label: v.stock < 5 ? ` · ⚠ stock:${v.stock}` : ` · stock:${v.stock}`,
+            })
+          }
+        } else {
+          lista.push({
+            key:         `${p.id}`,
+            producto_id: p.id,
+            variante_id: null,
+            label:       p.nombre,
+            costo:       p.costo_usd || 0,
+            stock:       p.stock || 0,
+            stock_label: (p.stock || 0) < 5 ? ` · ⚠ stock:${p.stock}` : ` · stock:${p.stock}`,
+          })
+        }
+      }
+      return lista.sort((a, b) => a.label.localeCompare(b.label))
+    },
   },
   async mounted() {
     await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario()])
@@ -227,8 +263,11 @@ export default {
       this.proveedores = res.data
     },
     async cargarInventario() {
-      const res = await axios.get('/productos/')
-      this.productosInventario = Array.isArray(res.data) ? res.data : (res.data.productos || [])
+      const res = await axios.get('/productos/', { params: { limit: 9999, incluir_inactivos: false } })
+      this.productosRaw = Array.isArray(res.data) ? res.data : (res.data.productos || [])
+    },
+    _lineaVacia() {
+      return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false }
     },
     abrirNueva() {
       this.editandoId = null
@@ -243,7 +282,9 @@ export default {
         fecha_esperada: o.fecha_esperada ? o.fecha_esperada.split('T')[0] : '',
         observacion:    o.observacion || '',
         detalles: o.detalles.map(d => ({
-          producto_id:        d.producto_id || '',
+          _key:               d.variante_id ? `${d.producto_id}_${d.variante_id}` : (d.producto_id ? `${d.producto_id}` : ''),
+          producto_id:        d.producto_id  || null,
+          variante_id:        d.variante_id  || null,
           nombre_producto:    d.nombre_producto,
           cantidad_pedida:    d.cantidad_pedida,
           precio_unitario_usd:d.precio_unitario_usd,
@@ -253,18 +294,23 @@ export default {
       this.mostrarForm = true
     },
     cerrarForm() { this.mostrarForm = false; this.error = '' },
-    agregarLinea() {
-      this.form.detalles.push({ producto_id: '', nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false })
-    },
+    agregarLinea() { this.form.detalles.push(this._lineaVacia()) },
     quitarLinea(i) { this.form.detalles.splice(i, 1) },
     llenarDesdeInventario(linea) {
-      const prod = this.productosInventario.find(p => p.id === linea.producto_id)
-      if (prod) {
-        linea.nombre_producto    = prod.nombre
-        linea.precio_unitario_usd= prod.costo_usd || 0
+      if (!linea._key) {
+        linea.producto_id = null
+        linea.variante_id = null
+        linea.nombre_producto = ''
+        linea.es_producto_nuevo = true
+        return
+      }
+      const op = this.opcionesProductos.find(o => o.key === linea._key)
+      if (op) {
+        linea.producto_id        = op.producto_id
+        linea.variante_id        = op.variante_id
+        linea.nombre_producto    = op.label
+        linea.precio_unitario_usd= op.costo
         linea.es_producto_nuevo  = false
-      } else {
-        linea.es_producto_nuevo = !linea.producto_id
       }
     },
     subtotalLinea(l) {
@@ -280,9 +326,12 @@ export default {
           ...this.form,
           creado_por: this.usuario.usuario || '',
           detalles: this.form.detalles.map(l => ({
-            ...l,
-            producto_id: l.producto_id || null,
-            es_producto_nuevo: !l.producto_id,
+            producto_id:         l.producto_id  || null,
+            variante_id:         l.variante_id  || null,
+            nombre_producto:     l.nombre_producto,
+            cantidad_pedida:     l.cantidad_pedida,
+            precio_unitario_usd: l.precio_unitario_usd,
+            es_producto_nuevo:   !l.producto_id,
           })),
         }
         if (this.editandoId) {
@@ -346,7 +395,8 @@ export default {
 
 .subtitulo { color: var(--texto-principal); font-size: 0.9rem; margin: 1.25rem 0 0.75rem; border-top: 1px solid var(--borde); padding-top: 1rem; font-weight: 700; }
 .linea-producto { background: var(--fondo-tabla-alt); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative; border: 1px solid var(--borde); }
-.linea-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 1.2fr 1fr; gap: 0.5rem; align-items: end; }
+.linea-grid { display: grid; grid-template-columns: 3fr 2fr 1fr 1.2fr 1fr; gap: 0.5rem; align-items: end; }
+.field-selector select { min-width: 0; }
 .field-subtotal span { color: #16A34A; font-size: 1rem; font-weight: 600; padding-top: 0.3rem; display: block; }
 .btn-quitar-linea { position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
 .btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; font-size: 0.88rem; width: 100%; }
