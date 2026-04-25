@@ -24,8 +24,20 @@
           </div>
           <div class="tasas-info">
             <span>BCV: <strong>{{ tasaBcv ? tasaBcv.toFixed(2) : '...' }}</strong></span>
-            <span>Binance: <strong class="txt-yellow">{{ tasaBinance ? tasaBinance.toFixed(2) : '...' }}</strong></span>
-            <span>Factor: <strong class="txt-green">{{ factor ? factor.toFixed(4) : '...' }}</strong></span>
+            <template v-if="esAdmin">
+              <span>Binance: <strong class="txt-yellow">{{ tasaBinance ? tasaBinance.toFixed(2) : '...' }}</strong></span>
+              <span>Factor: <strong class="txt-green">{{ factor ? factor.toFixed(4) : '...' }}</strong></span>
+            </template>
+            <template v-else>
+              <span class="tasa-oculta">
+                <span class="tasa-letra txt-yellow">B</span>
+                <span class="tasa-valor">Binance: <strong class="txt-yellow">{{ tasaBinance ? tasaBinance.toFixed(2) : '...' }}</strong></span>
+              </span>
+              <span class="tasa-oculta">
+                <span class="tasa-letra txt-green">F</span>
+                <span class="tasa-valor">Factor: <strong class="txt-green">{{ factor ? factor.toFixed(4) : '...' }}</strong></span>
+              </span>
+            </template>
           </div>
         </div>
       </div>
@@ -1623,6 +1635,10 @@ export default {
 .btn-base.activo-base { background: #7b2cbf; color: white; border-color: #7b2cbf; }
 .tasas-info { display: flex; gap: 1rem; font-size: 0.85rem; color: var(--texto-sec); }
 .tasas-info strong { color: var(--texto-principal); }
+.tasa-oculta { cursor: default; position: relative; }
+.tasa-oculta .tasa-valor { display: none; }
+.tasa-oculta:hover .tasa-letra { display: none; }
+.tasa-oculta:hover .tasa-valor { display: inline; }
 .aviso-base { background: #F3E8FF; border: 1px solid #7b2cbf; color: #6b21a8; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
 
 /* ── Tabs nav ── */
