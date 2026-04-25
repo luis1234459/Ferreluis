@@ -1391,7 +1391,9 @@ export default {
         const idx = this.productos.findIndex(p => p.id === this.modalVariantes.id)
         if (idx !== -1) this.$set(this.productos[idx], 'esquema_variante', esquema)
       } catch (e) {
-        alert(e?.response?.data?.detail || 'Error al actualizar esquema')
+        const status  = e?.response?.status || 'sin respuesta'
+        const detalle = e?.response?.data?.detail || e?.message || 'desconocido'
+        alert(`Error ${status}: ${detalle}`)
       }
     },
 
