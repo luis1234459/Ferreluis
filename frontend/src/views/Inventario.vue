@@ -122,12 +122,12 @@
                   <!-- Nombre -->
                   <td>
                     <template v-if="modoEdicion">
-                      <input class="celda-input celda-nombre" style="min-width:280px; width:280px"
+                      <input class="celda-input celda-nombre" style="min-width:140px; width:auto"
                         v-model="borradorEdicion[p.id].nombre"
                         @input="marcarModificado(p.id)" />
                     </template>
                     <template v-else>
-                      <span class="prod-nombre" style="min-width:280px; display:inline-block">{{ formatNombre(p.nombre) }}</span>
+                      <span class="prod-nombre" style="min-width:120px; display:inline-block">{{ formatNombre(p.nombre) }}</span>
                       <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
                       <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
                       <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
@@ -1942,4 +1942,42 @@ export default {
 .btn-esquema-opt:hover { border-color: var(--amarillo); color: var(--texto-principal); }
 .btn-esquema-opt.esq-activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
 .esquema-aviso-inline { font-size: 0.8rem; color: var(--danger); font-style: italic; }
+
+/* ── Columnas sticky: Ubicación + Acciones ── */
+/* Acciones (última): siempre visible al scroll derecho */
+.tabla-container table th:last-child,
+.tabla-container table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  min-width: 155px;
+  background: #FFFFFF;
+  box-shadow: -3px 0 6px rgba(0,0,0,0.07);
+}
+.tabla-container table thead th:last-child { background: var(--amarillo); }
+.fila-stock-bajo td:last-child { background: #FEF2F2; }
+.fila-modificada td:last-child { background: #FFFBEB; }
+
+/* Ubicación (penúltima): sticky a 155px del borde */
+.tabla-container table th:nth-last-child(2),
+.tabla-container table td:nth-last-child(2) {
+  position: sticky;
+  right: 155px;
+  z-index: 2;
+  min-width: 44px;
+  background: #FFFFFF;
+  box-shadow: -2px 0 3px rgba(0,0,0,0.04);
+}
+.tabla-container table thead th:nth-last-child(2) { background: var(--amarillo); }
+.fila-stock-bajo td:nth-last-child(2) { background: #FEF2F2; }
+.fila-modificada td:nth-last-child(2) { background: #FFFBEB; }
+
+/* Impedir que los botones de acciones desborden la celda sticky */
+.acciones { flex-wrap: nowrap; }
+
+/* ── Reducir nombre en pantallas medianas ── */
+@media (max-width: 1400px) {
+  .celda-nombre { min-width: 130px !important; max-width: 180px; }
+  .prod-nombre  { min-width: 130px !important; max-width: 180px; }
+}
 </style>

@@ -236,6 +236,15 @@ input:focus, select:focus, textarea:focus {
   z-index: 150;
 }
 
+/* ─── Pantallas medianas (1366px / 1280px) ─── */
+@media (max-width: 1400px) {
+  .contenido-inner { padding: 1.25rem 1.5rem; }
+}
+@media (max-width: 1200px) {
+  .contenido-inner { padding: 1rem 1rem; }
+  .sidebar { width: 190px; }
+}
+
 @media (max-width: 768px) {
   .btn-menu-movil { display: block; }
 

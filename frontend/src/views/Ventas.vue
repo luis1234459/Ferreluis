@@ -123,7 +123,7 @@
         <div v-if="clienteSeleccionado" class="venta-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;">
 
           <!-- ── Columna izq: Catálogo ── -->
-          <div class="catalogo" style="width:100%;min-width:0;overflow:hidden;">
+          <div class="catalogo" style="width:100%;min-width:0;">
 
             <!-- Buscador + botón filtros -->
             <div class="buscador-wrap">
@@ -1771,11 +1771,11 @@ export default {
 .pi-precios {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 0.6rem;
   flex-shrink: 0;
 }
-.pi-bs    { color: #B08800; font-size: 0.85rem; font-weight: 700; min-width: 90px; text-align: right; }
-.pi-ref   { color: #16A34A; font-size: 0.85rem; font-weight: 700; min-width: 70px; text-align: right; }
+.pi-bs    { color: #B08800; font-size: 0.85rem; font-weight: 700; min-width: 72px; text-align: right; }
+.pi-ref   { color: #16A34A; font-size: 0.85rem; font-weight: 700; min-width: 60px; text-align: right; }
 .pi-stock { color: var(--texto-muted); font-size: 0.82rem; white-space: nowrap; background: var(--borde-suave); padding: 0.1rem 0.4rem; border-radius: 4px; }
 .pi-base   { color: var(--texto-muted); font-size: 0.75rem; display: none; white-space: nowrap; }
 
@@ -2098,6 +2098,18 @@ export default {
 .pres-opciones { display: flex; flex-direction: column; gap: 0.5rem; }
 .pres-opciones .btn-primary { padding: 0.75rem; font-size: 0.95rem; }
 .pres-opciones .btn-sec { padding: 0.6rem; font-size: 0.9rem; text-align: center; }
+
+/* ── Responsive monitores medianos ── */
+@media (max-width: 1300px) {
+  .pi-bs  { min-width: 62px; font-size: 0.8rem; }
+  .pi-ref { min-width: 52px; font-size: 0.8rem; }
+  .pi-precios { gap: 0.4rem; }
+  .pi-stock { font-size: 0.78rem; }
+}
+@media (max-width: 1100px) {
+  .venta-grid { grid-template-columns: 58fr 42fr; }
+  .pi-base { display: none !important; }
+}
 
 /* ── Responsive móvil ── */
 @media (max-width: 768px) {
