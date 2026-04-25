@@ -348,9 +348,14 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=404,
                                     detail=f"Variante no encontrada: ID {variante_id}")
 
-        # Precios base del sistema (usa precio_override_usd de la variante si existe)
-        if variante and variante.precio_override_usd:
-            p_base = float(variante.precio_override_usd)
+        # Precios base del sistema
+        if variante:
+            if variante.precio_override_usd is not None:
+                p_base = float(variante.precio_override_usd)
+            else:
+                costo  = float(variante.costo_usd  if variante.costo_usd  is not None else (producto.costo_usd  or 0))
+                margen = float(variante.margen      if variante.margen     is not None else (producto.margen     or 0))
+                p_base = round(costo * (1 + margen), 4)
         else:
             p_base = _calcular_precio_base(producto)
         p_ref  = _calcular_precio_referencial(p_base, factor)

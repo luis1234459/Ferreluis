@@ -167,6 +167,14 @@ def inicializar_datos():
              "ALTER TABLE detalle_recepcion ADD COLUMN IF NOT EXISTS variante_id INTEGER"],
         )
 
+        # ── variantes_producto: costo y margen propios ───────────────────────
+        migrar(
+            ["ALTER TABLE variantes_producto ADD COLUMN costo_usd FLOAT",
+             "ALTER TABLE variantes_producto ADD COLUMN margen FLOAT"],
+            ["ALTER TABLE variantes_producto ADD COLUMN IF NOT EXISTS costo_usd FLOAT",
+             "ALTER TABLE variantes_producto ADD COLUMN IF NOT EXISTS margen FLOAT"],
+        )
+
         # ── clientes: campos crédito y saldo a favor ─────────────────────────
         migrar(
             ["ALTER TABLE clientes ADD COLUMN tiene_credito BOOLEAN DEFAULT 0",

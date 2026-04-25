@@ -365,19 +365,43 @@ def reporte_inventario(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    productos = db.query(Producto).all()
-    return [
-        {
-            "id":               p.id,
-            "nombre":           p.nombre,
-            "categoria":        p.categoria,
-            "stock":            p.stock,
-            "costo_usd":        round(float(p.costo_usd or 0), 2),
-            "valor_inventario": round(float(p.costo_usd or 0) * int(p.stock or 0), 2),
-            "alerta_stock":     p.stock < 5,
-        }
-        for p in productos
-    ]
+    productos  = db.query(Producto).all()
+    variantes_map: dict = {}
+    for v in db.query(VarianteProducto).all():
+        variantes_map.setdefault(v.producto_id, []).append(v)
+
+    resultado = []
+    for p in productos:
+        vs = variantes_map.get(p.id, [])
+        if vs:
+            for v in vs:
+                costo = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
+                stock = int(v.stock or 0)
+                label = f"{v.clase}" + (f" / {v.color}" if v.color else "")
+                resultado.append({
+                    "id":               p.id,
+                    "variante_id":      v.id,
+                    "nombre":           f"{p.nombre} ({label})",
+                    "categoria":        p.categoria,
+                    "stock":            stock,
+                    "costo_usd":        round(costo, 2),
+                    "valor_inventario": round(costo * stock, 2),
+                    "alerta_stock":     stock < 5,
+                    "activo":           v.activo,
+                })
+        else:
+            resultado.append({
+                "id":               p.id,
+                "variante_id":      None,
+                "nombre":           p.nombre,
+                "categoria":        p.categoria,
+                "stock":            p.stock,
+                "costo_usd":        round(float(p.costo_usd or 0), 2),
+                "valor_inventario": round(float(p.costo_usd or 0) * int(p.stock or 0), 2),
+                "alerta_stock":     p.stock < 5,
+                "activo":           p.activo,
+            })
+    return resultado
 
 
 # ---------------------------------------------------------------------------
@@ -391,6 +415,9 @@ def inventario_por_departamento(
 ):
     productos     = db.query(Producto).all()
     departamentos = {d.id: d for d in db.query(Departamento).all()}
+    variantes_map: dict = {}
+    for v in db.query(VarianteProducto).all():
+        variantes_map.setdefault(v.producto_id, []).append(v)
 
     grupos: dict = {}
     for p in productos:
@@ -405,11 +432,22 @@ def inventario_por_departamento(
                 "valor_usd":            0.0,
                 "productos_bajo_stock": 0,
             }
-        grupos[dept_id]["cantidad_productos"]   += 1
-        grupos[dept_id]["stock_total"]          += int(p.stock or 0)
-        grupos[dept_id]["valor_usd"]            += float(p.costo_usd or 0) * int(p.stock or 0)
-        if (p.stock or 0) < 5:
-            grupos[dept_id]["productos_bajo_stock"] += 1
+        vs = variantes_map.get(p.id, [])
+        if vs:
+            for v in vs:
+                costo = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
+                stock = int(v.stock or 0)
+                grupos[dept_id]["cantidad_productos"]   += 1
+                grupos[dept_id]["stock_total"]          += stock
+                grupos[dept_id]["valor_usd"]            += costo * stock
+                if stock < 5:
+                    grupos[dept_id]["productos_bajo_stock"] += 1
+        else:
+            grupos[dept_id]["cantidad_productos"]   += 1
+            grupos[dept_id]["stock_total"]          += int(p.stock or 0)
+            grupos[dept_id]["valor_usd"]            += float(p.costo_usd or 0) * int(p.stock or 0)
+            if (p.stock or 0) < 5:
+                grupos[dept_id]["productos_bajo_stock"] += 1
 
     resultado = sorted(grupos.values(), key=lambda x: x["valor_usd"], reverse=True)
     for g in resultado:
@@ -424,6 +462,9 @@ def inventario_por_proveedor(
 ):
     productos   = db.query(Producto).all()
     proveedores = {p.id: p for p in db.query(Proveedor).all()}
+    variantes_map: dict = {}
+    for v in db.query(VarianteProducto).all():
+        variantes_map.setdefault(v.producto_id, []).append(v)
 
     grupos: dict = {}
     for p in productos:
@@ -437,9 +478,18 @@ def inventario_por_proveedor(
                 "stock_total":       0,
                 "valor_usd":         0.0,
             }
-        grupos[prov_id]["cantidad_productos"] += 1
-        grupos[prov_id]["stock_total"]        += int(p.stock or 0)
-        grupos[prov_id]["valor_usd"]          += float(p.costo_usd or 0) * int(p.stock or 0)
+        vs = variantes_map.get(p.id, [])
+        if vs:
+            for v in vs:
+                costo = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
+                stock = int(v.stock or 0)
+                grupos[prov_id]["cantidad_productos"] += 1
+                grupos[prov_id]["stock_total"]        += stock
+                grupos[prov_id]["valor_usd"]          += costo * stock
+        else:
+            grupos[prov_id]["cantidad_productos"] += 1
+            grupos[prov_id]["stock_total"]        += int(p.stock or 0)
+            grupos[prov_id]["valor_usd"]          += float(p.costo_usd or 0) * int(p.stock or 0)
 
     resultado = sorted(grupos.values(), key=lambda x: x["valor_usd"], reverse=True)
     for g in resultado:
@@ -489,29 +539,54 @@ def inventario_rotacion(
     dias_periodo  = _calcular_dias_periodo(desde, hasta)
     productos     = db.query(Producto).all()
     departamentos = {d.id: d for d in db.query(Departamento).all()}
+    variantes_map: dict = {}
+    for v in db.query(VarianteProducto).all():
+        variantes_map.setdefault(v.producto_id, []).append(v)
 
     detalles = _detalles_en_periodo(db, desde, hasta)
     ventas_por_prod: dict = {}
+    ventas_por_variante: dict = {}
     for d in detalles:
-        pid = d.producto_id
-        ventas_por_prod[pid] = ventas_por_prod.get(pid, 0) + int(d.cantidad or 0)
+        ventas_por_prod[d.producto_id] = ventas_por_prod.get(d.producto_id, 0) + int(d.cantidad or 0)
+        if d.variante_id:
+            ventas_por_variante[d.variante_id] = ventas_por_variante.get(d.variante_id, 0) + int(d.cantidad or 0)
 
     resultado = []
     for p in productos:
-        stock    = int(p.stock or 0)
-        unidades = ventas_por_prod.get(p.id, 0)
-        rotacion = round(unidades / stock, 2) if stock > 0 else None
-        dias_agotamiento = round(stock * dias_periodo / unidades) if (unidades > 0 and stock > 0) else None
         dept = departamentos.get(p.departamento_id)
-        resultado.append({
-            "id":               p.id,
-            "nombre":           p.nombre,
-            "departamento":     dept.nombre if dept else "—",
-            "stock":            stock,
-            "unidades_vendidas": unidades,
-            "rotacion":         rotacion,
-            "dias_agotamiento": dias_agotamiento,
-        })
+        vs   = variantes_map.get(p.id, [])
+        if vs:
+            for v in vs:
+                stock    = int(v.stock or 0)
+                unidades = ventas_por_variante.get(v.id, 0)
+                rotacion = round(unidades / stock, 2) if stock > 0 else None
+                dias_agotamiento = round(stock * dias_periodo / unidades) if (unidades > 0 and stock > 0) else None
+                label = f"{v.clase}" + (f" / {v.color}" if v.color else "")
+                resultado.append({
+                    "id":                p.id,
+                    "variante_id":       v.id,
+                    "nombre":            f"{p.nombre} ({label})",
+                    "departamento":      dept.nombre if dept else "—",
+                    "stock":             stock,
+                    "unidades_vendidas": unidades,
+                    "rotacion":          rotacion,
+                    "dias_agotamiento":  dias_agotamiento,
+                })
+        else:
+            stock    = int(p.stock or 0)
+            unidades = ventas_por_prod.get(p.id, 0)
+            rotacion = round(unidades / stock, 2) if stock > 0 else None
+            dias_agotamiento = round(stock * dias_periodo / unidades) if (unidades > 0 and stock > 0) else None
+            resultado.append({
+                "id":                p.id,
+                "variante_id":       None,
+                "nombre":            p.nombre,
+                "departamento":      dept.nombre if dept else "—",
+                "stock":             stock,
+                "unidades_vendidas": unidades,
+                "rotacion":          rotacion,
+                "dias_agotamiento":  dias_agotamiento,
+            })
     return sorted(resultado, key=lambda x: x["rotacion"] if x["rotacion"] is not None else -1, reverse=True)
 
 

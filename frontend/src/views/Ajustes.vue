@@ -82,7 +82,10 @@
               <tbody>
                 <tr v-for="p in productosPrecio" :key="p.id"
                   :class="{ 'fila-modificada': p._modificado }">
-                  <td style="font-weight:600">{{ p.nombre }}</td>
+                  <td style="font-weight:600">
+                    {{ p.nombre }}
+                    <span v-if="p.tiene_variantes" class="badge-variantes" :title="`${p.variantes_count} variantes — costo base para las que no tienen valor propio`">V</span>
+                  </td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td>
                     <input class="input-celda" type="number" v-model.number="p._costo"
@@ -169,7 +172,10 @@
               <tbody>
                 <tr v-for="p in productosStock" :key="p.id"
                   :class="{ 'fila-modificada': p._modificado }">
-                  <td style="font-weight:600">{{ p.nombre }}</td>
+                  <td style="font-weight:600">
+                    {{ p.nombre }}
+                    <span v-if="p.tiene_variantes" class="badge-variantes" :title="`${p.variantes_count} variantes — stock distribuido por variante`">V</span>
+                  </td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td>{{ p.stock }}</td>
                   <td>
@@ -259,7 +265,10 @@
               <tbody>
                 <tr v-for="p in productosComision" :key="p.id"
                   :class="{ 'fila-modificada': p._modificado }">
-                  <td style="font-weight:600">{{ p.nombre }}</td>
+                  <td style="font-weight:600">
+                    {{ p.nombre }}
+                    <span v-if="p.tiene_variantes" class="badge-variantes" :title="`${p.variantes_count} variantes — comisión aplica a todas`">V</span>
+                  </td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td class="txt-muted">{{ p.proveedor_nombre }}</td>
                   <td class="txt-muted">${{ p.costo_usd.toFixed(4) }}</td>
@@ -710,8 +719,9 @@ export default {
 
 /* ── Badges ── */
 .badge-periodo  { background: var(--borde-suave); color: var(--texto-sec); font-size: 0.76rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 10px; }
-.badge-activa   { background: #16A34A1A; color: #16A34A;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
-.badge-inactiva { background: #8888881A; color: #555555;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.badge-activa    { background: #16A34A1A; color: #16A34A;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.badge-inactiva  { background: #8888881A; color: #555555;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.badge-variantes { background: #3B82F61A; color: #1D4ED8;  font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 8px; margin-left: 4px; cursor: help; }
 
 .badge-tipo-precio   { background: #1A1A1A1A; color: #1A1A1A;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
 .badge-tipo-stock    { background: #F59E0B1A; color: #92400E;  font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }

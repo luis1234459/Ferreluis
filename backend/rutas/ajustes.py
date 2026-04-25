@@ -9,7 +9,7 @@ import io
 
 from database import get_db
 from models import (
-    Producto, VendedorPerfil, Usuario, HistorialAjuste,
+    Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
     Departamento, Proveedor, TasaCambio,
 )
 from rutas.usuarios import require_admin
@@ -83,6 +83,22 @@ def _filtrar_productos(db: Session, filtro_tipo: str, filtro_id: Optional[int]):
     return q.all()
 
 
+def _stock_real(producto: Producto, db: Session) -> int:
+    """Para productos con variantes devuelve la suma del stock de variantes."""
+    variantes = db.query(VarianteProducto).filter(
+        VarianteProducto.producto_id == producto.id
+    ).all()
+    if variantes:
+        return sum(int(v.stock or 0) for v in variantes)
+    return int(producto.stock or 0)
+
+
+def _tiene_variantes(producto_id: int, db: Session) -> int:
+    return db.query(VarianteProducto).filter(
+        VarianteProducto.producto_id == producto_id
+    ).count()
+
+
 def _guardar_historial(db, usuario, tipo, descripcion, cambios):
     db.add(HistorialAjuste(
         usuario             = usuario or "admin",
@@ -110,11 +126,16 @@ def listar_productos_ajuste(
     productos     = _filtrar_productos(db, filtro_tipo, filtro_id)
     bcv, binance  = _tasas(db)
 
+    deptos_map = {d.id: d for d in db.query(Departamento).all()}
+    provs_map  = {p.id: p for p in db.query(Proveedor).all()}
+
     result = []
     for p in productos:
-        precio_base  = round(float(p.costo_usd or 0) * (1 + float(p.margen or 0)), 4)
-        depto = db.query(Departamento).filter(Departamento.id == p.departamento_id).first() if p.departamento_id else None
-        prov  = db.query(Proveedor).filter(Proveedor.id  == p.proveedor_id).first()  if p.proveedor_id  else None
+        precio_base     = round(float(p.costo_usd or 0) * (1 + float(p.margen or 0)), 4)
+        depto           = deptos_map.get(p.departamento_id)
+        prov            = provs_map.get(p.proveedor_id)
+        n_variantes     = _tiene_variantes(p.id, db)
+        stock_real      = _stock_real(p, db)
         result.append({
             "id":                 p.id,
             "nombre":             p.nombre,
@@ -126,8 +147,10 @@ def listar_productos_ajuste(
             "margen":             float(p.margen        or 0),
             "comision_pct":       float(p.comision_pct  or 0),
             "precio_base_usd":    precio_base,
-            "stock":              p.stock,
+            "stock":              stock_real,
             "es_producto_clave":  p.es_producto_clave,
+            "tiene_variantes":    n_variantes > 0,
+            "variantes_count":    n_variantes,
         })
     return result
 

@@ -62,6 +62,8 @@ class VarianteSchema(BaseModel):
     color:               Optional[str]  = None
     stock:               int            = 0
     precio_override_usd: Optional[float]= None
+    costo_usd:           Optional[float]= None
+    margen:              Optional[float]= None
     activo:              bool           = True
     codigo:              Optional[str]  = None
 
@@ -122,6 +124,8 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: li
             "activo":              v.activo,
             "codigo":              v.codigo,
             "precio_override_usd": v.precio_override_usd,
+            "costo_usd":           v.costo_usd,
+            "margen":              v.margen,
         }
         for v in vs
     ]
@@ -839,9 +843,17 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return db.query(VarianteProducto).filter(
+    variantes = db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).all()
+    resultado = []
+    for v in variantes:
+        d = {c.name: getattr(v, c.name) for c in v.__table__.columns}
+        d["costo_efectivo"]  = float(v.costo_usd  if v.costo_usd  is not None else (p.costo_usd  or 0))
+        d["margen_efectivo"] = float(v.margen      if v.margen     is not None else (p.margen     or 0))
+        d["precio_base_usd"] = round(d["costo_efectivo"] * (1 + d["margen_efectivo"]), 4)
+        resultado.append(d)
+    return resultado
 
 
 @router.post("/{producto_id}/variantes")

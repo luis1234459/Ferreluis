@@ -446,7 +446,9 @@
                   <th>Clase</th>
                   <th v-if="modalVariantes.esquema_variante !== 'clase'">Color</th>
                   <th>Stock</th>
-                  <th>Precio override</th>
+                  <th>Costo USD</th>
+                  <th>Margen %</th>
+                  <th>Precio base</th>
                   <th>Estado</th>
                   <th></th>
                 </tr>
@@ -457,7 +459,15 @@
                   <td style="font-weight:600">{{ v.clase }}</td>
                   <td v-if="modalVariantes.esquema_variante !== 'clase'">{{ v.color || '—' }}</td>
                   <td>{{ v.stock }}</td>
-                  <td>{{ v.precio_override_usd != null ? '$' + Number(v.precio_override_usd).toFixed(2) : 'Del producto' }}</td>
+                  <td :class="v.costo_usd != null ? '' : 'txt-muted'">
+                    ${{ Number(v.costo_efectivo || 0).toFixed(4) }}
+                    <span v-if="v.costo_usd == null" class="badge-heredado" title="Heredado del producto">↑</span>
+                  </td>
+                  <td :class="v.margen != null ? '' : 'txt-muted'">
+                    {{ (Number(v.margen_efectivo || 0) * 100).toFixed(2) }}%
+                    <span v-if="v.margen == null" class="badge-heredado" title="Heredado del producto">↑</span>
+                  </td>
+                  <td class="txt-verde">${{ Number(v.precio_base_usd || 0).toFixed(4) }}</td>
                   <td><span :class="v.activo ? 'badge-activa' : 'badge-inactiva'">{{ v.activo ? 'Activa' : 'Inactiva' }}</span></td>
                   <td class="acciones">
                     <button class="btn-editar"   @click="editarVariante(v)">Editar</button>
@@ -485,9 +495,14 @@
                   <input v-model.number="formVariante.stock" type="number" min="0" />
                 </div>
                 <div class="field">
-                  <label>Precio USD <small>(vacío = usa precio del producto)</small></label>
-                  <input v-model="formVariante.precio_override_str" type="number" min="0" step="0.01"
-                    placeholder="Precio del producto" />
+                  <label>Costo USD <small>(vacío = hereda del producto)</small></label>
+                  <input v-model="formVariante.costo_usd_str" type="number" min="0" step="0.0001"
+                    :placeholder="'Heredado: $' + modalVariantes.costo_usd_padre" />
+                </div>
+                <div class="field">
+                  <label>Margen % <small>(vacío = hereda del producto)</small></label>
+                  <input v-model="formVariante.margen_pct_str" type="number" min="0" step="0.1"
+                    :placeholder="'Heredado: ' + (modalVariantes.margen_padre * 100).toFixed(2) + '%'" />
                 </div>
               </div>
               <label class="check-opt" style="margin-top:0.5rem">
@@ -913,7 +928,7 @@ export default {
       variantes:           [],
       mostrarFormVariante: false,
       editandoVarianteId:  null,
-      formVariante: { clase: '', color: '', stock: 0, precio_override_str: '', activo: true },
+      formVariante: { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', activo: true },
 
       // Modal componentes
       modalComponentes: null,
@@ -1320,9 +1335,11 @@ export default {
 
     // ── CRUD Variantes ────────────────────────────────────────────────────────
     async abrirVariantes(p) {
-      this.modalVariantes      = p
-      this.mostrarFormVariante = false
-      this.editandoVarianteId  = null
+      this.modalVariantes                 = p
+      this.modalVariantes.costo_usd_padre = Number(p.costo_usd || 0).toFixed(4)
+      this.modalVariantes.margen_padre    = Number(p.margen || 0)
+      this.mostrarFormVariante            = false
+      this.editandoVarianteId             = null
       const res = await axios.get(`/productos/${p.id}/variantes`)
       this.variantes = res.data
     },
@@ -1333,17 +1350,18 @@ export default {
     },
     abrirFormVariante() {
       this.editandoVarianteId = null
-      this.formVariante = { clase: '', color: '', stock: 0, precio_override_str: '', activo: true }
+      this.formVariante = { clase: '', color: '', stock: 0, costo_usd_str: '', margen_pct_str: '', activo: true }
       this.mostrarFormVariante = true
     },
     editarVariante(v) {
       this.editandoVarianteId = v.id
       this.formVariante = {
-        clase:               v.clase,
-        color:               v.color || '',
-        stock:               v.stock,
-        precio_override_str: v.precio_override_usd != null ? String(v.precio_override_usd) : '',
-        activo:              v.activo,
+        clase:          v.clase,
+        color:          v.color || '',
+        stock:          v.stock,
+        costo_usd_str:  v.costo_usd  != null ? String(v.costo_usd)                    : '',
+        margen_pct_str: v.margen     != null ? String((v.margen * 100).toFixed(4))    : '',
+        activo:         v.activo,
       }
       this.mostrarFormVariante = true
     },
@@ -1356,12 +1374,15 @@ export default {
       this.guardando = true
       try {
         const payload = {
-          clase:               this.formVariante.clase,
-          color:               this.formVariante.color || null,
-          stock:               Number(this.formVariante.stock || 0),
-          precio_override_usd: this.formVariante.precio_override_str
-                                 ? Number(this.formVariante.precio_override_str)
-                                 : null,
+          clase:     this.formVariante.clase,
+          color:     this.formVariante.color || null,
+          stock:     Number(this.formVariante.stock || 0),
+          costo_usd: this.formVariante.costo_usd_str  !== ''
+                       ? Number(this.formVariante.costo_usd_str)
+                       : null,
+          margen:    this.formVariante.margen_pct_str !== ''
+                       ? Number(this.formVariante.margen_pct_str) / 100
+                       : null,
           activo: this.formVariante.activo,
         }
         if (this.editandoVarianteId) {
@@ -1825,6 +1846,7 @@ export default {
 
 .badge-activa  { background: #16A34A1A; color: #16A34A;  font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 10px; }
 .badge-inactiva{ background: #8888881A; color: #555555;  font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 10px; }
+.badge-heredado{ font-size: 0.65rem; color: #9CA3AF; cursor: help; margin-left: 2px; }
 
 .btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.75rem; font-size: 0.88rem; width: 100%; }
 .btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; }

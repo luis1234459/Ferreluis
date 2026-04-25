@@ -87,7 +87,9 @@ class VarianteProducto(Base):
     clase               = Column(String)                           # "Clase A", "Clase B", etc.
     color               = Column(String,  nullable=True)
     stock               = Column(Integer, default=0)
-    precio_override_usd = Column(Float,   nullable=True)           # None → usa costo_usd del producto
+    precio_override_usd = Column(Float,   nullable=True)           # legado — usar costo_usd+margen en su lugar
+    costo_usd           = Column(Float,   nullable=True)           # None → hereda del producto padre
+    margen              = Column(Float,   nullable=True)           # None → hereda del producto padre
     activo              = Column(Boolean, default=True)
     codigo              = Column(String,  nullable=True, index=True)  # código del proveedor para esta variante
 
