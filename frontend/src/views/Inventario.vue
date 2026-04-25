@@ -337,9 +337,13 @@
                 <input v-model.number="form.margen_pct" type="number" min="0" max="999" step="1"
                   placeholder="Ej: 30" @input="actualizarMargen" />
               </div>
-              <div class="field">
+              <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
                 <input v-model.number="form.stock" type="number" min="0" placeholder="0" />
+              </div>
+              <div class="field" v-else>
+                <label>Stock</label>
+                <p class="aviso-stock-variantes">El stock se gestiona por variante. Usa el botón <strong>Variantes</strong> en la tabla.</p>
               </div>
               <div class="field">
                 <label>Descripción</label>
@@ -1673,6 +1677,7 @@ export default {
 .btn-comp     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .fila-stock-bajo td { background: #DC262608; }
+.aviso-stock-variantes { font-size: 0.82rem; color: var(--texto-muted); background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0; }
 .stock-variantes { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .sv-chip { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 4px; background: #F0F9FF; border: 1px solid #BAE6FD; color: #0369A1; white-space: nowrap; }
 .sv-chip.sv-bajo { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
