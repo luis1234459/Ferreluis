@@ -88,6 +88,7 @@ class VarianteProducto(Base):
     stock               = Column(Integer, default=0)
     precio_override_usd = Column(Float,   nullable=True)           # None → usa costo_usd del producto
     activo              = Column(Boolean, default=True)
+    codigo              = Column(String,  nullable=True, index=True)  # código del proveedor para esta variante
 
 
 class ComponenteProducto(Base):
@@ -306,6 +307,7 @@ class CatalogoProveedor(Base):
     id                    = Column(Integer, primary_key=True, index=True)
     proveedor_id          = Column(Integer, index=True)
     producto_id           = Column(Integer, nullable=True)   # None si producto aún no existe
+    variante_id           = Column(Integer, nullable=True)   # None si es producto sin variantes
     nombre_producto       = Column(String)
     codigo_proveedor      = Column(String,  nullable=True)
     precio_referencia_usd = Column(Float,   nullable=True)
@@ -336,6 +338,7 @@ class DetalleOrdenCompra(Base):
     id                = Column(Integer, primary_key=True, index=True)
     orden_id          = Column(Integer, index=True)
     producto_id       = Column(Integer, nullable=True)
+    variante_id       = Column(Integer, nullable=True)
     nombre_producto   = Column(String)
     codigo_proveedor  = Column(String,  nullable=True)
     cantidad_pedida   = Column(Float)
@@ -367,6 +370,7 @@ class DetalleRecepcion(Base):
     recepcion_id           = Column(Integer, index=True)
     detalle_orden_id       = Column(Integer)
     producto_id            = Column(Integer)
+    variante_id            = Column(Integer, nullable=True)
     cantidad_recibida      = Column(Float)
     precio_unitario_real_usd = Column(Float)
     subtotal               = Column(Float)

@@ -14,7 +14,7 @@ from sqlalchemy import func, or_
 from database import get_db
 from models import (
     Proveedor, CatalogoProveedor, OrdenCompra, DetalleOrdenCompra,
-    RecepcionCompra, DetalleRecepcion, Producto,
+    RecepcionCompra, DetalleRecepcion, Producto, VarianteProducto,
 )
 from rutas.usuarios import require_admin
 from typing import Optional
@@ -58,6 +58,7 @@ def _serializar_orden(o: OrdenCompra, db: Session) -> dict:
             {
                 "id":                  d.id,
                 "producto_id":         d.producto_id,
+                "variante_id":         d.variante_id,
                 "nombre_producto":     d.nombre_producto,
                 "codigo_proveedor":    d.codigo_proveedor,
                 "cantidad_pedida":     d.cantidad_pedida,
@@ -176,9 +177,11 @@ def listar_catalogo(proveedor_id: int, db: Session = Depends(get_db)):
 
 @router.post("/proveedores/{proveedor_id}/catalogo")
 def agregar_catalogo(proveedor_id: int, datos: dict, db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    vid = datos.get("variante_id")
     item = CatalogoProveedor(
         proveedor_id          = proveedor_id,
         producto_id           = datos.get("producto_id"),
+        variante_id           = int(vid) if vid else None,
         nombre_producto       = datos.get("nombre_producto", ""),
         codigo_proveedor      = datos.get("codigo_proveedor"),
         precio_referencia_usd = datos.get("precio_referencia_usd"),
@@ -198,7 +201,7 @@ def actualizar_catalogo(proveedor_id: int, item_id: int, datos: dict,
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Ítem de catálogo no encontrado")
-    for k in ("nombre_producto", "codigo_proveedor", "precio_referencia_usd", "producto_id"):
+    for k in ("nombre_producto", "codigo_proveedor", "precio_referencia_usd", "producto_id", "variante_id"):
         if k in datos:
             setattr(item, k, datos[k])
     db.commit()
@@ -269,9 +272,11 @@ def crear_orden(datos: dict, db: Session = Depends(get_db),
     for d in datos["detalles"]:
         cantidad = float(d.get("cantidad_pedida", 1))
         precio   = float(d.get("precio_unitario_usd", 0))
+        vid      = d.get("variante_id")
         det = DetalleOrdenCompra(
             orden_id           = orden.id,
             producto_id        = d.get("producto_id"),
+            variante_id        = int(vid) if vid else None,
             nombre_producto    = d.get("nombre_producto", ""),
             codigo_proveedor   = d.get("codigo_proveedor"),
             cantidad_pedida    = cantidad,
@@ -444,25 +449,45 @@ def registrar_recepcion(orden_id: int, datos: dict, db: Session = Depends(get_db
             det_ord.producto_id       = prod_id
             det_ord.es_producto_nuevo = False
 
+        variante_id = item.get("variante_id")
+        if variante_id is not None:
+            variante_id = int(variante_id)
+
         producto = db.query(Producto).filter(Producto.id == prod_id).first() if prod_id else None
-        actualizo_costo  = False
-        costo_anterior   = None
+        variante = None
+        if variante_id:
+            variante = db.query(VarianteProducto).filter(
+                VarianteProducto.id == variante_id,
+                VarianteProducto.producto_id == prod_id,
+            ).first()
+
+        actualizo_costo = False
+        costo_anterior  = None
 
         if producto:
-            # Actualizar stock
-            producto.stock += int(cantidad)
+            # Stock: si tiene variante → actualizar variante; si no → actualizar producto
+            if variante:
+                variante.stock = float(variante.stock or 0) + cantidad
+            else:
+                tiene_variantes = db.query(VarianteProducto).filter(
+                    VarianteProducto.producto_id == prod_id
+                ).first() is not None
+                if not tiene_variantes:
+                    producto.stock += int(cantidad)
+                # producto con variantes sin variante_id especificada: no tocar nada
 
-            # Actualizar costo si varió > TOLERANCIA
+            # Actualizar costo en el producto padre (precio de compra siempre en el padre)
             precio_ord = float(detalles_orden[det_ord_id].precio_unitario_usd) if det_ord_id in detalles_orden else 0
             if abs(precio_real - precio_ord) > 0.01 and precio_real > 0:
-                costo_anterior   = float(producto.costo_usd or 0)
+                costo_anterior     = float(producto.costo_usd or 0)
                 producto.costo_usd = precio_real
-                actualizo_costo  = True
+                actualizo_costo    = True
 
         dr = DetalleRecepcion(
             recepcion_id             = recepcion.id,
             detalle_orden_id         = det_ord_id,
             producto_id              = prod_id,
+            variante_id              = variante_id,
             cantidad_recibida        = cantidad,
             precio_unitario_real_usd = precio_real,
             subtotal                 = subtotal,
@@ -521,8 +546,16 @@ def obtener_recepcion(recepcion_id: int, db: Session = Depends(get_db)):
         "fecha_recepcion": r.fecha_recepcion.isoformat() if r.fecha_recepcion else None,
         "recibido_por":    r.recibido_por,
         "total_recibido":  r.total_recibido,
-        "detalles":        [{"producto_id": d.producto_id, "cantidad_recibida": d.cantidad_recibida,
-                             "precio_real": d.precio_unitario_real_usd, "actualizo_costo": d.actualizo_costo} for d in detalles],
+        "detalles": [
+            {
+                "producto_id":      d.producto_id,
+                "variante_id":      d.variante_id,
+                "cantidad_recibida":d.cantidad_recibida,
+                "precio_real":      d.precio_unitario_real_usd,
+                "actualizo_costo":  d.actualizo_costo,
+            }
+            for d in detalles
+        ],
     }
 
 
