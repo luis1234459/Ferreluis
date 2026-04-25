@@ -697,7 +697,7 @@
                 <span class="variante-stock">Stock: {{ v.stock }}</span>
                 <span class="variante-bs">Bs {{ variantePrecioBs(v).toFixed(2) }}</span>
                 <span class="variante-ref">${{ variantePrecioRef(v).toFixed(2) }}</span>
-                <span class="variante-base" v-if="tipoPrecio === 'base'">Base: ${{ variantePrecioBase(v).toFixed(2) }}</span>
+                <span class="variante-base">Base: ${{ variantePrecioBase(v).toFixed(2) }}</span>
               </div>
             </button>
           </div>
@@ -2134,9 +2134,10 @@ export default {
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
 }
-.variante-bs  { color: #B08800; font-weight: 700; font-size: 0.82rem; }
-.variante-ref { color: #16A34A; font-weight: 700; font-size: 0.9rem; }
-.variante-base { color: #7b2cbf; font-size: 0.75rem; font-weight: 600; }
+.variante-bs   { color: #B08800; font-weight: 700; font-size: 0.82rem; }
+.variante-ref  { color: #16A34A; font-weight: 700; font-size: 0.9rem; }
+.variante-base { color: #7b2cbf; font-size: 0.75rem; font-weight: 600; display: none; }
+.variante-item:hover .variante-base { display: block; }
 .pi-variantes-count { color: #0369A1; font-size: 0.78rem; font-weight: 700; background: #E0F2FE; padding: 0.1rem 0.4rem; border-radius: 4px; }
 .variante-tag {
   font-size: 0.72rem;
