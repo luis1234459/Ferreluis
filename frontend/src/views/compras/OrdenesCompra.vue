@@ -135,35 +135,31 @@
               <span class="filtro-contador">{{ opcionesFiltradas.length }} opciones</span>
             </div>
 
-            <div v-for="(linea, i) in form.detalles" :key="i" class="linea-producto">
-              <div class="linea-grid">
-                <div class="field field-selector">
-                  <label>Producto / Variante</label>
-                  <select v-model="linea._key" @change="llenarDesdeInventario(linea)">
-                    <option value="">— Nuevo producto —</option>
-                    <option v-for="op in opcionesFiltradas" :key="op.key" :value="op.key">
-                      {{ op.label }}{{ op.stock_label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label>Nombre</label>
-                  <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea._key" />
-                </div>
-                <div class="field">
-                  <label>Cantidad</label>
-                  <input v-model.number="linea.cantidad_pedida" type="number" min="1" />
-                </div>
-                <div class="field">
-                  <label>Precio USD</label>
-                  <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" />
-                </div>
-                <div class="field field-subtotal">
-                  <label>Subtotal</label>
-                  <span>${{ subtotalLinea(linea).toFixed(2) }}</span>
-                </div>
+            <!-- Cabecera tabla de líneas -->
+            <div class="lineas-head">
+              <span>Producto / Variante</span>
+              <span>Nombre</span>
+              <span class="tc">Cant.</span>
+              <span class="tc">Precio $</span>
+              <span class="tr">Subtotal</span>
+              <span></span>
+            </div>
+            <!-- Filas de líneas (scrollable) -->
+            <div class="lineas-scroll">
+              <div v-for="(linea, i) in form.detalles" :key="i" class="fila-linea">
+                <select v-model="linea._key" @change="llenarDesdeInventario(linea)">
+                  <option value="">— Nuevo producto —</option>
+                  <option v-for="op in opcionesFiltradas" :key="op.key" :value="op.key">
+                    {{ op.label }}{{ op.stock_label }}
+                  </option>
+                </select>
+                <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea._key" />
+                <input v-model.number="linea.cantidad_pedida" type="number" min="1" class="tc" />
+                <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" class="tc" />
+                <span class="fila-sub">${{ subtotalLinea(linea).toFixed(2) }}</span>
+                <button class="btn-del-fila" @click="quitarLinea(i)" title="Quitar">✕</button>
               </div>
-              <button class="btn-quitar-linea" @click="quitarLinea(i)">✕</button>
+              <div v-if="form.detalles.length === 0" class="fila-vacia">Sin productos — agrega uno abajo</div>
             </div>
             <button class="btn-agregar-linea" @click="agregarLinea">+ Agregar producto</button>
 
@@ -443,18 +439,66 @@ export default {
 .total-grande strong { color: #16A34A; font-size: 1.1rem; }
 .obs { color: var(--texto-sec); font-size: 0.88rem; font-style: italic; margin-top: 0.75rem; }
 
-.subtitulo { color: var(--texto-principal); font-size: 0.9rem; margin: 1.25rem 0 0.5rem; border-top: 1px solid var(--borde); padding-top: 1rem; font-weight: 700; }
-.filtros-producto-oc { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.filtro-busq-oc { flex: 1; min-width: 160px; padding: 0.4rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.85rem; }
-.filtro-sel-oc  { padding: 0.4rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.85rem; max-width: 160px; }
-.filtro-contador { font-size: 0.78rem; color: var(--texto-sec); white-space: nowrap; }
-.linea-producto { background: var(--fondo-tabla-alt); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative; border: 1px solid var(--borde); }
-.linea-grid { display: grid; grid-template-columns: 3fr 2fr 1fr 1.2fr 1fr; gap: 0.5rem; align-items: end; }
-.field-selector select { min-width: 0; }
-.field-subtotal span { color: #16A34A; font-size: 1rem; font-weight: 600; padding-top: 0.3rem; display: block; }
-.btn-quitar-linea { position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
-.btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; font-size: 0.88rem; width: 100%; }
-.btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; }
+/* ── modal form ancho ── */
+.modal-form { max-width: 1080px !important; width: 96vw !important; padding: 1.5rem !important; }
+
+.subtitulo { color: var(--texto-principal); font-size: 0.88rem; margin: 1rem 0 0.4rem; border-top: 1px solid var(--borde); padding-top: 0.75rem; font-weight: 700; }
+.filtros-producto-oc { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.filtro-busq-oc { flex: 1; min-width: 140px; padding: 0.3rem 0.5rem; border: 1px solid var(--borde); border-radius: 5px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.82rem; height: 30px; }
+.filtro-sel-oc  { padding: 0.3rem 0.5rem; border: 1px solid var(--borde); border-radius: 5px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.82rem; max-width: 160px; height: 30px; }
+.filtro-contador { font-size: 0.75rem; color: var(--texto-sec); white-space: nowrap; }
+
+/* ── tabla de líneas ── */
+.lineas-head,
+.fila-linea {
+  display: grid;
+  grid-template-columns: 3fr 2fr 72px 100px 88px 26px;
+  gap: 4px;
+  align-items: center;
+  padding: 0 0.4rem;
+}
+.lineas-head {
+  height: 28px;
+  background: var(--fondo-sidebar);
+  border: 1px solid var(--borde);
+  border-radius: 6px 6px 0 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--texto-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.lineas-head .tc { text-align: center; }
+.lineas-head .tr { text-align: right; }
+.lineas-scroll {
+  border: 1px solid var(--borde);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  max-height: 510px;
+  overflow-y: auto;
+}
+.fila-linea {
+  height: 34px;
+  border-bottom: 1px solid var(--borde);
+}
+.fila-linea:last-child { border-bottom: none; }
+.fila-linea:nth-child(even) { background: var(--fondo-tabla-alt); }
+.fila-linea select,
+.fila-linea input {
+  width: 100%; height: 26px; padding: 0 0.35rem;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: var(--texto-principal);
+  font-size: 0.82rem;
+}
+.fila-linea select:focus,
+.fila-linea input:focus  { border-color: var(--amarillo); background: #FFFDF0; outline: none; }
+.fila-linea input:disabled { color: var(--texto-sec); }
+.fila-linea .tc { text-align: center; }
+.fila-sub { font-size: 0.82rem; font-weight: 600; color: #16A34A; text-align: right; padding-right: 0.3rem; }
+.btn-del-fila { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; padding: 0; text-align: center; line-height: 1; }
+.fila-vacia { padding: 0.6rem 0.5rem; font-size: 0.82rem; color: var(--texto-sec); font-style: italic; }
+.btn-agregar-linea { background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec); padding: 0.35rem 1rem; border-radius: 0 0 6px 6px; cursor: pointer; margin-top: 0; font-size: 0.82rem; width: 100%; border-top: none; }
+.btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; color: var(--amarillo); }
 
 .form-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--borde); }
 .totales-form { color: var(--texto-sec); }
