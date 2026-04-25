@@ -758,19 +758,42 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(p, i) in notaImpresion.productos" :key="i">
-            <td>
-              {{ p.nombre }}
-              <span v-if="p.variante_label" class="np-variante"> — {{ p.variante_label }}</span>
-              <span v-if="p.variante_codigo" class="np-cod"> [{{ p.variante_codigo }}]</span>
-            </td>
-            <td class="np-td-num">{{ p.cantidad }}</td>
-            <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv)).toFixed(2) }}</td>
-            <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv) * p.cantidad).toFixed(2) }}</td>
-          </tr>
+          <template v-for="(p, i) in notaImpresion.productos" :key="i">
+            <tr>
+              <td>
+                {{ p.nombre }}
+                <span v-if="p.variante_label" class="np-variante"> — {{ p.variante_label }}</span>
+                <span v-if="p.variante_codigo" class="np-cod"> [{{ p.variante_codigo }}]</span>
+              </td>
+              <td class="np-td-num">{{ p.cantidad }}</td>
+              <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv)).toFixed(2) }}</td>
+              <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv) * p.cantidad).toFixed(2) }}</td>
+            </tr>
+            <tr v-if="npGarantia(p.id)" class="np-fila-garantia">
+              <td colspan="4">
+                <div class="np-garantia-bloque">
+                  <span v-if="npGarantia(p.id).serial"><strong>Serial:</strong> {{ npGarantia(p.id).serial }}</span>
+                  <span v-if="npGarantia(p.id).modelo">&nbsp;·&nbsp;<strong>Modelo:</strong> {{ npGarantia(p.id).modelo }}</span>
+                  <span v-if="npGarantia(p.id).meses_garantia">&nbsp;·&nbsp;<strong>Garantía:</strong> {{ npGarantia(p.id).meses_garantia }} meses</span>
+                  <div v-if="npGarantia(p.id).condiciones_snapshot" class="np-garantia-cond">{{ npGarantia(p.id).condiciones_snapshot }}</div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
       <div class="np-total">TOTAL: Bs {{ Number(notaImpresion.totalBs).toFixed(2) }}</div>
+
+      <div class="np-firmas" v-if="notaImpresion.garantias && notaImpresion.garantias.length">
+        <div class="np-firma-bloque">
+          <div class="np-firma-linea"></div>
+          <div class="np-firma-label">Firma del Cliente</div>
+        </div>
+        <div class="np-firma-bloque">
+          <div class="np-firma-linea"></div>
+          <div class="np-firma-label">Firma del Vendedor</div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -1421,12 +1444,27 @@ export default {
         this.modalCobro    = false
 
         const snapshotProductos = this.carrito.map(item => ({
+          id:              item.id,
           nombre:          item.nombre,
           variante_label:  item.variante_label  || null,
           variante_codigo: item.variante_codigo || null,
           cantidad:        Number(item.cantidad),
           precio_unitario: Number(item.precio_unitario),
         }))
+        // Enriquecer garantías con condiciones de la plantilla (disponibles en el carrito)
+        const garantiaMap = {}
+        for (const item of this.carrito) {
+          if (item.garantia) garantiaMap[item.id] = item.garantia
+        }
+        const snapshotGarantias = this.garantiasPendientes.map(g => ({
+          producto_id:          g.producto_id,
+          serial:               g.serial,
+          modelo:               g.modelo,
+          meses_garantia:       garantiaMap[g.producto_id]?.meses       || null,
+          condiciones_snapshot: garantiaMap[g.producto_id]?.condiciones || null,
+          nombre_plantilla:     garantiaMap[g.producto_id]?.nombre      || null,
+        }))
+
         const snapshotCliente = this.clienteSeleccionado
         const snapshotTasaBcv = this.tasaBcv
         const snapshotTotalBs = this.subtotalUSD * (this.tasaBcv || 1)
@@ -1461,12 +1499,13 @@ export default {
 
         } else if (accion === 'imprimir') {
           this.notaImpresion = {
-            ventaId: snapshotVentaId,
+            ventaId:   snapshotVentaId,
             clienteNombre: snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final',
-            fecha:   new Date().toLocaleDateString('es-VE'),
+            fecha:     new Date().toLocaleDateString('es-VE'),
             productos: snapshotProductos,
-            totalBs: Number(snapshotTotalBs),
-            tasaBcv: Number(snapshotTasaBcv),
+            garantias: snapshotGarantias,
+            totalBs:   Number(snapshotTotalBs),
+            tasaBcv:   Number(snapshotTasaBcv),
           }
           await this.$nextTick()
           window.print()
@@ -1633,6 +1672,10 @@ export default {
         const raw = localStorage.getItem('ultimos_vendidos')
         this.ultimosVendidos = raw ? JSON.parse(raw) : []
       } catch { this.ultimosVendidos = [] }
+    },
+    npGarantia(productoId) {
+      if (!this.notaImpresion?.garantias?.length) return null
+      return this.notaImpresion.garantias.find(g => g.producto_id === productoId) || null
     },
     guardarUltimosVendidos(carritoSnapshot) {
       const nuevos  = carritoSnapshot.map(i => ({ id: i.id, nombre: i.nombre }))
@@ -2118,6 +2161,15 @@ export default {
 .np-total    { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
 .np-variante { font-size: 0.82rem; color: #444; font-style: italic; }
 .np-cod      { font-size: 0.78rem; color: #666; font-weight: 700; }
+
+.np-fila-garantia td   { padding: 3px 8px 8px; border-bottom: 1px solid #ddd; background: #FAFAF5; }
+.np-garantia-bloque    { font-size: 0.78rem; color: #333; }
+.np-garantia-cond      { margin-top: 3px; white-space: pre-wrap; color: #555; font-size: 0.74rem; line-height: 1.45; }
+
+.np-firmas       { display: flex; gap: 3rem; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ccc; }
+.np-firma-bloque { flex: 1; text-align: center; }
+.np-firma-linea  { border-top: 1px solid #000; margin-bottom: 4px; margin-top: 2.5rem; }
+.np-firma-label  { font-size: 0.8rem; color: #444; }
 
 @media print {
   body > * { display: none !important; }
