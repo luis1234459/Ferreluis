@@ -60,8 +60,10 @@
                 <option value="costo_pct_aum">Aumentar costo %</option>
                 <option value="costo_pct_dis">Disminuir costo %</option>
                 <option value="margen_fijo">Fijar margen %</option>
+                <option value="precio_directo">Fijar precio USD directo</option>
               </select>
-              <input type="number" v-model.number="globalPrecioValor" min="0" step="0.1" placeholder="Valor %" />
+              <input type="number" v-model.number="globalPrecioValor" min="0" step="0.0001"
+                :placeholder="globalPrecioTipo === 'precio_directo' ? 'Precio USD' : 'Valor %'" />
               <button class="btn-aplicar" @click="aplicarGlobalPrecio">Aplicar a todos</button>
             </div>
           </div>
@@ -89,14 +91,15 @@
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td>
                     <input class="input-celda" type="number" v-model.number="p._costo"
-                      step="0.01" min="0" @input="p._modificado = true" />
+                      step="0.0001" min="0" @input="recalcularDesde(p, 'costo')" />
                   </td>
                   <td>
                     <input class="input-celda" type="number" v-model.number="p._margen"
-                      step="0.1" min="0" max="9999" @input="p._modificado = true" />
+                      step="0.1" min="0" max="9999" @input="recalcularDesde(p, 'margen')" />
                   </td>
-                  <td class="txt-verde">
-                    ${{ (p._costo * (1 + p._margen / 100)).toFixed(4) }}
+                  <td>
+                    <input class="input-celda input-precio-directo" type="number" v-model.number="p._precio"
+                      step="0.0001" min="0" @input="recalcularDesde(p, 'precio')" />
                   </td>
                   <td class="txt-muted">{{ p.stock }}</td>
                 </tr>
@@ -469,25 +472,50 @@ export default {
         const params = { filtro_tipo: this.filtroPrecioTipo }
         if (this.filtroPrecioId) params.filtro_id = this.filtroPrecioId
         const res = await axios.get('/ajustes/productos', { params, headers: this._headers() })
-        this.productosPrecio = res.data.map(p => ({
-          ...p,
-          _costo:      parseFloat((p.costo_usd || 0).toFixed(4)),
-          _margen:     parseFloat((p.margen * 100).toFixed(4)),
-          _modificado: false,
-        }))
+        this.productosPrecio = res.data.map(p => {
+          const costo  = parseFloat((p.costo_usd || 0).toFixed(4))
+          const margen = parseFloat((p.margen * 100).toFixed(4))
+          return {
+            ...p,
+            _costo:      costo,
+            _margen:     margen,
+            _precio:     parseFloat((costo * (1 + margen / 100)).toFixed(4)),
+            _modificado: false,
+          }
+        })
       } finally {
         this.cargandoPrecio = false
+      }
+    },
+    recalcularDesde(p, campo) {
+      p._modificado = true
+      if (campo === 'costo' || campo === 'margen') {
+        p._precio = parseFloat((p._costo * (1 + p._margen / 100)).toFixed(4))
+      } else if (campo === 'precio') {
+        const divisor = 1 + p._margen / 100
+        if (divisor > 0) {
+          p._costo = parseFloat((p._precio / divisor).toFixed(4))
+        }
       }
     },
     aplicarGlobalPrecio() {
       const v = this.globalPrecioValor || 0
       this.productosPrecio.forEach(p => {
         if (this.globalPrecioTipo === 'costo_pct_aum') {
-          p._costo = parseFloat((p._costo * (1 + v / 100)).toFixed(4))
+          p._costo  = parseFloat((p._costo * (1 + v / 100)).toFixed(4))
+          p._precio = parseFloat((p._costo * (1 + p._margen / 100)).toFixed(4))
         } else if (this.globalPrecioTipo === 'costo_pct_dis') {
-          p._costo = parseFloat((p._costo * (1 - v / 100)).toFixed(4))
+          p._costo  = parseFloat((p._costo * (1 - v / 100)).toFixed(4))
+          p._precio = parseFloat((p._costo * (1 + p._margen / 100)).toFixed(4))
         } else if (this.globalPrecioTipo === 'margen_fijo') {
           p._margen = v
+          p._precio = parseFloat((p._costo * (1 + p._margen / 100)).toFixed(4))
+        } else if (this.globalPrecioTipo === 'precio_directo') {
+          p._precio = parseFloat(v.toFixed(4))
+          const divisor = 1 + p._margen / 100
+          if (divisor > 0) {
+            p._costo = parseFloat((p._precio / divisor).toFixed(4))
+          }
         }
         p._modificado = true
       })
@@ -707,6 +735,8 @@ export default {
 
 /* ── Tabla editable ── */
 .input-celda  { width: 90px; padding: 0.25rem 0.4rem; border: 1px solid var(--borde); border-radius: 5px; font-size: 0.85rem; background: #fff; }
+.input-precio-directo { border-color: #16A34A55; background: #F0FDF4; color: #15803D; font-weight: 600; }
+.input-precio-directo:focus { border-color: #16A34A; outline: none; }
 .input-motivo { width: 140px; }
 .select-celda { padding: 0.25rem 0.4rem; border: 1px solid var(--borde); border-radius: 5px; font-size: 0.85rem; background: #fff; }
 .fila-modificada { background: #FFCC0022 !important; }
