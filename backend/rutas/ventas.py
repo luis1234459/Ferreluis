@@ -28,7 +28,7 @@ from sqlalchemy import func as sqlfunc
 from datetime import datetime, date
 from database import get_db
 from models import (
-    Producto, Venta, PagoVenta, DetalleVenta,
+    Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
@@ -160,14 +160,21 @@ def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
     detalles_out = []
     for d in detalles:
         prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        variante_label = None
+        if d.variante_id:
+            v = db.query(VarianteProducto).filter(VarianteProducto.id == d.variante_id).first()
+            if v:
+                variante_label = f"{v.clase} {v.color or ''}".strip()
         detalles_out.append({
-            "id":             d.id,
-            "producto_id":    d.producto_id,
-            "nombre":         prod.nombre if prod else f"Producto #{d.producto_id}",
-            "cantidad":       d.cantidad,
+            "id":              d.id,
+            "producto_id":     d.producto_id,
+            "variante_id":     d.variante_id,
+            "variante_label":  variante_label,
+            "nombre":          prod.nombre if prod else f"Producto #{d.producto_id}",
+            "cantidad":        d.cantidad,
             "tipo_precio_usado": d.tipo_precio_usado,
-            "precio_unitario":d.precio_unitario,
-            "subtotal":       d.subtotal,
+            "precio_unitario": d.precio_unitario,
+            "subtotal":        d.subtotal,
         })
 
     pagos_out = [
@@ -315,6 +322,9 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
 
     for item in detalles_in:
         producto_id = int(item.get("producto_id"))
+        variante_id = item.get("variante_id")
+        if variante_id is not None:
+            variante_id = int(variante_id)
         cantidad    = float(item.get("cantidad", 1) or 1)
 
         if cantidad <= 0:
@@ -325,8 +335,21 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404,
                                 detail=f"Producto no encontrado: ID {producto_id}")
 
-        # Precios base del sistema
-        p_base = _calcular_precio_base(producto)
+        variante = None
+        if variante_id:
+            variante = db.query(VarianteProducto).filter(
+                VarianteProducto.id == variante_id,
+                VarianteProducto.producto_id == producto_id,
+            ).first()
+            if not variante:
+                raise HTTPException(status_code=404,
+                                    detail=f"Variante no encontrada: ID {variante_id}")
+
+        # Precios base del sistema (usa precio_override_usd de la variante si existe)
+        if variante and variante.precio_override_usd:
+            p_base = float(variante.precio_override_usd)
+        else:
+            p_base = _calcular_precio_base(producto)
         p_ref  = _calcular_precio_referencial(p_base, factor)
 
         # Precio esperado según tier seleccionado
@@ -340,9 +363,11 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         if precio_unitario_usd < 0:
             raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
 
-        # Sin stock
-        if cantidad > float(producto.stock or 0):
-            motivos_autorizacion.append(f"Venta sin stock: {producto.nombre}")
+        # Sin stock — verificar contra variante o producto
+        stock_disponible = float(variante.stock or 0) if variante else float(producto.stock or 0)
+        if cantidad > stock_disponible:
+            label = f"{producto.nombre}" + (f" ({variante.clase} {variante.color or ''})".rstrip() if variante else "")
+            motivos_autorizacion.append(f"Venta sin stock: {label}")
 
         # Descuento manual (por debajo del precio del tier)
         if precio_unitario_usd < precio_esperado_usd - TOLERANCIA:
@@ -360,6 +385,8 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         detalles_procesados.append({
             "producto":               producto,
             "producto_id":            producto_id,
+            "variante":               variante,
+            "variante_id":            variante_id,
             "cantidad":               cantidad,
             "tipo_precio_usado":      tipo_precio,
             "precio_base_snap":       p_base,
@@ -490,6 +517,7 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         db.add(DetalleVenta(
             venta_id              = venta.id,
             producto_id           = d["producto_id"],
+            variante_id           = d["variante_id"],
             cantidad              = d["cantidad"],
             tipo_precio_usado     = d["tipo_precio_usado"],
             precio_base_snap      = d["precio_base_snap"],
@@ -497,7 +525,10 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             precio_unitario       = d["precio_unitario"],
             subtotal              = d["subtotal"],
         ))
-        d["producto"].stock = float(d["producto"].stock or 0) - d["cantidad"]
+        if d["variante"]:
+            d["variante"].stock = float(d["variante"].stock or 0) - d["cantidad"]
+        else:
+            d["producto"].stock = float(d["producto"].stock or 0) - d["cantidad"]
 
     db.commit()
 

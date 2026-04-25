@@ -5,7 +5,7 @@ from database import get_db
 from models import (
     DevolucionCliente, DetalleDevolucionCliente,
     DevolucionProveedor,
-    Producto, Cliente, Proveedor, RecepcionCompra,
+    Producto, VarianteProducto, Cliente, Proveedor, RecepcionCompra,
     MovimientoBancario, CuentaBancaria, MetodoPagoCuenta,
     Venta, VentaCliente, DetalleVenta,
 )
@@ -267,8 +267,15 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
     precio_unitario = round(float(detalle.precio_unitario or 0), 2)
     monto_devolucion = round(precio_unitario * cantidad_dev, 2)
 
-    # ── 1. Restaurar stock del producto original ─────────────────────────────
-    if prod_original:
+    # ── 1. Restaurar stock (variante o producto) ─────────────────────────────
+    variante_dev = None
+    if detalle.variante_id:
+        variante_dev = db.query(VarianteProducto).filter(
+            VarianteProducto.id == detalle.variante_id
+        ).first()
+    if variante_dev:
+        variante_dev.stock = float(variante_dev.stock or 0) + cantidad_dev
+    elif prod_original:
         prod_original.stock = int(float(prod_original.stock or 0)) + int(cantidad_dev)
 
     ahora = datetime.now()
@@ -359,6 +366,7 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
     db.add(DetalleDevolucionCliente(
         devolucion_id     = dev.id,
         producto_id       = detalle.producto_id,
+        variante_id       = detalle.variante_id,
         nombre_producto   = nombre_producto,
         cantidad          = cantidad_dev,
         precio_unitario   = precio_unitario,
@@ -413,19 +421,27 @@ def registrar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
     db.flush()
 
     for item in productos_data:
+        vid = item.get("variante_id")
         dd = DetalleDevolucionCliente(
             devolucion_id     = dev.id,
             producto_id       = item.get("producto_id"),
+            variante_id       = int(vid) if vid else None,
             nombre_producto   = item.get("nombre_producto", ""),
             cantidad          = float(item.get("cantidad", 0)),
             precio_unitario   = float(item.get("precio_unitario", 0)),
             vuelve_inventario = item.get("vuelve_inventario", True),
         )
         db.add(dd)
-        if item.get("vuelve_inventario", True) and item.get("producto_id"):
-            prod = db.query(Producto).filter(Producto.id == item["producto_id"]).first()
-            if prod:
-                prod.stock += int(float(item.get("cantidad", 0)))
+        if item.get("vuelve_inventario", True):
+            cant = float(item.get("cantidad", 0))
+            if vid:
+                var = db.query(VarianteProducto).filter(VarianteProducto.id == int(vid)).first()
+                if var:
+                    var.stock = float(var.stock or 0) + cant
+            elif item.get("producto_id"):
+                prod = db.query(Producto).filter(Producto.id == item["producto_id"]).first()
+                if prod:
+                    prod.stock += int(cant)
 
     if datos.get("tipo_resolucion") == "credito" and datos.get("cliente_id"):
         cliente = db.query(Cliente).filter(Cliente.id == datos["cliente_id"]).first()

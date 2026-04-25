@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import (
-    Venta, PagoVenta, DetalleVenta, Producto, CierreCaja, LABELS_METODO,
+    Venta, PagoVenta, DetalleVenta, Producto, VarianteProducto, CierreCaja, LABELS_METODO,
     Cliente, VentaCliente, NivelFidelidad,
     Departamento, Proveedor, OrdenCompra, DetalleOrdenCompra, RecepcionCompra,
     VendedorPerfil, ComisionVenta, Usuario,
@@ -318,6 +318,7 @@ def top_productos(
 ):
     q = db.query(
         DetalleVenta.producto_id,
+        DetalleVenta.variante_id,
         func.sum(DetalleVenta.cantidad).label("total_cantidad"),
         func.sum(DetalleVenta.subtotal).label("total_monto"),
     )
@@ -325,20 +326,28 @@ def top_productos(
         q = q.join(Venta, Venta.id == DetalleVenta.venta_id)
         if desde: q = q.filter(Venta.fecha >= desde)
         if hasta: q = q.filter(Venta.fecha <= hasta)
-    q = q.group_by(DetalleVenta.producto_id).order_by(func.sum(DetalleVenta.cantidad).desc()).limit(n)
+    q = (q.group_by(DetalleVenta.producto_id, DetalleVenta.variante_id)
+          .order_by(func.sum(DetalleVenta.cantidad).desc()).limit(n))
     rows = q.all()
 
     departamentos = {d.id: d for d in db.query(Departamento).all()}
     proveedores   = {p.id: p for p in db.query(Proveedor).all()}
+    variantes_map = {v.id: v for v in db.query(VarianteProducto).all()}
 
     resultado = []
     for r in rows:
         p    = db.query(Producto).filter(Producto.id == r.producto_id).first()
         dept = departamentos.get(p.departamento_id) if p else None
         prov = proveedores.get(p.proveedor_id)     if p else None
+        nombre = p.nombre if p else f"ID {r.producto_id}"
+        if r.variante_id:
+            v = variantes_map.get(r.variante_id)
+            if v:
+                nombre += f" ({v.clase} {v.color or ''})".rstrip()
         resultado.append({
             "producto_id":    r.producto_id,
-            "nombre":         p.nombre if p else f"ID {r.producto_id}",
+            "variante_id":    r.variante_id,
+            "nombre":         nombre,
             "departamento":   dept.nombre if dept else "—",
             "proveedor":      prov.nombre if prov else "—",
             "total_cantidad": int(r.total_cantidad or 0),

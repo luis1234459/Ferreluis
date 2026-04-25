@@ -143,6 +143,16 @@ def inicializar_datos():
              "ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS numero_factura TEXT"],
         )
 
+        # ── variante_id en tablas de detalle ─────────────────────────────────
+        migrar(
+            ["ALTER TABLE detalle_ventas ADD COLUMN variante_id INTEGER",
+             "ALTER TABLE detalle_presupuesto ADD COLUMN variante_id INTEGER",
+             "ALTER TABLE detalle_devolucion_cliente ADD COLUMN variante_id INTEGER"],
+            ["ALTER TABLE detalle_ventas ADD COLUMN IF NOT EXISTS variante_id INTEGER",
+             "ALTER TABLE detalle_presupuesto ADD COLUMN IF NOT EXISTS variante_id INTEGER",
+             "ALTER TABLE detalle_devolucion_cliente ADD COLUMN IF NOT EXISTS variante_id INTEGER"],
+        )
+
         # ── clientes: campos crédito y saldo a favor ─────────────────────────
         migrar(
             ["ALTER TABLE clientes ADD COLUMN tiene_credito BOOLEAN DEFAULT 0",

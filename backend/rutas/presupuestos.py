@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     Presupuesto, DetallePresupuesto,
-    Producto, TasaCambio,
+    Producto, VarianteProducto, TasaCambio,
     Venta, DetalleVenta, VentaCliente,
 )
 from datetime import datetime, timedelta
@@ -47,6 +47,7 @@ def _serializar(p: Presupuesto, db: Session) -> dict:
             {
                 "id":              d.id,
                 "producto_id":     d.producto_id,
+                "variante_id":     d.variante_id,
                 "nombre_producto": d.nombre_producto,
                 "cantidad":        d.cantidad,
                 "precio_unitario": d.precio_unitario,
@@ -139,9 +140,11 @@ def crear_presupuesto(datos: dict, db: Session = Depends(get_db)):
     for item in productos_data:
         cant  = float(item.get("cantidad", 0))
         precio = float(item.get("precio_unitario", 0))
+        vid   = item.get("variante_id")
         db.add(DetallePresupuesto(
             presupuesto_id  = p.id,
             producto_id     = item.get("producto_id"),
+            variante_id     = int(vid) if vid else None,
             nombre_producto = item.get("nombre_producto", ""),
             cantidad        = cant,
             precio_unitario = precio,
@@ -222,6 +225,7 @@ def convertir_a_venta(
         db.add(DetalleVenta(
             venta_id               = venta.id,
             producto_id            = d.producto_id,
+            variante_id            = d.variante_id,
             cantidad               = int(d.cantidad),
             tipo_precio_usado      = "base",
             precio_base_snap       = d.precio_unitario,
@@ -229,7 +233,11 @@ def convertir_a_venta(
             precio_unitario        = d.precio_unitario,
             subtotal               = d.subtotal,
         ))
-        if d.producto_id:
+        if d.variante_id:
+            var = db.query(VarianteProducto).filter(VarianteProducto.id == d.variante_id).first()
+            if var:
+                var.stock = max(0, float(var.stock or 0) - int(d.cantidad))
+        elif d.producto_id:
             prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
             if prod:
                 prod.stock = max(0, prod.stock - int(d.cantidad))

@@ -174,6 +174,7 @@ class DetalleVenta(Base):
     id                    = Column(Integer, primary_key=True, index=True)
     venta_id              = Column(Integer)
     producto_id           = Column(Integer)
+    variante_id           = Column(Integer, nullable=True)
     cantidad              = Column(Integer)
     tipo_precio_usado     = Column(String)   # "base" | "referencial"
     precio_base_snap      = Column(Float)    # costo_usd*(1+margen) al momento
@@ -603,6 +604,7 @@ class DetallePresupuesto(Base):
     id              = Column(Integer, primary_key=True, index=True)
     presupuesto_id  = Column(Integer, index=True)
     producto_id     = Column(Integer, nullable=True)
+    variante_id     = Column(Integer, nullable=True)
     nombre_producto = Column(String)
     cantidad        = Column(Float)
     precio_unitario = Column(Float)
@@ -633,6 +635,7 @@ class DetalleDevolucionCliente(Base):
     id                  = Column(Integer, primary_key=True, index=True)
     devolucion_id       = Column(Integer, index=True)
     producto_id         = Column(Integer)
+    variante_id         = Column(Integer, nullable=True)
     nombre_producto     = Column(String)
     cantidad            = Column(Float)
     precio_unitario     = Column(Float)

@@ -1316,6 +1316,7 @@ export default {
           cliente_id:         this.clienteSeleccionado ? this.clienteSeleccionado.id : null,
           detalles: this.carrito.map(item => ({
             producto_id:     Number(item.id),
+            variante_id:     item.variante_id ? Number(item.variante_id) : null,
             cantidad:        Number(item.cantidad),
             precio_unitario: Number(item.precio_unitario),
           })),
@@ -1466,6 +1467,7 @@ export default {
           observacion:      obs,
           productos: this.carrito.map(item => ({
             producto_id:     Number(item.id),
+            variante_id:     item.variante_id ? Number(item.variante_id) : null,
             nombre_producto: item.nombre,
             cantidad:        Number(item.cantidad),
             precio_unitario: Number(item.precio_unitario),
