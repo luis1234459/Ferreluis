@@ -191,10 +191,13 @@
                   </span>
                   <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo)" class="pi-vcods">
                     <span
-                      v-for="v in (p.variantes_resumen || []).filter(v => v.activo)"
+                      v-for="v in (p.variantes_resumen || []).filter(v => v.activo).slice(0, 5)"
                       :key="v.id"
                       class="pi-vcod"
-                    ><template v-if="v.codigo">{{ v.codigo }} · </template>{{ v.color && p.esquema_variante !== 'clase' ? v.clase + '/' + v.color : v.clase }}</span>
+                    >{{ v.color && p.esquema_variante !== 'clase' ? v.clase + '/' + v.color : v.clase }}</span>
+                    <span v-if="(p.variantes_resumen || []).filter(v => v.activo).length > 5" class="pi-vcod-mas">
+                      +{{ (p.variantes_resumen || []).filter(v => v.activo).length - 5 }}
+                    </span>
                   </div>
                 </div>
                 <span class="pi-precios">
@@ -1742,6 +1745,13 @@ export default {
 .prod-item-resaltado .pi-nombre-texto { color: #1A1A1A; }
 .prod-item:hover .pi-vcod,
 .prod-item-resaltado .pi-vcod { background: #7c3aed; color: #fff; }
+.pi-vcod-mas {
+  font-size: 0.65rem; font-weight: 700; color: #6B7280;
+  background: #F3F4F6; border: 1px solid #D1D5DB;
+  padding: 0.05rem 0.3rem; border-radius: 3px; white-space: nowrap;
+}
+.prod-item:hover .pi-vcod-mas,
+.prod-item-resaltado .pi-vcod-mas { background: #D1D5DB; color: #1A1A1A; }
 .pi-precios {
   display: flex;
   align-items: center;
