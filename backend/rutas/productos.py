@@ -63,6 +63,7 @@ class VarianteSchema(BaseModel):
     stock:               int            = 0
     precio_override_usd: Optional[float]= None
     activo:              bool           = True
+    codigo:              Optional[str]  = None
 
     class Config:
         from_attributes = True
@@ -113,7 +114,7 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: li
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
     d["variantes_resumen"] = [
-        {"id": v.id, "clase": v.clase, "color": v.color, "stock": v.stock, "activo": v.activo}
+        {"id": v.id, "clase": v.clase, "color": v.color, "stock": v.stock, "activo": v.activo, "codigo": v.codigo}
         for v in vs
     ]
     return d
@@ -818,6 +819,14 @@ def crear_variante(
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    # Si es la primera variante del producto, transferir el control de stock a variantes
+    es_primera = not db.query(VarianteProducto).filter(
+        VarianteProducto.producto_id == producto_id
+    ).first()
+    if es_primera and float(p.stock or 0) > 0:
+        p.stock = 0  # el producto padre ya no tiene stock; las variantes son el inventario real
+
     nueva = VarianteProducto(producto_id=producto_id, **datos.dict())
     db.add(nueva)
     db.commit()
