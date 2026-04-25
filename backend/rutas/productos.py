@@ -842,10 +842,28 @@ def crear_variante(
         VarianteProducto.producto_id == producto_id
     ).first()
     if es_primera:
-        p.stock  = 0     # stock vive en las variantes
-        p.codigo = None  # código vive en las variantes; el padre era solo un "generador"
+        p.stock  = 0
+        p.codigo = None
 
-    nueva = VarianteProducto(producto_id=producto_id, **datos.dict())
+    datos_dict = datos.model_dump()
+
+    # Auto-generar código si no se proporcionó
+    if not datos_dict.get("codigo"):
+        prefijo = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X') + '-V'
+        existentes = db.query(VarianteProducto.codigo).filter(
+            VarianteProducto.producto_id == producto_id,
+            VarianteProducto.codigo.like(f"{prefijo}%"),
+        ).all()
+        numeros = []
+        for (cod,) in existentes:
+            if cod:
+                m = re.search(r'(\d+)$', cod)
+                if m:
+                    numeros.append(int(m.group(1)))
+        siguiente = max(numeros) + 1 if numeros else 1
+        datos_dict["codigo"] = f"{prefijo}{siguiente:02d}"
+
+    nueva = VarianteProducto(producto_id=producto_id, **datos_dict)
     db.add(nueva)
     db.commit()
     db.refresh(nueva)

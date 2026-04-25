@@ -189,10 +189,16 @@
                   <span v-if="p.codigo" class="cod-tag-v">{{ p.codigo }}</span>
                 </span>
                 <span class="pi-precios">
-                  <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
-                  <span class="pi-ref">${{ precioRef(p).toFixed(2) }}</span>
-                  <span class="pi-stock">{{ p.stock }}</span>
-                  <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
+                  <template v-if="!p.tiene_variantes">
+                    <span class="pi-bs">Bs {{ precioBs(p).toFixed(2) }}</span>
+                    <span class="pi-ref">${{ precioRef(p).toFixed(2) }}</span>
+                    <span class="pi-stock">{{ p.stock }}</span>
+                    <span class="pi-base">Base: ${{ precioBase(p).toFixed(2) }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="pi-variantes-count">{{ (p.variantes_resumen || []).filter(v => v.activo).length }} var.</span>
+                    <span class="pi-stock">{{ (p.variantes_resumen || []).filter(v => v.activo).reduce((s, v) => s + (v.stock || 0), 0) }} uds</span>
+                  </template>
                   <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
                 </span>
               </div>
@@ -215,7 +221,8 @@
                   <span class="item-nombre">
                     {{ item.nombre }}
                     <span v-if="item.variante_label" class="variante-tag">{{ item.variante_label }}</span>
-                    <span v-if="item.codigo" class="cod-tag-v">{{ item.codigo }}</span>
+                    <span v-if="item.variante_codigo" class="cod-tag-v">{{ item.variante_codigo }}</span>
+                    <span v-else-if="item.codigo && !item.variante_id" class="cod-tag-v">{{ item.codigo }}</span>
                   </span>
                   <span class="item-ref">Ref: ${{ Number(item.precio_unitario).toFixed(2) }}</span>
                 </div>
@@ -684,15 +691,13 @@
               <div class="variante-info">
                 <span class="variante-clase">{{ v.clase }}</span>
                 <span v-if="v.color" class="variante-color">{{ v.color }}</span>
+                <span v-if="v.codigo" class="variante-cod-tag">{{ v.codigo }}</span>
               </div>
               <div class="variante-right">
                 <span class="variante-stock">Stock: {{ v.stock }}</span>
-                <span class="variante-precio" v-if="v.precio_override_usd">
-                  ${{ precioParaTier({ costo_usd: v.precio_override_usd, margen: productoVariantes?.margen || 0 }).toFixed(2) }}
-                </span>
-                <span class="variante-precio" v-else>
-                  ${{ precioParaTier(productoVariantes).toFixed(2) }}
-                </span>
+                <span class="variante-bs">Bs {{ variantePrecioBs(v).toFixed(2) }}</span>
+                <span class="variante-ref">${{ variantePrecioRef(v).toFixed(2) }}</span>
+                <span class="variante-base" v-if="tipoPrecio === 'base'">Base: ${{ variantePrecioBase(v).toFixed(2) }}</span>
               </div>
             </button>
           </div>
@@ -722,7 +727,11 @@
         </thead>
         <tbody>
           <tr v-for="(p, i) in notaImpresion.productos" :key="i">
-            <td>{{ p.nombre }}</td>
+            <td>
+              {{ p.nombre }}
+              <span v-if="p.variante_label" class="np-variante"> — {{ p.variante_label }}</span>
+              <span v-if="p.variante_codigo" class="np-cod"> [{{ p.variante_codigo }}]</span>
+            </td>
             <td class="np-td-num">{{ p.cantidad }}</td>
             <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv)).toFixed(2) }}</td>
             <td class="np-td-num">{{ (Number(p.precio_unitario) * Number(notaImpresion.tasaBcv) * p.cantidad).toFixed(2) }}</td>
@@ -1033,6 +1042,13 @@ export default {
     precioBase(p)     { return Number(p.costo_usd || 0) * (1 + Number(p.margen || 0)) },
     precioRef(p)      { return this.precioBase(p) * this.factor },
     precioBs(p)       { return this.precioBase(p) * (this.tasaBinance || 0) },
+
+    variantePrecioBase(v) {
+      const costo = v.precio_override_usd ?? (this.productoVariantes?.costo_usd || 0)
+      return Number(costo) * (1 + Number(this.productoVariantes?.margen || 0))
+    },
+    variantePrecioRef(v)  { return this.variantePrecioBase(v) * this.factor },
+    variantePrecioBs(v)   { return this.variantePrecioBase(v) * (this.tasaBinance || 0) },
     precioParaTier(p) { return this.tipoPrecio === 'base' ? this.precioBase(p) : this.precioRef(p) },
 
     cambiarTipoPrecio(nuevo) {
@@ -1075,6 +1091,7 @@ export default {
         _key:            key,
         variante_id:     variante?.id     || null,
         variante_label:  variante ? `${variante.clase}${variante.color ? ' · ' + variante.color : ''}` : null,
+        variante_codigo: variante?.codigo || null,
         stock:           variante?.stock  ?? p.stock,
         costo_usd:       costoBase,
         cantidad:        1,
@@ -1341,7 +1358,11 @@ export default {
         this.modalCobro    = false
 
         const snapshotProductos = this.carrito.map(item => ({
-          nombre: item.nombre, cantidad: Number(item.cantidad), precio_unitario: Number(item.precio_unitario),
+          nombre:          item.nombre,
+          variante_label:  item.variante_label  || null,
+          variante_codigo: item.variante_codigo || null,
+          cantidad:        Number(item.cantidad),
+          precio_unitario: Number(item.precio_unitario),
         }))
         const snapshotCliente = this.clienteSeleccionado
         const snapshotTasaBcv = this.tasaBcv
@@ -1995,7 +2016,9 @@ export default {
 .np-tabla td  { padding: 5px 8px; border-bottom: 1px solid #ddd; }
 .np-td-num    { text-align: right; }
 .np-tabla tbody tr:nth-child(even) { background: #F5F5F0; }
-.np-total { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
+.np-total    { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
+.np-variante { font-size: 0.82rem; color: #444; font-style: italic; }
+.np-cod      { font-size: 0.78rem; color: #666; font-weight: 700; }
 
 @media print {
   body > * { display: none !important; }
@@ -2089,6 +2112,15 @@ export default {
   font-size: 0.8rem;
   color: var(--texto-sec);
 }
+.variante-cod-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #5B21B6;
+  background: #EDE9FE;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  margin-top: 0.1rem;
+}
 .variante-right {
   display: flex;
   flex-direction: column;
@@ -2102,11 +2134,10 @@ export default {
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
 }
-.variante-precio {
-  color: #16A34A;
-  font-weight: 700;
-  font-size: 0.9rem;
-}
+.variante-bs  { color: #B08800; font-weight: 700; font-size: 0.82rem; }
+.variante-ref { color: #16A34A; font-weight: 700; font-size: 0.9rem; }
+.variante-base { color: #7b2cbf; font-size: 0.75rem; font-weight: 600; }
+.pi-variantes-count { color: #0369A1; font-size: 0.78rem; font-weight: 700; background: #E0F2FE; padding: 0.1rem 0.4rem; border-radius: 4px; }
 .variante-tag {
   font-size: 0.72rem;
   font-weight: 700;

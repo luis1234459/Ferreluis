@@ -305,7 +305,22 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
         if producto_nuevo_id:
             prod_nuevo = db.query(Producto).filter(Producto.id == producto_nuevo_id).first()
             if prod_nuevo:
-                prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - cantidad_nueva)
+                var_nueva_id = datos.get("producto_nuevo_variante_id")
+                var_nueva = (
+                    db.query(VarianteProducto).filter(
+                        VarianteProducto.id == int(var_nueva_id),
+                        VarianteProducto.producto_id == prod_nuevo.id,
+                    ).first()
+                    if var_nueva_id else None
+                )
+                if var_nueva:
+                    var_nueva.stock = max(0, float(var_nueva.stock or 0) - cantidad_nueva)
+                else:
+                    tiene_vars = db.query(VarianteProducto).filter(
+                        VarianteProducto.producto_id == prod_nuevo.id
+                    ).first() is not None
+                    if not tiene_vars:
+                        prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - cantidad_nueva)
 
         # Recalcular diferencia en el backend
         precio_nuevo          = float(getattr(prod_nuevo, 'precio_referencial_usd', None) or getattr(prod_nuevo, 'precio_base_usd', None) or 0) if prod_nuevo else 0
@@ -526,7 +541,22 @@ def registrar_devolucion_proveedor(datos: dict, db: Session = Depends(get_db)):
     if datos.get("producto_id"):
         prod = db.query(Producto).filter(Producto.id == datos["producto_id"]).first()
         if prod:
-            prod.stock = max(0, prod.stock - int(cantidad))
+            vid = datos.get("variante_id")
+            variante = (
+                db.query(VarianteProducto).filter(
+                    VarianteProducto.id == int(vid),
+                    VarianteProducto.producto_id == prod.id,
+                ).first()
+                if vid else None
+            )
+            if variante:
+                variante.stock = max(0, float(variante.stock or 0) - cantidad)
+            else:
+                tiene_vars = db.query(VarianteProducto).filter(
+                    VarianteProducto.producto_id == prod.id
+                ).first() is not None
+                if not tiene_vars:
+                    prod.stock = max(0, prod.stock - int(cantidad))
 
     if datos.get("tipo_resolucion") == "credito" and datos.get("proveedor_id"):
         prov = db.query(Proveedor).filter(Proveedor.id == datos["proveedor_id"]).first()

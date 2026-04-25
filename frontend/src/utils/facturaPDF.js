@@ -76,19 +76,28 @@ export function exportarFacturaPDF(data) {
 
   autoTable(doc, {
     startY: y,
-    head: [['Producto', 'Cantidad', 'Precio unit.', 'Subtotal']],
-    body: detalles.map(d => [
-      d.nombre,
-      d.cantidad,
-      `${sym} ${Number(d.precio_unitario).toFixed(2)}`,
-      `${sym} ${Number(d.subtotal).toFixed(2)}`,
-    ]),
+    head: [['Producto', 'Cant.', 'Precio unit.', 'Subtotal']],
+    body: detalles.map(d => {
+      let nombre = d.nombre
+      if (d.variante_label) {
+        nombre += `\n  ${d.variante_label}`
+        if (d.variante_codigo) nombre += `  [${d.variante_codigo}]`
+      } else if (d.codigo) {
+        nombre += `  [${d.codigo}]`
+      }
+      return [
+        nombre,
+        d.cantidad,
+        `${sym} ${Number(d.precio_unitario).toFixed(2)}`,
+        `${sym} ${Number(d.subtotal).toFixed(2)}`,
+      ]
+    }),
     styles: { fontSize: 9, cellPadding: 3, textColor: NEGRO },
     headStyles: { fillColor: AZUL, textColor: BLANCO, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 245, 250] },
     columnStyles: {
       0: { cellWidth: 'auto' },
-      1: { halign: 'center', cellWidth: 22 },
+      1: { halign: 'center', cellWidth: 18 },
       2: { halign: 'right',  cellWidth: 32 },
       3: { halign: 'right',  cellWidth: 32 },
     },

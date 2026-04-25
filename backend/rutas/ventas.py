@@ -160,21 +160,24 @@ def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
     detalles_out = []
     for d in detalles:
         prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
-        variante_label = None
+        variante_label  = None
+        variante_codigo = None
         if d.variante_id:
             v = db.query(VarianteProducto).filter(VarianteProducto.id == d.variante_id).first()
             if v:
-                variante_label = f"{v.clase} {v.color or ''}".strip()
+                variante_label  = f"{v.clase} {v.color or ''}".strip()
+                variante_codigo = v.codigo
         detalles_out.append({
-            "id":              d.id,
-            "producto_id":     d.producto_id,
-            "variante_id":     d.variante_id,
-            "variante_label":  variante_label,
-            "nombre":          prod.nombre if prod else f"Producto #{d.producto_id}",
-            "cantidad":        d.cantidad,
-            "tipo_precio_usado": d.tipo_precio_usado,
-            "precio_unitario": d.precio_unitario,
-            "subtotal":        d.subtotal,
+            "id":               d.id,
+            "producto_id":      d.producto_id,
+            "variante_id":      d.variante_id,
+            "variante_label":   variante_label,
+            "variante_codigo":  variante_codigo,
+            "nombre":           prod.nombre if prod else f"Producto #{d.producto_id}",
+            "cantidad":         d.cantidad,
+            "tipo_precio_usado":d.tipo_precio_usado,
+            "precio_unitario":  d.precio_unitario,
+            "subtotal":         d.subtotal,
         })
 
     pagos_out = [
