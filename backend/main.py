@@ -4,7 +4,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves
+from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias
 from database import engine, SessionLocal
 from database import Base
 from config import ENVIRONMENT
@@ -54,6 +54,7 @@ app.include_router(presupuestos.router)
 app.include_router(devoluciones.router)
 app.include_router(ubicaciones.router)
 app.include_router(claves.router)
+app.include_router(garantias.router)
 
 
 @app.on_event("startup")
@@ -173,6 +174,50 @@ def inicializar_datos():
              "ALTER TABLE variantes_producto ADD COLUMN margen FLOAT"],
             ["ALTER TABLE variantes_producto ADD COLUMN IF NOT EXISTS costo_usd FLOAT",
              "ALTER TABLE variantes_producto ADD COLUMN IF NOT EXISTS margen FLOAT"],
+        )
+
+        # ── garantías ────────────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN requiere_serial BOOLEAN DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN plantilla_garantia_id INTEGER",
+             """CREATE TABLE IF NOT EXISTS plantillas_garantia (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 nombre TEXT NOT NULL,
+                 meses INTEGER DEFAULT 0,
+                 condiciones TEXT,
+                 activa BOOLEAN DEFAULT 1
+             )""",
+             """CREATE TABLE IF NOT EXISTS garantias_venta (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 venta_id INTEGER NOT NULL,
+                 producto_id INTEGER NOT NULL,
+                 variante_id INTEGER,
+                 serial TEXT,
+                 modelo TEXT,
+                 meses_garantia INTEGER,
+                 condiciones_snapshot TEXT,
+                 fecha DATETIME
+             )"""],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS requiere_serial BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS plantilla_garantia_id INTEGER",
+             """CREATE TABLE IF NOT EXISTS plantillas_garantia (
+                 id SERIAL PRIMARY KEY,
+                 nombre TEXT NOT NULL,
+                 meses INTEGER DEFAULT 0,
+                 condiciones TEXT,
+                 activa BOOLEAN DEFAULT TRUE
+             )""",
+             """CREATE TABLE IF NOT EXISTS garantias_venta (
+                 id SERIAL PRIMARY KEY,
+                 venta_id INTEGER NOT NULL,
+                 producto_id INTEGER NOT NULL,
+                 variante_id INTEGER,
+                 serial TEXT,
+                 modelo TEXT,
+                 meses_garantia INTEGER,
+                 condiciones_snapshot TEXT,
+                 fecha TIMESTAMP
+             )"""],
         )
 
         # ── clientes: campos crédito y saldo a favor ─────────────────────────

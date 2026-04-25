@@ -384,6 +384,27 @@
               </div>
             </div>
 
+            <!-- Garantía -->
+            <div class="opciones-especiales" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+              <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Garantía</p>
+              <label class="check-opt">
+                <input type="checkbox" v-model="form.requiere_serial" />
+                <span class="check-label">
+                  <strong>Requiere número de serie</strong>
+                  <small>Se solicitará al vendedor antes de cerrar la venta</small>
+                </span>
+              </label>
+              <div class="field" style="margin-top:0.6rem">
+                <label>Plantilla de garantía</label>
+                <select v-model="form.plantilla_garantia_id">
+                  <option :value="null">Sin garantía</option>
+                  <option v-for="pl in plantillasGarantia" :key="pl.id" :value="pl.id">
+                    {{ pl.nombre }} ({{ pl.meses }} meses)
+                  </option>
+                </select>
+              </div>
+            </div>
+
             <!-- Preview precios -->
             <div class="preview-precios" v-if="form.costo_usd > 0 && form.margen > 0">
               <p class="preview-titulo">Vista previa de precios</p>
@@ -887,10 +908,11 @@ export default {
   name: 'Inventario',
   data() {
     return {
-      usuario:       JSON.parse(localStorage.getItem('usuario') || '{}'),
-      productos:     [],
-      departamentos: [],
-      proveedores:   [],
+      usuario:           JSON.parse(localStorage.getItem('usuario') || '{}'),
+      productos:         [],
+      departamentos:     [],
+      proveedores:       [],
+      plantillasGarantia:[],
       tasaBcv:       null,
       tasaBinance:   null,
       factor:        1,
@@ -1086,11 +1108,18 @@ export default {
       this.cargarDepartamentos(),
       this.cargarProveedores(),
       this.cargarCategorias(),
+      this.cargarPlantillasGarantia(),
     ])
   },
 
   methods: {
     // ── Carga inicial ─────────────────────────────────────────────────────────
+    async cargarPlantillasGarantia() {
+      try {
+        const r = await axios.get('/garantias/plantillas?solo_activas=true')
+        this.plantillasGarantia = r.data
+      } catch {}
+    },
     async cargarTasa() {
       const r = await axios.get('/tasa/')
       this.tasaBcv     = r.data.tasa
@@ -1166,6 +1195,7 @@ export default {
         stock: 0, descripcion: '', foto_url: '',
         es_producto_clave: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
+        requiere_serial: false, plantilla_garantia_id: null,
       }
       this.mostrarForm = true
     },
@@ -1179,6 +1209,8 @@ export default {
         es_producto_clave:       p.es_producto_clave       ?? false,
         es_producto_compuesto:   p.es_producto_compuesto   ?? false,
         descuento_compuesto_pct: p.descuento_compuesto_pct ?? 0,
+        requiere_serial:         p.requiere_serial         ?? false,
+        plantilla_garantia_id:   p.plantilla_garantia_id   ?? null,
       }
       this.editando    = true
       this.error       = ''
@@ -1201,7 +1233,9 @@ export default {
           es_producto_clave:       Boolean(this.form.es_producto_clave),
           es_producto_compuesto:   Boolean(this.form.es_producto_compuesto),
           descuento_compuesto_pct: Number(this.form.descuento_compuesto_pct || 0),
-          codigo:                  this.form.codigo          || null,
+          codigo:                  this.form.codigo               || null,
+          requiere_serial:         Boolean(this.form.requiere_serial),
+          plantilla_garantia_id:   this.form.plantilla_garantia_id || null,
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)

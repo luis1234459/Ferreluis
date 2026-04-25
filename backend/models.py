@@ -72,6 +72,8 @@ class Producto(Base):
     codigo                  = Column(String,  nullable=True, unique=True, index=True)
     activo                  = Column(Boolean, default=True)
     esquema_variante        = Column(String,  nullable=True)   # 'clase' | 'clase_color'
+    requiere_serial         = Column(Boolean, default=False)
+    plantilla_garantia_id   = Column(Integer, nullable=True)   # FK → PlantillaGarantia
 
     # Precios calculados (NO se guardan, se computan al vuelo):
     #   precio_base_usd        = costo_usd * (1 + margen)
@@ -715,3 +717,32 @@ class AliasProveedor(Base):
     alias_normalizado = Column(String,   nullable=False, index=True)
     fecha_creacion    = Column(DateTime, default=datetime.now)
     creado_por        = Column(String,   nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Módulo de Garantías
+# ---------------------------------------------------------------------------
+
+class PlantillaGarantia(Base):
+    __tablename__ = "plantillas_garantia"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    nombre      = Column(String,  nullable=False)          # "Garantía Bombas Sumergibles"
+    meses       = Column(Integer, default=0)               # duración en meses
+    condiciones = Column(String,  nullable=True)           # texto completo de condiciones
+    activa      = Column(Boolean, default=True)
+
+
+class GarantiaVenta(Base):
+    """Registro de garantía por ítem vendido. El texto se copia (snapshot) al momento de la venta."""
+    __tablename__ = "garantias_venta"
+
+    id                   = Column(Integer,  primary_key=True, index=True)
+    venta_id             = Column(Integer,  index=True, nullable=False)
+    producto_id          = Column(Integer,  index=True, nullable=False)
+    variante_id          = Column(Integer,  nullable=True)
+    serial               = Column(String,   nullable=True)
+    modelo               = Column(String,   nullable=True)
+    meses_garantia       = Column(Integer,  nullable=True)   # copiado de la plantilla
+    condiciones_snapshot = Column(String,   nullable=True)   # texto copiado al momento de venta
+    fecha                = Column(DateTime, default=datetime.now)

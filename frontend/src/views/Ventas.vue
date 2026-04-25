@@ -729,6 +729,14 @@
       </div>
     </div>
 
+    <!-- Modal garantías -->
+    <ModalGarantia
+      v-if="modalGarantia"
+      :items="itemsGarantia"
+      @confirmar="onGarantiaConfirmada"
+      @cancelar="modalGarantia = false"
+    />
+
     <!-- Nota de entrega para impresión -->
     <div id="nota-print" v-if="notaImpresion">
       <div class="np-encabezado">
@@ -770,6 +778,7 @@
 
 <script>
 import AppSidebar from '../components/AppSidebar.vue'
+import ModalGarantia from '../components/ModalGarantia.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
 
@@ -788,7 +797,7 @@ const LABELS = {
 const TOLERANCIA = 0.01
 
 export default {
-  components: { AppSidebar },
+  components: { AppSidebar, ModalGarantia },
   name: 'Ventas',
   data() {
     return {
@@ -884,6 +893,11 @@ export default {
       productoVariantes: null,
       variantes:         [],
       cargandoVariantes: false,
+
+      // Garantías
+      modalGarantia:       false,
+      itemsGarantia:       [],
+      garantiasPendientes: [],  // se llena al confirmar el modal
     }
   },
   computed: {
@@ -1345,12 +1359,36 @@ export default {
       this.modoCobro = this.monedaVenta === 'Bs' ? 'Bs' : 'USD'
       this.modalCobro = true
     },
+
+    onGarantiaConfirmada(datos) {
+      this.garantiasPendientes = datos
+      this.modalGarantia = false
+      this.cobrar(this._accionCobro || 'solo')
+    },
     async cobrar(accion = 'solo') {
       this.error = ''
       if (!this.pagoCompleto)       { this.error = 'El cobro no cubre el total'; return }
       if (this.requiereAutorizacion && !this.autorizacionClave)
                                     { this.error = 'Ingresa la clave de autorización'; return }
       if (!this.tasaBcv)            { this.error = 'No hay tasa definida. Ve a Tasa BCV.'; return }
+
+      // ── Pre-check garantías ─────────────────────────────────────────────────
+      const itemsConGarantia = this.carrito.filter(
+        item => item.requiere_serial || item.garantia
+      )
+      if (itemsConGarantia.length > 0 && this.garantiasPendientes.length === 0) {
+        this.itemsGarantia = itemsConGarantia.map(item => ({
+          id:            item.id,
+          nombre:        item.nombre,
+          variante_id:   item.variante_id || null,
+          variante_label:item.variante_label || null,
+          requiere_serial: !!item.requiere_serial,
+          garantia:      item.garantia || null,
+        }))
+        this._accionCobro = accion
+        this.modalGarantia = true
+        return
+      }
 
       this.cargando = true
       try {
@@ -1374,6 +1412,7 @@ export default {
             referencia:        p.referencia || '',
             cuenta_destino_id: p.cuenta_destino_id || null,
           })),
+          garantias: this.garantiasPendientes,
         }
 
         const res = await axios.post('/ventas/', payload)
@@ -1397,6 +1436,7 @@ export default {
         this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
         this.autorizacionClave = ''; this.observacion = ''
         this.clienteSeleccionado = null; this.nuevoMonto = ''
+        this.garantiasPendientes = []; this.itemsGarantia = []
 
         setTimeout(() => { this.exitoso = false }, 5000)
         await this.cargarProductos()

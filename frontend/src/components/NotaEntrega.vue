@@ -66,17 +66,51 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(p, i) in productos" :key="i">
-          <td>{{ p.nombre }}</td>
-          <td class="nota-td-num">{{ p.cantidad }}</td>
-          <td class="nota-td-num">{{ precioUnitBs(p).toFixed(2) }}</td>
-          <td class="nota-td-num">{{ (precioUnitBs(p) * p.cantidad).toFixed(2) }}</td>
-        </tr>
+        <template v-for="(p, i) in productos" :key="i">
+          <tr>
+            <td>
+              {{ p.nombre }}
+              <span v-if="p.variante_label" style="color:#666"> — {{ p.variante_label }}</span>
+            </td>
+            <td class="nota-td-num">{{ p.cantidad }}</td>
+            <td class="nota-td-num">{{ precioUnitBs(p).toFixed(2) }}</td>
+            <td class="nota-td-num">{{ (precioUnitBs(p) * p.cantidad).toFixed(2) }}</td>
+          </tr>
+          <tr v-if="garantiasPorProducto[p.producto_id || p.id]" class="nota-fila-garantia">
+            <td colspan="4">
+              <div class="nota-garantia-bloque">
+                <span v-if="garantiasPorProducto[p.producto_id || p.id].serial">
+                  <strong>Serial:</strong> {{ garantiasPorProducto[p.producto_id || p.id].serial }}
+                </span>
+                <span v-if="garantiasPorProducto[p.producto_id || p.id].modelo">
+                  &nbsp;·&nbsp;<strong>Modelo:</strong> {{ garantiasPorProducto[p.producto_id || p.id].modelo }}
+                </span>
+                <span v-if="garantiasPorProducto[p.producto_id || p.id].meses_garantia">
+                  &nbsp;·&nbsp;<strong>Garantía:</strong> {{ garantiasPorProducto[p.producto_id || p.id].meses_garantia }} meses
+                </span>
+                <div v-if="garantiasPorProducto[p.producto_id || p.id].condiciones_snapshot" class="nota-garantia-cond">
+                  {{ garantiasPorProducto[p.producto_id || p.id].condiciones_snapshot }}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
 
     <div class="nota-total">
       TOTAL: Bs {{ Number(totalBs).toFixed(2) }}
+    </div>
+
+    <div class="nota-firmas" v-if="garantias && garantias.length > 0">
+      <div class="nota-firma-bloque">
+        <div class="nota-firma-linea"></div>
+        <div class="nota-firma-label">Firma del Cliente</div>
+      </div>
+      <div class="nota-firma-bloque">
+        <div class="nota-firma-linea"></div>
+        <div class="nota-firma-label">Firma del Vendedor</div>
+      </div>
     </div>
   </div>
 </template>
@@ -93,6 +127,7 @@ export default {
     clienteNombre:   { type: String,  default: 'Consumidor Final' },
     clienteTelefono: { type: String,  default: '' },
     productos:       { type: Array,   required: true },  // [{nombre, cantidad, precio_unitario}]
+    garantias:       { type: Array,   default: () => [] }, // [{producto_id, serial, modelo, meses_garantia, condiciones_snapshot}]
     totalBs:         { type: Number,  required: true },
     tasaBcv:         { type: Number,  required: true },
     pasoInicial:     { type: String,  default: 'preguntar' },
@@ -120,6 +155,13 @@ export default {
     },
     telefonoEfectivo() {
       return this.clienteTelefono || this.telefonoManual
+    },
+    garantiasPorProducto() {
+      const map = {}
+      for (const g of (this.garantias || [])) {
+        map[g.producto_id] = g
+      }
+      return map
     },
   },
   methods: {
@@ -276,6 +318,18 @@ export default {
 .nota-tabla tbody tr:nth-child(even) { background: #F5F5F0; }
 
 .nota-total { text-align: right; font-size: 1rem; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; }
+
+.nota-fila-garantia td { padding: 4px 8px 8px; border-bottom: 1px solid #ddd; background: #FAFAF5; }
+.nota-garantia-bloque { font-size: 0.78rem; color: #333; }
+.nota-garantia-cond   { margin-top: 4px; white-space: pre-wrap; color: #555; font-size: 0.74rem; line-height: 1.45; }
+
+.nota-firmas {
+  display: flex; gap: 2rem; margin-top: 2rem; padding-top: 1rem;
+  border-top: 1px solid #ccc;
+}
+.nota-firma-bloque { flex: 1; text-align: center; }
+.nota-firma-linea  { border-top: 1px solid #000; margin-bottom: 4px; margin-top: 2.5rem; }
+.nota-firma-label  { font-size: 0.8rem; color: #444; }
 
 /* ── Media print — oculta TODO excepto .nota-doc ── */
 @media print {

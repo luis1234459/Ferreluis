@@ -31,6 +31,7 @@ from models import (
     Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
+    GarantiaVenta, PlantillaGarantia,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
@@ -199,6 +200,13 @@ def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
         if c:
             cliente_nombre = c.nombre
 
+    # Garantías registradas para esta venta
+    garantias_raw = db.query(GarantiaVenta).filter(GarantiaVenta.venta_id == venta_id).all()
+    garantias_out = [
+        {c.name: getattr(g, c.name) for c in g.__table__.columns}
+        for g in garantias_raw
+    ]
+
     return {
         "venta": {
             "id":             venta.id,
@@ -217,8 +225,9 @@ def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
             "estado":         venta.estado,
             "observacion":    venta.observacion,
         },
-        "detalles": detalles_out,
-        "pagos":    pagos_out,
+        "detalles":  detalles_out,
+        "pagos":     pagos_out,
+        "garantias": garantias_out,
     }
 
 
@@ -543,6 +552,34 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
     # Vincular cliente (siempre — nunca queda sin cliente)
     if cliente_id:
         db.add(VentaCliente(venta_id=venta.id, cliente_id=int(cliente_id)))
+        db.commit()
+
+    # ── Guardar garantías (snapshot del texto al momento de la venta) ─────────
+    garantias_in = data.get("garantias", []) or []
+    for g in garantias_in:
+        prod_id = g.get("producto_id")
+        if not prod_id:
+            continue
+        prod_g = db.query(Producto).filter(Producto.id == prod_id).first()
+        meses_snap = None
+        cond_snap  = None
+        if prod_g and prod_g.plantilla_garantia_id:
+            pl = db.query(PlantillaGarantia).filter(
+                PlantillaGarantia.id == prod_g.plantilla_garantia_id
+            ).first()
+            if pl:
+                meses_snap = pl.meses
+                cond_snap  = pl.condiciones
+        db.add(GarantiaVenta(
+            venta_id             = venta.id,
+            producto_id          = prod_id,
+            variante_id          = g.get("variante_id"),
+            serial               = g.get("serial") or None,
+            modelo               = g.get("modelo") or None,
+            meses_garantia       = meses_snap,
+            condiciones_snapshot = cond_snap,
+        ))
+    if garantias_in:
         db.commit()
 
     # ── Procesar cargos a crédito ─────────────────────────────────────────────

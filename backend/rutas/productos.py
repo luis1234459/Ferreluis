@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
@@ -35,6 +35,8 @@ class ProductoSchema(BaseModel):
     descuento_compuesto_pct: float           = 0.0
     codigo:                  Optional[str]   = None
     activo:                  bool            = True
+    requiere_serial:         bool            = False
+    plantilla_garantia_id:   Optional[int]   = None
 
     class Config:
         from_attributes = True
@@ -110,7 +112,8 @@ def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float) -> di
     }
 
 
-def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: list = None) -> dict:
+def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
+                variantes: list = None, plantilla: PlantillaGarantia = None) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance))
     vs = variantes or []
@@ -129,7 +132,22 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: li
         }
         for v in vs
     ]
+    if plantilla:
+        d["garantia"] = {
+            "id":          plantilla.id,
+            "nombre":      plantilla.nombre,
+            "meses":       plantilla.meses,
+            "condiciones": plantilla.condiciones,
+        }
+    else:
+        d["garantia"] = None
     return d
+
+
+def _plantilla_de(p: Producto, db: Session):
+    if p.plantilla_garantia_id:
+        return db.query(PlantillaGarantia).filter(PlantillaGarantia.id == p.plantilla_garantia_id).first()
+    return None
 
 
 def _tasas_actuales(db: Session):
@@ -477,7 +495,15 @@ def listar_productos(
     if ids:
         for v in db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(ids)).all():
             variantes_map.setdefault(v.producto_id, []).append(v)
-    productos = [_enriquecer(p, bcv, binance, variantes_map.get(p.id, [])) for p in lista]
+    plantilla_ids = {p.plantilla_garantia_id for p in lista if p.plantilla_garantia_id}
+    plantillas_map: dict = {}
+    if plantilla_ids:
+        for pl in db.query(PlantillaGarantia).filter(PlantillaGarantia.id.in_(plantilla_ids)).all():
+            plantillas_map[pl.id] = pl
+    productos = [
+        _enriquecer(p, bcv, binance, variantes_map.get(p.id, []), plantillas_map.get(p.plantilla_garantia_id))
+        for p in lista
+    ]
     return {"total": total, "productos": productos}
 
 
@@ -599,7 +625,7 @@ def buscar_por_codigo(codigo: str, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
 
 
 @router.post("/")
@@ -620,7 +646,7 @@ def crear_producto(
     db.commit()
     db.refresh(nuevo)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(nuevo, bcv, binance)
+    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db))
 
 
 @router.post("/generar-codigos-masivo")
@@ -712,7 +738,7 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
     variantes = db.query(VarianteProducto).filter(VarianteProducto.producto_id == p.id).all()
-    return _enriquecer(p, bcv, binance, variantes)
+    return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db))
 
 
 @router.put("/edicion-masiva")
@@ -756,7 +782,7 @@ def actualizar_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
 
 
 @router.put("/{producto_id}/codigo")
@@ -781,7 +807,7 @@ def actualizar_codigo_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
 
 
 @router.put("/{producto_id}/estado")
@@ -798,7 +824,7 @@ def cambiar_estado_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
 
 
 @router.delete("/{producto_id}")
