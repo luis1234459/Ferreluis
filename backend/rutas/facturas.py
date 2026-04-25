@@ -11,7 +11,7 @@ from database import get_db
 from models import (
     OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion,
-    Producto, Proveedor, CatalogoProveedor, AliasProveedor,
+    Producto, VarianteProducto, Proveedor, CatalogoProveedor, AliasProveedor,
     MovimientoBancario, TasaCambio,
 )
 
@@ -301,7 +301,40 @@ def buscar_producto(
     db: Session = Depends(get_db),
 ):
     resultados = []
-    ids_ya: set[int] = set()
+    ids_ya: set = set()  # (producto_id, variante_id_or_None)
+
+    def _res_variante(p, v, codigo_prov="", match_exacto=False):
+        partes = [x for x in [v.clase, v.color] if x]
+        sufijo = f" ({' / '.join(partes)})" if partes else ""
+        cod_var = v.codigo or ""
+        nombre_display = f"[{cod_var}] {p.nombre}{sufijo}" if cod_var else f"{p.nombre}{sufijo}"
+        return {
+            "id": p.id, "nombre": nombre_display,
+            "codigo_proveedor": codigo_prov,
+            "variante_id": v.id, "variante_codigo": cod_var,
+            "costo_usd": float(v.costo_usd or p.costo_usd or 0),
+            "stock": int(v.stock or 0),
+            "match_exacto": match_exacto,
+        }
+
+    def _res_producto(p, codigo_prov="", match_exacto=False):
+        return {
+            "id": p.id, "nombre": p.nombre,
+            "codigo_proveedor": codigo_prov,
+            "variante_id": None, "variante_codigo": None,
+            "costo_usd": float(p.costo_usd or 0),
+            "stock": int(p.stock or 0),
+            "match_exacto": match_exacto,
+        }
+
+    def _expandir(p, codigo_prov="", match_exacto=False):
+        vs = db.query(VarianteProducto).filter(
+            VarianteProducto.producto_id == p.id,
+            VarianteProducto.activo == True,
+        ).all()
+        if vs:
+            return [_res_variante(p, v, codigo_prov, match_exacto) for v in vs]
+        return [_res_producto(p, codigo_prov, match_exacto)]
 
     # Prioridad 1: match exacto por código en catálogo del proveedor
     if proveedor_id and codigo:
@@ -310,16 +343,24 @@ def buscar_producto(
             CatalogoProveedor.codigo_proveedor == codigo.strip(),
         ).all()
         for c in cats:
-            if c.producto_id:
-                p = db.query(Producto).filter(Producto.id == c.producto_id).first()
-                if p and p.id not in ids_ya:
-                    resultados.append({
-                        "id": p.id, "nombre": p.nombre,
-                        "codigo_proveedor": c.codigo_proveedor,
-                        "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
-                        "match_exacto": True,
-                    })
-                    ids_ya.add(p.id)
+            if not c.producto_id:
+                continue
+            p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+            if not p:
+                continue
+            if c.variante_id:
+                key = (p.id, c.variante_id)
+                if key not in ids_ya:
+                    v = db.query(VarianteProducto).filter(VarianteProducto.id == c.variante_id).first()
+                    if v:
+                        resultados.append(_res_variante(p, v, c.codigo_proveedor, True))
+                        ids_ya.add(key)
+            else:
+                for r in _expandir(p, c.codigo_proveedor, True):
+                    key = (p.id, r["variante_id"])
+                    if key not in ids_ya:
+                        resultados.append(r)
+                        ids_ya.add(key)
 
     # Prioridad 2: match parcial por código en catálogo
     if proveedor_id and codigo and not resultados:
@@ -328,16 +369,24 @@ def buscar_producto(
             CatalogoProveedor.codigo_proveedor.ilike(f"%{codigo}%"),
         ).limit(5).all()
         for c in cats:
-            if c.producto_id:
-                p = db.query(Producto).filter(Producto.id == c.producto_id).first()
-                if p and p.id not in ids_ya:
-                    resultados.append({
-                        "id": p.id, "nombre": p.nombre,
-                        "codigo_proveedor": c.codigo_proveedor,
-                        "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
-                        "match_exacto": False,
-                    })
-                    ids_ya.add(p.id)
+            if not c.producto_id:
+                continue
+            p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+            if not p:
+                continue
+            if c.variante_id:
+                key = (p.id, c.variante_id)
+                if key not in ids_ya:
+                    v = db.query(VarianteProducto).filter(VarianteProducto.id == c.variante_id).first()
+                    if v:
+                        resultados.append(_res_variante(p, v, c.codigo_proveedor, False))
+                        ids_ya.add(key)
+            else:
+                for r in _expandir(p, c.codigo_proveedor, False):
+                    key = (p.id, r["variante_id"])
+                    if key not in ids_ya:
+                        resultados.append(r)
+                        ids_ya.add(key)
 
     # Prioridad 3: buscar por nombre en inventario
     busq = nombre or codigo
@@ -346,16 +395,13 @@ def buscar_producto(
             Producto.nombre.ilike(f"%{busq}%")
         ).limit(10).all()
         for p in prods:
-            if p.id not in ids_ya:
-                resultados.append({
-                    "id": p.id, "nombre": p.nombre,
-                    "codigo_proveedor": "",
-                    "codigo": p.codigo or "", "costo_usd": p.costo_usd, "stock": p.stock,
-                    "match_exacto": False,
-                })
-                ids_ya.add(p.id)
+            for r in _expandir(p, "", False):
+                key = (p.id, r["variante_id"])
+                if key not in ids_ya:
+                    resultados.append(r)
+                    ids_ya.add(key)
 
-    return resultados[:10]
+    return resultados[:15]
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +434,7 @@ def ordenes_pendientes(proveedor_id: Optional[int] = None, db: Session = Depends
                 {
                     "id":                  d.id,
                     "producto_id":         d.producto_id,
+                    "variante_id":         d.variante_id,
                     "nombre_producto":     d.nombre_producto,
                     "codigo_proveedor":    d.codigo_proveedor or "",
                     "cantidad_pedida":     d.cantidad_pedida,
@@ -458,6 +505,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             db.add(DetalleOrdenCompra(
                 orden_id            = orden.id,
                 producto_id         = p.get("producto_id"),
+                variante_id         = p.get("variante_id"),
                 nombre_producto     = p.get("nombre_producto", ""),
                 codigo_proveedor    = p.get("codigo_proveedor", ""),
                 cantidad_pedida     = float(p.get("cantidad", 0)),
@@ -505,6 +553,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
     # ── Detalles de recepción + stock + costo ─────────────────────────────────
     for p in productos_data:
         prod_id     = p.get("producto_id")
+        variante_id = p.get("variante_id")
         cantidad    = float(p.get("cantidad", 0))
         precio      = float(p.get("precio_unitario_usd", 0))
         actualizar  = bool(p.get("actualizar_costo", False))
@@ -531,10 +580,18 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         if prod_id:
             prod = db.query(Producto).filter(Producto.id == prod_id).first()
             if prod:
-                prod.stock = (prod.stock or 0) + int(cantidad)
-                if actualizar:
-                    costo_ant      = prod.costo_usd
-                    prod.costo_usd = precio
+                if variante_id:
+                    variante = db.query(VarianteProducto).filter(VarianteProducto.id == variante_id).first()
+                    if variante:
+                        variante.stock = (variante.stock or 0) + int(cantidad)
+                        if actualizar:
+                            costo_ant = variante.costo_usd
+                            variante.costo_usd = precio
+                else:
+                    prod.stock = (prod.stock or 0) + int(cantidad)
+                    if actualizar:
+                        costo_ant      = prod.costo_usd
+                        prod.costo_usd = precio
 
         db.add(DetalleRecepcion(
             recepcion_id             = recepcion.id,
@@ -552,11 +609,13 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             existente_catalogo = db.query(CatalogoProveedor).filter(
                 CatalogoProveedor.proveedor_id == proveedor_id,
                 CatalogoProveedor.producto_id  == prod_id,
+                CatalogoProveedor.variante_id  == variante_id,
             ).first()
             if not existente_catalogo:
                 db.add(CatalogoProveedor(
                     proveedor_id          = proveedor_id,
                     producto_id           = prod_id,
+                    variante_id           = variante_id,
                     nombre_producto       = nombre_prod,
                     codigo_proveedor      = codigo_prov if codigo_prov else None,
                     precio_referencia_usd = precio,

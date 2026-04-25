@@ -278,7 +278,8 @@
                         <span class="match-ok" @click="limpiarMatch(linea)" title="Clic para desvincular">
                           ✓ {{ linea.match.nombre }}
                         </span>
-                        <small v-if="linea.match.match_exacto" class="match-codigo-tag">por código</small>
+                        <small v-if="linea.match.variante_codigo" class="match-codigo-tag">[{{ linea.match.variante_codigo }}]</small>
+                        <small v-else-if="linea.match.match_exacto" class="match-codigo-tag">por código</small>
                       </div>
 
                       <!-- Sin decidir -->
@@ -310,7 +311,7 @@
                         <ul v-if="linea._busqAbierta && linea._busqResultados.length" class="dropdown-list dropdown-sm">
                           <li
                             v-for="prod in linea._busqResultados"
-                            :key="prod.id"
+                            :key="`${prod.id}_${prod.variante_id||''}`"
                             @mousedown="seleccionarMatch(linea, prod)"
                           >
                             {{ prod.nombre }}
@@ -976,7 +977,8 @@ export default {
           cuenta_id: p.cuenta_id,
         })),
         productos: this.lineas.map(l => ({
-          producto_id:         l.match?.id        || null,
+          producto_id:         l.match?.id          || null,
+          variante_id:         l.match?.variante_id || null,
           nombre_producto:     l.nombreFinal || l.match?.nombre || l.nombre_ia,
           nombre_ia:           l.nombre_ia,
           codigo_proveedor:    l.codigo_proveedor || '',
@@ -1054,11 +1056,14 @@ export default {
         cantidad:         d.cantidad_pedida,
         precio_unitario:  d.precio_unitario_usd,
         actualizar_costo: true,
-        match:            d.producto_id ? { id: d.producto_id, nombre: d.nombre_producto } : null,
+        match:            d.producto_id ? { id: d.producto_id, nombre: d.nombre_producto, variante_id: d.variante_id || null } : null,
+        esNuevo:          false,
+        nombreFinal:      '',
         buscandoMatch:    false,
         _busqTexto:       d.nombre_producto || '',
         _busqResultados:  [],
         _busqAbierta:     false,
+        _busqVisible:     false,
       }))
     },
     desvincularOrden() {

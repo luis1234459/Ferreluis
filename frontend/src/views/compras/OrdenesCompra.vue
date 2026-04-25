@@ -120,13 +120,28 @@
             </div>
 
             <h3 class="subtitulo">Productos</h3>
+
+            <!-- Filtros de búsqueda de producto -->
+            <div class="filtros-producto-oc">
+              <input v-model="filtroBusquedaOC" class="filtro-busq-oc" placeholder="🔍 Buscar producto o código..." />
+              <select v-model="filtroDeptoOC" class="filtro-sel-oc">
+                <option value="">Todos los departamentos</option>
+                <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+              </select>
+              <select v-model="filtroProveedorOC" class="filtro-sel-oc">
+                <option value="">Todos los proveedores</option>
+                <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+              </select>
+              <span class="filtro-contador">{{ opcionesFiltradas.length }} opciones</span>
+            </div>
+
             <div v-for="(linea, i) in form.detalles" :key="i" class="linea-producto">
               <div class="linea-grid">
                 <div class="field field-selector">
                   <label>Producto / Variante</label>
                   <select v-model="linea._key" @change="llenarDesdeInventario(linea)">
                     <option value="">— Nuevo producto —</option>
-                    <option v-for="op in opcionesProductos" :key="op.key" :value="op.key">
+                    <option v-for="op in opcionesFiltradas" :key="op.key" :value="op.key">
                       {{ op.label }}{{ op.stock_label }}
                     </option>
                   </select>
@@ -184,8 +199,12 @@ export default {
       ordenes:            [],
       proveedores:        [],
       productosRaw:       [],
+      departamentos:      [],
       filtroEstado:       '',
       filtroProveedor:    '',
+      filtroDeptoOC:      '',
+      filtroProveedorOC:  '',
+      filtroBusquedaOC:   '',
       ordenDetalle:       null,
       mostrarForm:        false,
       editandoId:         null,
@@ -219,36 +238,59 @@ export default {
         if (variantes.length > 0) {
           for (const v of variantes) {
             const costo = v.costo_usd != null ? v.costo_usd : (p.costo_usd || 0)
-            const label = v.color
+            const base  = v.color
               ? `${p.nombre} (${v.clase} / ${v.color})`
               : `${p.nombre} (${v.clase})`
+            const label = v.codigo ? `[${v.codigo}] ${base}` : base
             lista.push({
-              key:         `${p.id}_${v.id}`,
-              producto_id: p.id,
-              variante_id: v.id,
+              key:            `${p.id}_${v.id}`,
+              producto_id:    p.id,
+              variante_id:    v.id,
+              departamento_id:p.departamento_id || null,
+              proveedor_id:   p.proveedor_id    || null,
               label,
+              labelBusq:      label.toLowerCase(),
               costo,
-              stock:       v.stock || 0,
-              stock_label: v.stock < 5 ? ` · ⚠ stock:${v.stock}` : ` · stock:${v.stock}`,
+              stock:          v.stock || 0,
+              stock_label:    v.stock < 5 ? ` · ⚠ stock:${v.stock}` : ` · stock:${v.stock}`,
             })
           }
         } else {
           lista.push({
-            key:         `${p.id}`,
-            producto_id: p.id,
-            variante_id: null,
-            label:       p.nombre,
-            costo:       p.costo_usd || 0,
-            stock:       p.stock || 0,
-            stock_label: (p.stock || 0) < 5 ? ` · ⚠ stock:${p.stock}` : ` · stock:${p.stock}`,
+            key:            `${p.id}`,
+            producto_id:    p.id,
+            variante_id:    null,
+            departamento_id:p.departamento_id || null,
+            proveedor_id:   p.proveedor_id    || null,
+            label:          p.nombre,
+            labelBusq:      p.nombre.toLowerCase(),
+            costo:          p.costo_usd || 0,
+            stock:          p.stock || 0,
+            stock_label:    (p.stock || 0) < 5 ? ` · ⚠ stock:${p.stock}` : ` · stock:${p.stock}`,
           })
         }
       }
       return lista.sort((a, b) => a.label.localeCompare(b.label))
     },
+    opcionesFiltradas() {
+      let lista = this.opcionesProductos
+      if (this.filtroDeptoOC) {
+        const id = parseInt(this.filtroDeptoOC)
+        lista = lista.filter(o => o.departamento_id === id)
+      }
+      if (this.filtroProveedorOC) {
+        const id = parseInt(this.filtroProveedorOC)
+        lista = lista.filter(o => o.proveedor_id === id)
+      }
+      if (this.filtroBusquedaOC.trim()) {
+        const q = this.filtroBusquedaOC.trim().toLowerCase()
+        lista = lista.filter(o => o.labelBusq.includes(q))
+      }
+      return lista
+    },
   },
   async mounted() {
-    await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario()])
+    await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario(), this.cargarDepartamentos()])
   },
   methods: {
     async cargar() {
@@ -266,17 +308,25 @@ export default {
       const res = await axios.get('/productos/', { params: { limit: 9999, incluir_inactivos: false } })
       this.productosRaw = Array.isArray(res.data) ? res.data : (res.data.productos || [])
     },
+    async cargarDepartamentos() {
+      try {
+        const res = await axios.get('/productos/departamentos')
+        this.departamentos = res.data
+      } catch {}
+    },
     _lineaVacia() {
       return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false }
     },
     abrirNueva() {
       this.editandoId = null
       this.form = { proveedor_id: '', fecha_esperada: '', observacion: '', detalles: [] }
+      this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.agregarLinea()
       this.mostrarForm = true
     },
     editarOrden(o) {
       this.editandoId = o.id
+      this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.form = {
         proveedor_id:   o.proveedor_id,
         fecha_esperada: o.fecha_esperada ? o.fecha_esperada.split('T')[0] : '',
@@ -393,7 +443,11 @@ export default {
 .total-grande strong { color: #16A34A; font-size: 1.1rem; }
 .obs { color: var(--texto-sec); font-size: 0.88rem; font-style: italic; margin-top: 0.75rem; }
 
-.subtitulo { color: var(--texto-principal); font-size: 0.9rem; margin: 1.25rem 0 0.75rem; border-top: 1px solid var(--borde); padding-top: 1rem; font-weight: 700; }
+.subtitulo { color: var(--texto-principal); font-size: 0.9rem; margin: 1.25rem 0 0.5rem; border-top: 1px solid var(--borde); padding-top: 1rem; font-weight: 700; }
+.filtros-producto-oc { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.filtro-busq-oc { flex: 1; min-width: 160px; padding: 0.4rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.85rem; }
+.filtro-sel-oc  { padding: 0.4rem 0.6rem; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo-tabla-alt); color: var(--texto-principal); font-size: 0.85rem; max-width: 160px; }
+.filtro-contador { font-size: 0.78rem; color: var(--texto-sec); white-space: nowrap; }
 .linea-producto { background: var(--fondo-tabla-alt); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative; border: 1px solid var(--borde); }
 .linea-grid { display: grid; grid-template-columns: 3fr 2fr 1fr 1.2fr 1fr; gap: 0.5rem; align-items: end; }
 .field-selector select { min-width: 0; }
