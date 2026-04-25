@@ -159,13 +159,26 @@
                   <td style="color:#996600;font-weight:600">Bs. {{ Number(p.precio_bs).toFixed(2) }}</td>
 
                   <!-- Stock -->
-                  <td :class="{ 'txt-rojo': !modoEdicion && p.stock < 5 }">
-                    <template v-if="modoEdicion">
+                  <td>
+                    <template v-if="p.tiene_variantes && p.variantes_resumen && p.variantes_resumen.length > 0">
+                      <div class="stock-variantes">
+                        <span
+                          v-for="v in p.variantes_resumen" :key="v.id"
+                          :class="['sv-chip', v.stock < 5 ? 'sv-bajo' : '', !v.activo ? 'sv-inactiva' : '']"
+                          :title="v.activo ? '' : 'Variante inactiva'"
+                        >
+                          {{ v.clase }}<template v-if="v.color"> · {{ v.color }}</template>: <strong>{{ v.stock }}</strong>
+                        </span>
+                      </div>
+                    </template>
+                    <template v-else-if="modoEdicion">
                       <input class="celda-input celda-num" type="number" min="0"
                         v-model.number="borradorEdicion[p.id].stock"
                         @input="marcarModificado(p.id)" />
                     </template>
-                    <template v-else>{{ p.stock }}</template>
+                    <template v-else>
+                      <span :class="{ 'txt-rojo': p.stock < 5 }">{{ p.stock }}</span>
+                    </template>
                   </td>
 
                   <!-- Ubicación / Activo -->
@@ -1660,6 +1673,10 @@ export default {
 .btn-comp     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .fila-stock-bajo td { background: #DC262608; }
+.stock-variantes { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.sv-chip { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 4px; background: #F0F9FF; border: 1px solid #BAE6FD; color: #0369A1; white-space: nowrap; }
+.sv-chip.sv-bajo { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+.sv-chip.sv-inactiva { opacity: 0.45; text-decoration: line-through; }
 
 /* ── Toggle inactivos y estado ── */
 .btn-toggle-inactivos { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }

@@ -107,9 +107,15 @@ def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float) -> di
     }
 
 
-def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float) -> dict:
+def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: list = None) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance))
+    vs = variantes or []
+    d["tiene_variantes"]   = len(vs) > 0
+    d["variantes_resumen"] = [
+        {"id": v.id, "clase": v.clase, "color": v.color, "stock": v.stock, "activo": v.activo}
+        for v in vs
+    ]
     return d
 
 
@@ -443,7 +449,13 @@ def listar_productos(
     total = q.count()
     bcv, binance = _tasas_actuales(db)
     q = q.order_by(func.length(Producto.nombre), Producto.nombre)
-    productos = [_enriquecer(p, bcv, binance) for p in q.offset(skip).limit(limit).all()]
+    lista = q.offset(skip).limit(limit).all()
+    ids   = [p.id for p in lista]
+    variantes_map: dict = {}
+    if ids:
+        for v in db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(ids)).all():
+            variantes_map.setdefault(v.producto_id, []).append(v)
+    productos = [_enriquecer(p, bcv, binance, variantes_map.get(p.id, [])) for p in lista]
     return {"total": total, "productos": productos}
 
 
@@ -677,7 +689,8 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance)
+    variantes = db.query(VarianteProducto).filter(VarianteProducto.producto_id == p.id).all()
+    return _enriquecer(p, bcv, binance, variantes)
 
 
 @router.put("/edicion-masiva")
