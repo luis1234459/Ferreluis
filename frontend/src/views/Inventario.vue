@@ -102,16 +102,21 @@
               <tbody>
                 <tr v-for="p in productosFiltrados" :key="p.id"
                   :class="{ 'fila-stock-bajo': !modoEdicion && p.stock < 5, 'fila-modificada': modoEdicion && filasModificadas.has(p.id) }">
-                  <!-- Código (no editable en modo masivo) -->
+                  <!-- Código -->
                   <td class="celda-codigo">
-                    <span v-if="codigoEditando !== p.id" class="codigo-tag" @click="iniciarEditCodigo(p)" title="Clic para editar código">
-                      {{ p.codigo || '—' }}
-                    </span>
-                    <span v-else class="codigo-edit-wrap">
-                      <input v-model="codigoTemp" class="input-codigo" @keyup.enter="guardarCodigo(p)" @keyup.escape="codigoEditando = null" placeholder="Ej: HRR-001" />
-                      <button class="btn-ok-codigo" @click="guardarCodigo(p)">✓</button>
-                      <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
-                    </span>
+                    <template v-if="p.tiene_variantes">
+                      <span class="codigo-padre-tag" title="Los códigos pertenecen a cada variante">variantes</span>
+                    </template>
+                    <template v-else>
+                      <span v-if="codigoEditando !== p.id" class="codigo-tag" @click="iniciarEditCodigo(p)" title="Clic para editar código">
+                        {{ p.codigo || '—' }}
+                      </span>
+                      <span v-else class="codigo-edit-wrap">
+                        <input v-model="codigoTemp" class="input-codigo" @keyup.enter="guardarCodigo(p)" @keyup.escape="codigoEditando = null" placeholder="Ej: HRR-001" />
+                        <button class="btn-ok-codigo" @click="guardarCodigo(p)">✓</button>
+                        <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
+                      </span>
+                    </template>
                   </td>
 
                   <!-- Nombre -->
@@ -168,6 +173,7 @@
                           :title="v.activo ? '' : 'Variante inactiva'"
                         >
                           {{ v.clase }}<template v-if="v.color"> · {{ v.color }}</template>: <strong>{{ v.stock }}</strong>
+                          <span v-if="v.codigo" class="sv-codigo">{{ v.codigo }}</span>
                         </span>
                       </div>
                     </template>
@@ -303,9 +309,13 @@
                 <label>Nombre *</label>
                 <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" />
               </div>
-              <div class="field">
+              <div class="field" v-if="!form.tiene_variantes">
                 <label>Código</label>
                 <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" />
+              </div>
+              <div class="field" v-else>
+                <label>Prefijo generador <small class="txt-muted">(base para códigos de variantes)</small></label>
+                <input v-model="form.codigo" placeholder="Ej: CABLE-12 (sugerencia para variantes)" class="input-prefijo" />
               </div>
               <div class="field">
                 <label>Departamento</label>
@@ -1682,6 +1692,11 @@ export default {
 .sv-chip { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 4px; background: #F0F9FF; border: 1px solid #BAE6FD; color: #0369A1; white-space: nowrap; }
 .sv-chip.sv-bajo { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
 .sv-chip.sv-inactiva { opacity: 0.45; text-decoration: line-through; }
+.sv-codigo { font-size: 0.68rem; font-weight: 700; background: #0369A122; color: #0369A1; border-radius: 3px; padding: 0 0.25rem; margin-left: 0.25rem; }
+.sv-chip.sv-bajo .sv-codigo { background: #DC262622; color: #DC2626; }
+.codigo-padre-tag { font-size: 0.72rem; font-weight: 700; color: #6B7280; background: #F3F4F6; border: 1px dashed #D1D5DB; border-radius: 4px; padding: 0.1rem 0.4rem; cursor: default; }
+.input-prefijo { border-color: #6366F1 !important; }
+.input-prefijo:focus { box-shadow: 0 0 0 2px #6366F133 !important; }
 
 /* ── Toggle inactivos y estado ── */
 .btn-toggle-inactivos { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }

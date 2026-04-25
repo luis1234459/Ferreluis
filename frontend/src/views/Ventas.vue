@@ -864,10 +864,17 @@ export default {
       const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor
       if (q.length < 2 && !tienesFiltro) return []
       if (q.length >= 2) {
+        // Código exacto en producto simple
         const exactCodigo = this.productos.filter(p =>
           p.codigo && p.codigo.toLowerCase() === q
         )
-        return exactCodigo.length ? exactCodigo : this.productos
+        if (exactCodigo.length) return exactCodigo
+        // Código exacto en variante → retorna el padre (se auto-agrega en seleccionarResaltado)
+        const exactVariante = this.productos.filter(p =>
+          p.variantes_resumen && p.variantes_resumen.some(v => v.codigo && v.codigo.toLowerCase() === q)
+        )
+        if (exactVariante.length) return exactVariante
+        return this.productos
       }
       return this.productos
     },
@@ -1423,7 +1430,20 @@ export default {
     },
     seleccionarResaltado() {
       if (this.indiceResaltado >= 0 && this.indiceResaltado < this.productosFiltrados.length) {
-        this.agregar(this.productosFiltrados[this.indiceResaltado])
+        const p = this.productosFiltrados[this.indiceResaltado]
+        const q = this.busqueda.trim().toLowerCase()
+        // Código exacto de variante → agregar esa variante directamente sin abrir modal
+        if (q && p.variantes_resumen) {
+          const varMatch = p.variantes_resumen.find(v => v.codigo && v.codigo.toLowerCase() === q)
+          if (varMatch) {
+            this._agregarDirecto(p, varMatch)
+            this.busqueda        = ''
+            this.indiceResaltado = -1
+            this.$refs.inputBuscador?.focus()
+            return
+          }
+        }
+        this.agregar(p)
         this.indiceResaltado = -1
       }
     },

@@ -114,7 +114,15 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float, variantes: li
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
     d["variantes_resumen"] = [
-        {"id": v.id, "clase": v.clase, "color": v.color, "stock": v.stock, "activo": v.activo, "codigo": v.codigo}
+        {
+            "id":                  v.id,
+            "clase":               v.clase,
+            "color":               v.color,
+            "stock":               v.stock,
+            "activo":              v.activo,
+            "codigo":              v.codigo,
+            "precio_override_usd": v.precio_override_usd,
+        }
         for v in vs
     ]
     return d
@@ -440,7 +448,16 @@ def listar_productos(
     if not incluir_inactivos:
         q = q.filter(Producto.activo == True)
     if busqueda:
-        q = q.filter(Producto.nombre.ilike(f"%{busqueda}%"))
+        from sqlalchemy import or_
+        variante_ids = db.query(VarianteProducto.producto_id).filter(
+            VarianteProducto.codigo.ilike(f"%{busqueda}%")
+        ).subquery()
+        q = q.filter(
+            or_(
+                Producto.nombre.ilike(f"%{busqueda}%"),
+                Producto.id.in_(variante_ids),
+            )
+        )
     if departamento_id is not None:
         q = q.filter(Producto.departamento_id == departamento_id)
     if categoria_id is not None:
@@ -820,12 +837,13 @@ def crear_variante(
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    # Si es la primera variante del producto, transferir el control de stock a variantes
+    # Primera variante: el padre cede stock y código — las variantes son el inventario real
     es_primera = not db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).first()
-    if es_primera and float(p.stock or 0) > 0:
-        p.stock = 0  # el producto padre ya no tiene stock; las variantes son el inventario real
+    if es_primera:
+        p.stock  = 0     # stock vive en las variantes
+        p.codigo = None  # código vive en las variantes; el padre era solo un "generador"
 
     nueva = VarianteProducto(producto_id=producto_id, **datos.dict())
     db.add(nueva)
