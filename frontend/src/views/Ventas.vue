@@ -212,7 +212,11 @@
                 <span class="item-qty">{{ item.cantidad }}</span>
                 <button class="btn-cnt" @click="sumar(i)">+</button>
                 <div class="item-info">
-                  <span class="item-nombre">{{ item.nombre }}<span v-if="item.codigo" class="cod-tag-v">{{ item.codigo }}</span></span>
+                  <span class="item-nombre">
+                    {{ item.nombre }}
+                    <span v-if="item.variante_label" class="variante-tag">{{ item.variante_label }}</span>
+                    <span v-if="item.codigo" class="cod-tag-v">{{ item.codigo }}</span>
+                  </span>
                   <span class="item-ref">Ref: ${{ Number(item.precio_unitario).toFixed(2) }}</span>
                 </div>
                 <span class="item-sub">{{ formatMonto(subtotalLinea(item), monedaVenta) }}</span>
@@ -659,6 +663,43 @@
       </div>
     </div>
 
+    <!-- Modal variantes -->
+    <div class="cobro-modal-overlay" v-if="modalVariantes" @click.self="modalVariantes = false">
+      <div class="cobro-modal" style="max-width:420px">
+        <div class="cobro-modal-header">
+          <h3>{{ productoVariantes?.nombre }}</h3>
+          <button class="cobro-modal-cerrar" @click="modalVariantes = false">✕</button>
+        </div>
+        <div class="cobro-modal-body">
+          <p style="color:var(--texto-muted);font-size:0.85rem;margin:0 0 0.75rem">
+            Selecciona la variante:
+          </p>
+          <div class="variantes-lista">
+            <button
+              v-for="v in variantes"
+              :key="v.id"
+              class="variante-item"
+              @click="seleccionarVariante(v)"
+            >
+              <div class="variante-info">
+                <span class="variante-clase">{{ v.clase }}</span>
+                <span v-if="v.color" class="variante-color">{{ v.color }}</span>
+              </div>
+              <div class="variante-right">
+                <span class="variante-stock">Stock: {{ v.stock }}</span>
+                <span class="variante-precio" v-if="v.precio_override_usd">
+                  ${{ precioParaTier({ costo_usd: v.precio_override_usd, margen: productoVariantes?.margen || 0 }).toFixed(2) }}
+                </span>
+                <span class="variante-precio" v-else>
+                  ${{ precioParaTier(productoVariantes).toFixed(2) }}
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Nota de entrega para impresión -->
     <div id="nota-print" v-if="notaImpresion">
       <div class="np-encabezado">
@@ -804,6 +845,12 @@ export default {
 
       // Nota de entrega
       notaImpresion: null,
+
+      // Variantes
+      modalVariantes:    false,
+      productoVariantes: null,
+      variantes:         [],
+      cargandoVariantes: false,
     }
   },
   computed: {
@@ -991,16 +1038,50 @@ export default {
         item.precio_unitario = precio
       })
     },
-    agregar(p) {
-      const existe = this.carrito.find(i => i.id === p.id)
+    async agregar(p) {
+      this.cargandoVariantes = true
+      try {
+        const res = await axios.get(`/productos/${p.id}/variantes`)
+        const activas = res.data.filter(v => v.activo && v.stock > 0)
+        if (activas.length > 0) {
+          this.productoVariantes = p
+          this.variantes         = activas
+          this.modalVariantes    = true
+          return
+        }
+      } catch { /* si falla, agregar normal */ }
+      finally { this.cargandoVariantes = false }
+      this._agregarDirecto(p)
+    },
+
+    _agregarDirecto(p, variante = null) {
+      const key    = variante ? `${p.id}-${variante.id}` : String(p.id)
+      const existe = this.carrito.find(i => i._key === key)
       if (existe) { existe.cantidad++; return }
-      const precio = this.precioParaTier(p)
+
+      const costoBase   = variante?.precio_override_usd ?? p.costo_usd
+      const productoMod = { ...p, costo_usd: costoBase }
+      const precio      = this.precioParaTier(productoMod)
+
       this.carrito.push({
         ...p,
+        _key:            key,
+        variante_id:     variante?.id     || null,
+        variante_label:  variante ? `${variante.clase}${variante.color ? ' · ' + variante.color : ''}` : null,
+        stock:           variante?.stock  ?? p.stock,
+        costo_usd:       costoBase,
         cantidad:        1,
         precio_original: precio,
         precio_unitario: precio,
       })
+    },
+
+    seleccionarVariante(variante) {
+      this._agregarDirecto(this.productoVariantes, variante)
+      this.modalVariantes    = false
+      this.productoVariantes = null
+      this.variantes         = []
+      this.$refs.inputBuscador?.focus()
     },
     sumar(i)  { this.carrito[i].cantidad++ },
     restar(i) {
@@ -1948,4 +2029,69 @@ export default {
 .ar-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .ar-chip { padding: 0.25rem 0.65rem; background: #FFCC0022; border: 1px solid #FFCC0077; color: #7A6000; border-radius: 20px; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.12s; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 .ar-chip:hover { background: #FFCC00; color: #1A1A1A; border-color: #FFCC00; }
+
+/* ── Variantes ── */
+.variantes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.variante-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.9rem;
+  background: #FFFFFF;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+  width: 100%;
+}
+.variante-item:hover {
+  border-color: #FFCC00;
+  background: #FFFDF0;
+}
+.variante-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+.variante-clase {
+  font-weight: 700;
+  color: var(--texto-principal);
+  font-size: 0.9rem;
+}
+.variante-color {
+  font-size: 0.8rem;
+  color: var(--texto-sec);
+}
+.variante-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+.variante-stock {
+  font-size: 0.78rem;
+  color: var(--texto-muted);
+  background: var(--borde-suave);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.variante-precio {
+  color: #16A34A;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.variante-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0369A1;
+  background: #E0F2FE;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  margin-left: 0.25rem;
+}
 </style>
