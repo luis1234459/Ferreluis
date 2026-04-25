@@ -13,7 +13,7 @@ const LABELS_METODO = {
 }
 
 export function exportarFacturaPDF(data) {
-  const { venta, detalles, pagos } = data
+  const { venta, detalles, pagos, garantias = [] } = data
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const AZUL   = [22, 33, 62]       // #16213e
@@ -172,14 +172,112 @@ export function exportarFacturaPDF(data) {
     y += 6
   }
 
+  // ── Garantías ────────────────────────────────────────────────────────────────
+  const garantiasConDatos = garantias.filter(g => g.serial || g.modelo || g.meses_garantia || g.condiciones_snapshot)
+  if (garantiasConDatos.length > 0) {
+    // Mapa producto_id → nombre desde detalles
+    const nombreProd = {}
+    for (const d of detalles) {
+      if (!nombreProd[d.producto_id]) nombreProd[d.producto_id] = d.nombre
+    }
+
+    const altoPagina = 297
+    const piePagina  = altoPagina - 14  // reservar espacio para pie
+
+    const nuevaPagina = () => {
+      doc.addPage()
+      y = 18
+    }
+
+    const checkY = (needed) => { if (y + needed > piePagina) nuevaPagina() }
+
+    checkY(14)
+    doc.setFillColor(...AZUL)
+    doc.rect(margen, y, ancho - margen * 2, 7, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9.5)
+    doc.setTextColor(...BLANCO)
+    doc.text('ACUERDO DE GARANTÍA', margen + 3, y + 5)
+    y += 11
+
+    for (const g of garantiasConDatos) {
+      const nombre = nombreProd[g.producto_id] || `Producto #${g.producto_id}`
+
+      checkY(22)
+
+      // Nombre del producto
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(...NEGRO)
+      doc.text(nombre, margen, y)
+      y += 5
+
+      // Serial / modelo / duración
+      const meta = []
+      if (g.serial)         meta.push(`Serial: ${g.serial}`)
+      if (g.modelo)         meta.push(`Modelo: ${g.modelo}`)
+      if (g.meses_garantia) meta.push(`Garantía: ${g.meses_garantia} mes${g.meses_garantia !== 1 ? 'es' : ''}`)
+      if (meta.length > 0) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(80, 80, 80)
+        doc.text(meta.join('   |   '), margen, y)
+        y += 5
+      }
+
+      // Condiciones snapshot
+      if (g.condiciones_snapshot) {
+        const maxAncho = ancho - margen * 2
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(100, 100, 100)
+        const lineas = doc.splitTextToSize(g.condiciones_snapshot, maxAncho)
+        for (const linea of lineas) {
+          checkY(5)
+          doc.text(linea, margen, y)
+          y += 4.2
+        }
+        y += 2
+      }
+
+      // Separador
+      checkY(3)
+      doc.setDrawColor(220, 220, 220)
+      doc.line(margen, y, ancho - margen, y)
+      y += 5
+    }
+
+    // Líneas de firma
+    checkY(28)
+    y += 4
+    const firmaAncho = (ancho - margen * 2 - 20) / 2
+    const x1 = margen
+    const x2 = margen + firmaAncho + 20
+
+    doc.setDrawColor(...NEGRO)
+    doc.line(x1, y + 14, x1 + firmaAncho, y + 14)
+    doc.line(x2, y + 14, x2 + firmaAncho, y + 14)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...NEGRO)
+    doc.text('Firma del Cliente', x1 + firmaAncho / 2, y + 18, { align: 'center' })
+    doc.text('Firma del Vendedor', x2 + firmaAncho / 2, y + 18, { align: 'center' })
+
+    doc.setFontSize(7.5)
+    doc.setTextColor(...GRIS)
+    doc.text('C.I. / RIF: ___________________________', x1 + firmaAncho / 2, y + 23, { align: 'center' })
+    y += 28
+  }
+
   // ── Pie de página ────────────────────────────────────────────────────────────
-  const altoPagina = 297
+  const altoPaginaFinal = 297
   doc.setFillColor(...AZUL)
-  doc.rect(0, altoPagina - 12, ancho, 12, 'F')
+  doc.rect(0, altoPaginaFinal - 12, ancho, 12, 'F')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   doc.setTextColor(...GRIS)
-  doc.text('DOCUMENTO NO FISCAL — USO INTERNO', ancho / 2, altoPagina - 4.5, { align: 'center' })
+  doc.text('DOCUMENTO NO FISCAL — USO INTERNO', ancho / 2, altoPaginaFinal - 4.5, { align: 'center' })
 
   doc.save(`Factura-${venta.id}.pdf`)
 }
