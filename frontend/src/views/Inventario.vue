@@ -15,6 +15,7 @@
             <template v-else>
               <button class="btn-guardar-masivo" :disabled="guardandoMasivo" @click="guardarEdicionMasiva">
                 {{ guardandoMasivo ? 'Guardando...' : '✓ Guardar Cambios' }}
+                <span v-if="!guardandoMasivo && filasModificadas.size > 0" class="badge-pendientes">{{ filasModificadas.size }}</span>
               </button>
               <button class="btn-cancelar-edicion" @click="cancelarModoEdicion">✕ Cancelar</button>
             </template>
@@ -31,6 +32,25 @@
       <transition name="toast-fade">
         <div v-if="toastMasivo" class="toast-masivo">{{ toastMasivo }}</div>
       </transition>
+
+      <!-- Diálogo: cambios pendientes al salir -->
+      <div v-if="dialogSalida" class="overlay-salida">
+        <div class="dialog-salida">
+          <h3>Cambios sin guardar</h3>
+          <p>
+            Tienes <strong>{{ filasModificadas.size }}</strong>
+            producto{{ filasModificadas.size !== 1 ? 's' : '' }} modificado{{ filasModificadas.size !== 1 ? 's' : '' }} sin guardar.
+            ¿Qué deseas hacer?
+          </p>
+          <div class="salida-botones">
+            <button class="btn-primario" :disabled="guardandoMasivo" @click="confirmarSalida">
+              {{ guardandoMasivo ? 'Guardando...' : '✓ Guardar y salir' }}
+            </button>
+            <button class="btn-peligro" @click="descartarSalida">Descartar y salir</button>
+            <button class="btn-secundario" @click="cancelarSalida">Cancelar</button>
+          </div>
+        </div>
+      </div>
 
       <div class="contenido-inner">
 
@@ -1010,6 +1030,10 @@ export default {
       guardandoMasivo:  false,
       toastMasivo:      '',
       generandoCodigos: false,
+
+      // Diálogo de cambios pendientes al navegar
+      dialogSalida: false,
+      _pendingNav:  null,
     }
   },
 
@@ -1110,6 +1134,22 @@ export default {
       this.cargarCategorias(),
       this.cargarPlantillasGarantia(),
     ])
+    if (this.esAdmin) this.activarModoEdicion()
+    window.addEventListener('beforeunload', this._onBeforeUnload)
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('beforeunload', this._onBeforeUnload)
+  },
+
+  beforeRouteLeave(to, from, next) {
+    if (this.filasModificadas.size > 0) {
+      this._pendingNav = next
+      this.dialogSalida = true
+    } else {
+      this.cancelarModoEdicion()
+      next()
+    }
   },
 
   methods: {
@@ -1135,6 +1175,7 @@ export default {
       const res = await axios.get('/productos/', { params })
       this.productos      = res.data.productos
       this.totalProductos = res.data.total
+      if (this.modoEdicion) this.sincronizarBorrador()
     },
     async cargarDepartamentos() {
       const res = await axios.get('/productos/departamentos')
@@ -1764,6 +1805,48 @@ export default {
       return p ? p.numero : '—'
     },
 
+    // ── Edición persistente (auto-modo) ──────────────────────────────────────
+    sincronizarBorrador() {
+      for (const p of this.productos) {
+        if (!this.borradorEdicion[p.id]) {
+          this.borradorEdicion[p.id] = {
+            nombre:      p.nombre,
+            stock:       p.stock,
+            costo_usd:   Number(p.costo_usd),
+            margen_pct:  Math.round(Number(p.margen) * 100),
+            descripcion: p.descripcion || '',
+            activo:      p.activo !== false,
+          }
+        }
+      }
+    },
+    _onBeforeUnload(e) {
+      if (this.filasModificadas.size > 0) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    },
+    async confirmarSalida() {
+      await this.guardarEdicionMasiva()
+      const nav = this._pendingNav
+      this.dialogSalida = false
+      this._pendingNav  = null
+      if (nav) nav()
+    },
+    descartarSalida() {
+      const nav = this._pendingNav
+      this.dialogSalida = false
+      this._pendingNav  = null
+      this.cancelarModoEdicion()
+      if (nav) nav()
+    },
+    cancelarSalida() {
+      const nav = this._pendingNav
+      this.dialogSalida = false
+      this._pendingNav  = null
+      if (nav) nav(false)
+    },
+
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -2013,5 +2096,35 @@ export default {
 @media (max-width: 1400px) {
   .celda-nombre { min-width: 130px !important; max-width: 180px; }
   .prod-nombre  { min-width: 130px !important; max-width: 180px; }
+}
+
+/* ── Diálogo cambios pendientes ── */
+.overlay-salida {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9000;
+}
+.dialog-salida {
+  background: #FFFFFF; border-radius: 12px; padding: 1.75rem 2rem;
+  width: 100%; max-width: 420px;
+  border: 0.5px solid var(--borde);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+}
+.dialog-salida h3 {
+  margin: 0 0 0.75rem; font-size: 1.05rem; color: var(--texto-principal);
+}
+.dialog-salida p {
+  margin: 0 0 1.5rem; font-size: 0.9rem; color: var(--texto-sec); line-height: 1.5;
+}
+.salida-botones {
+  display: flex; gap: 0.6rem; justify-content: flex-end; flex-wrap: wrap;
+}
+
+/* Contador de cambios pendientes en botón guardar */
+.badge-pendientes {
+  background: white; color: #16A34A;
+  font-size: 0.72rem; font-weight: 800;
+  padding: 0.05rem 0.4rem; border-radius: 10px;
+  margin-left: 0.35rem;
 }
 </style>
