@@ -156,7 +156,7 @@
 
                   <!-- Depto -->
                   <td>
-                    <template v-if="modoEdicion">
+                    <template v-if="modoEdicion && borradorEdicion[p.id]">
                       <select class="celda-input celda-select"
                         v-model="borradorEdicion[p.id].departamento_id"
                         @change="onCambiarDepto(p.id)">
@@ -170,7 +170,7 @@
                   </td>
                   <!-- Categoría -->
                   <td>
-                    <template v-if="modoEdicion">
+                    <template v-if="modoEdicion && borradorEdicion[p.id]">
                       <select class="celda-input celda-select"
                         v-model="borradorEdicion[p.id].categoria_id"
                         @change="marcarModificado(p.id)">
@@ -722,7 +722,7 @@
           <div class="modal modal-sm">
             <div class="modal-header">
               <h2>Departamentos</h2>
-              <button class="btn-cerrar-modal" @click="mostrarDeptos = false">✕</button>
+              <button class="btn-cerrar-modal" @click="mostrarDeptos = false; errorDeptos = ''">✕</button>
             </div>
 
             <div v-for="d in departamentos" :key="d.id" class="depto-row">
@@ -796,6 +796,8 @@
                 + Agregar
               </button>
             </div>
+
+            <p v-if="errorDeptos" class="msg-error-deptos">⚠ {{ errorDeptos }}</p>
           </div>
         </div>
 
@@ -1027,6 +1029,7 @@ export default {
       editandoDeptoId:  null,
       formDepto:        { nombre: '', descripcion: '', activo: true },
       nuevoDeptoNombre: '',
+      errorDeptos:      '',
 
       // Modal ubicaciones
       modalUbicaciones: null,
@@ -1676,13 +1679,18 @@ export default {
     },
     async crearCat() {
       if (!this.nuevaCatNombre.trim() || !this.nuevaCatDeptoId) return
-      await axios.post('/productos/categorias', {
-        nombre: this.nuevaCatNombre,
-        departamento_id: Number(this.nuevaCatDeptoId),
-      })
-      await this.cargarCategorias()
-      this.nuevaCatNombre  = ''
-      this.nuevaCatDeptoId = ''
+      this.errorDeptos = ''
+      try {
+        await axios.post('/productos/categorias', {
+          nombre: this.nuevaCatNombre,
+          departamento_id: Number(this.nuevaCatDeptoId),
+        })
+        await this.cargarCategorias()
+        this.nuevaCatNombre  = ''
+        this.nuevaCatDeptoId = ''
+      } catch (e) {
+        this.errorDeptos = e?.response?.data?.detail || e?.message || 'Error al crear categoría'
+      }
     },
     async eliminarCat(id) {
       if (!confirm('¿Eliminar esta categoría?')) return
@@ -1707,9 +1715,14 @@ export default {
     },
     async crearDepto() {
       if (!this.nuevoDeptoNombre.trim()) return
-      await axios.post('/productos/departamentos', { nombre: this.nuevoDeptoNombre, activo: true })
-      await this.cargarDepartamentos()
-      this.nuevoDeptoNombre = ''
+      this.errorDeptos = ''
+      try {
+        await axios.post('/productos/departamentos', { nombre: this.nuevoDeptoNombre, activo: true })
+        await this.cargarDepartamentos()
+        this.nuevoDeptoNombre = ''
+      } catch (e) {
+        this.errorDeptos = e?.response?.data?.detail || e?.message || 'Error al crear departamento'
+      }
     },
     async eliminarDepto(id) {
       if (!confirm('¿Eliminar este departamento?')) return
@@ -2069,6 +2082,7 @@ export default {
 .btn-guardar-sm  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 700; }
 .btn-guardar-sm:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-cancelar-sm { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 0.35rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.msg-error-deptos { color: var(--danger); font-size: 0.82rem; margin-top: 0.75rem; font-weight: 600; }
 .txt-verde { color: #16A34A; font-weight: 600; }
 
 /* ── Botón ubicar ── */
