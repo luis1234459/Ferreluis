@@ -154,9 +154,34 @@
                     </template>
                   </td>
 
-                  <!-- Depto / Categoría — solo lectura en ambos modos -->
-                  <td class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</td>
-                  <td class="txt-muted">{{ nombreCategoria(p.categoria_id) }}</td>
+                  <!-- Depto -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <select class="celda-input celda-select"
+                        v-model="borradorEdicion[p.id].departamento_id"
+                        @change="onCambiarDepto(p.id)">
+                        <option :value="null">— sin depto —</option>
+                        <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                      </select>
+                    </template>
+                    <template v-else>
+                      <span class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</span>
+                    </template>
+                  </td>
+                  <!-- Categoría -->
+                  <td>
+                    <template v-if="modoEdicion">
+                      <select class="celda-input celda-select"
+                        v-model="borradorEdicion[p.id].categoria_id"
+                        @change="marcarModificado(p.id)">
+                        <option :value="null">— sin cat. —</option>
+                        <option v-for="c in categoriasParaProducto(p.id)" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                      </select>
+                    </template>
+                    <template v-else>
+                      <span class="txt-muted">{{ nombreCategoria(p.categoria_id) }}</span>
+                    </template>
+                  </td>
 
                   <!-- Costo USD -->
                   <td>
@@ -1311,12 +1336,14 @@ export default {
       const borrador = {}
       for (const p of this.productos) {
         borrador[p.id] = {
-          nombre:      p.nombre,
-          stock:       p.stock,
-          costo_usd:   Number(p.costo_usd),
-          margen_pct:  Math.round(Number(p.margen) * 100),
-          descripcion: p.descripcion || '',
-          activo:      p.activo !== false,
+          nombre:          p.nombre,
+          stock:           p.stock,
+          costo_usd:       Number(p.costo_usd),
+          margen_pct:      Math.round(Number(p.margen) * 100),
+          descripcion:     p.descripcion || '',
+          activo:          p.activo !== false,
+          departamento_id: p.departamento_id || null,
+          categoria_id:    p.categoria_id    || null,
         }
       }
       this.borradorEdicion  = borrador
@@ -1349,14 +1376,16 @@ export default {
           const b = this.borradorEdicion[id]
           return {
             id,
-            nombre:      b.nombre,
-            stock:       Number(b.stock),
-            costo_usd:   Number(b.costo_usd),
-            margen:      Number(b.margen_pct) / 100,
-            descripcion: b.descripcion
+            nombre:          b.nombre,
+            stock:           Number(b.stock),
+            costo_usd:       Number(b.costo_usd),
+            margen:          Number(b.margen_pct) / 100,
+            descripcion:     b.descripcion
               ? b.descripcion.charAt(0).toUpperCase() + b.descripcion.slice(1).toLowerCase()
               : null,
-            activo:      b.activo,
+            activo:          b.activo,
+            departamento_id: b.departamento_id || null,
+            categoria_id:    b.categoria_id    || null,
           }
         })
         const res = await axios.put('/productos/edicion-masiva', items)
@@ -1806,16 +1835,27 @@ export default {
     },
 
     // ── Edición persistente (auto-modo) ──────────────────────────────────────
+    categoriasParaProducto(id) {
+      const deptoId = this.borradorEdicion[id]?.departamento_id
+      if (!deptoId) return this.categorias
+      return this.categorias.filter(c => c.departamento_id === deptoId)
+    },
+    onCambiarDepto(id) {
+      this.borradorEdicion[id].categoria_id = null
+      this.marcarModificado(id)
+    },
     sincronizarBorrador() {
       for (const p of this.productos) {
         if (!this.borradorEdicion[p.id]) {
           this.borradorEdicion[p.id] = {
-            nombre:      p.nombre,
-            stock:       p.stock,
-            costo_usd:   Number(p.costo_usd),
-            margen_pct:  Math.round(Number(p.margen) * 100),
-            descripcion: p.descripcion || '',
-            activo:      p.activo !== false,
+            nombre:          p.nombre,
+            stock:           p.stock,
+            costo_usd:       Number(p.costo_usd),
+            margen_pct:      Math.round(Number(p.margen) * 100),
+            descripcion:     p.descripcion || '',
+            activo:          p.activo !== false,
+            departamento_id: p.departamento_id || null,
+            categoria_id:    p.categoria_id    || null,
           }
         }
       }
@@ -1970,6 +2010,7 @@ export default {
 .celda-num    { max-width: 80px; text-align: right; }
 .celda-nombre { min-width: 200px; }
 .celda-desc   { min-width: 220px; text-transform: lowercase; }
+.celda-select { min-width: 110px; max-width: 150px; padding: 0.22rem 0.35rem; font-size: 0.8rem; }
 .celda-desc::first-line { text-transform: capitalize; }
 .celda-check { width: 16px; height: 16px; accent-color: #1A1A1A; cursor: pointer; }
 
