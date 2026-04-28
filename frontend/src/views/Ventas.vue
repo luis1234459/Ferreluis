@@ -1112,8 +1112,12 @@ export default {
     precioBs(p)       { return this.precioBase(p) * (this.tasaBinance || 0) },
 
     variantePrecioBase(v) {
-      const costo = v.precio_override_usd ?? (this.productoVariantes?.costo_usd || 0)
-      return Number(costo) * (1 + Number(this.productoVariantes?.margen || 0))
+      // Usar precio_base_usd precalculado por el backend (incluye costo/margen propios de la variante)
+      if (v.precio_base_usd != null) return Number(v.precio_base_usd)
+      // Fallback para datos incompletos
+      const costo = v.costo_efectivo ?? v.precio_override_usd ?? (this.productoVariantes?.costo_usd || 0)
+      const margen = v.margen_efectivo ?? (this.productoVariantes?.margen || 0)
+      return Number(costo) * (1 + Number(margen))
     },
     variantePrecioRef(v)  { return this.variantePrecioBase(v) * this.factor },
     variantePrecioBs(v)   { return this.variantePrecioBase(v) * (this.tasaBinance || 0) },
@@ -1161,8 +1165,10 @@ export default {
       const existe = this.carrito.find(i => i._key === key)
       if (existe) { existe.cantidad++; return }
 
-      const costoBase   = variante?.precio_override_usd ?? p.costo_usd
-      const productoMod = { ...p, costo_usd: costoBase }
+      // Usar costo/margen efectivos de la variante (pueden diferir del padre)
+      const costoBase   = variante?.costo_efectivo ?? variante?.precio_override_usd ?? p.costo_usd
+      const margenBase  = variante?.margen_efectivo ?? p.margen
+      const productoMod = { ...p, costo_usd: costoBase, margen: margenBase }
       const precio      = this.precioParaTier(productoMod)
 
       this.carrito.push({
