@@ -713,16 +713,18 @@
             <button
               v-for="v in variantes"
               :key="v.id"
-              class="variante-item"
+              :class="['variante-item', v.stock <= 0 ? 'variante-sin-stock' : '']"
+              :disabled="v.stock <= 0"
               @click="seleccionarVariante(v)"
             >
               <div class="variante-info">
                 <span class="variante-clase">{{ v.clase }}</span>
                 <span v-if="v.color" class="variante-color">{{ v.color }}</span>
                 <span v-if="v.codigo" class="variante-cod-tag">{{ v.codigo }}</span>
+                <span v-if="v.stock <= 0" class="variante-agotado-tag">Agotado</span>
               </div>
               <div class="variante-right">
-                <span class="variante-stock">Stock: {{ v.stock }}</span>
+                <span class="variante-stock" :class="{ 'txt-rojo': v.stock <= 0 }">Stock: {{ v.stock }}</span>
                 <span class="variante-bs">Bs {{ variantePrecioBs(v).toFixed(2) }}</span>
                 <span class="variante-ref">${{ variantePrecioRef(v).toFixed(2) }}</span>
                 <span class="variante-base">Base: ${{ variantePrecioBase(v).toFixed(2) }}</span>
@@ -1131,15 +1133,12 @@ export default {
       this.cargandoVariantes = true
       try {
         const res = await axios.get(`/productos/${p.id}/variantes`)
-        const todas  = res.data
-        const activas = todas.filter(v => v.activo && v.stock > 0)
-        if (todas.length > 0) {
-          if (activas.length === 0) {
-            this._avisoSinStock(`Sin stock en variantes de "${p.nombre}"`)
-            return
-          }
+        const todasActivas = res.data.filter(v => v.activo)
+        if (todasActivas.length > 0) {
+          // Abre el modal con TODAS las variantes activas, incluso con stock=0
+          // Las sin stock se muestran (para consultar precio) pero no se pueden agregar
           this.productoVariantes = p
-          this.variantes         = activas
+          this.variantes         = todasActivas
           this.modalVariantes    = true
           return
         }
@@ -2283,10 +2282,23 @@ export default {
   transition: all 0.12s;
   width: 100%;
 }
-.variante-item:hover {
+.variante-item:hover:not(:disabled) {
   border-color: #FFCC00;
   background: #FFFDF0;
 }
+.variante-sin-stock {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--borde) !important;
+  background: #FAFAF7 !important;
+}
+.variante-agotado-tag {
+  font-size: 0.68rem; font-weight: 700;
+  color: #DC2626; background: #FEE2E2;
+  padding: 0.1rem 0.4rem; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.txt-rojo { color: #DC2626 !important; font-weight: 600; }
 .variante-info {
   display: flex;
   flex-direction: column;
