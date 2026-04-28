@@ -189,6 +189,10 @@
 
             <!-- Lista compacta de productos -->
             <div class="prod-list" ref="tbodyCatalogo">
+              <transition name="aviso-fade">
+                <div v-if="avisoSinStock" class="aviso-sin-stock">⚠ {{ avisoSinStock }}</div>
+              </transition>
+
               <div
                 v-for="(p, index) in productosFiltrados" :key="p.id"
                 :class="['prod-item', index === indiceResaltado ? 'prod-item-resaltado' : '']"
@@ -916,6 +920,7 @@ export default {
       productoVariantes: null,
       variantes:         [],
       cargandoVariantes: false,
+      avisoSinStock:     '',
 
       // Garantías
       modalGarantia:       false,
@@ -1126,8 +1131,13 @@ export default {
       this.cargandoVariantes = true
       try {
         const res = await axios.get(`/productos/${p.id}/variantes`)
-        const activas = res.data.filter(v => v.activo && v.stock > 0)
-        if (activas.length > 0) {
+        const todas  = res.data
+        const activas = todas.filter(v => v.activo && v.stock > 0)
+        if (todas.length > 0) {
+          if (activas.length === 0) {
+            this._avisoSinStock(`Sin stock en variantes de "${p.nombre}"`)
+            return
+          }
           this.productoVariantes = p
           this.variantes         = activas
           this.modalVariantes    = true
@@ -1135,7 +1145,16 @@ export default {
         }
       } catch { /* si falla, agregar normal */ }
       finally { this.cargandoVariantes = false }
+      if (p.stock <= 0) {
+        this._avisoSinStock(`Sin stock: "${p.nombre}"`)
+        return
+      }
       this._agregarDirecto(p)
+    },
+    _avisoSinStock(msg) {
+      this.avisoSinStock = msg
+      clearTimeout(this._avisoTimer)
+      this._avisoTimer = setTimeout(() => { this.avisoSinStock = '' }, 2500)
     },
 
     _agregarDirecto(p, variante = null) {
@@ -1780,6 +1799,14 @@ export default {
   border: 1px solid var(--borde);
   border-radius: 8px;
 }
+.aviso-sin-stock {
+  background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA;
+  border-radius: 6px; padding: 0.45rem 0.85rem; font-size: 0.82rem;
+  font-weight: 600; margin-bottom: 0.4rem;
+}
+.aviso-fade-enter-active, .aviso-fade-leave-active { transition: opacity 0.3s; }
+.aviso-fade-enter-from, .aviso-fade-leave-to { opacity: 0; }
+
 .prod-item {
   display: flex;
   justify-content: space-between;
