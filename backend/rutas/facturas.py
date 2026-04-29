@@ -815,15 +815,26 @@ def importar_catalogo(
                 continue
 
             if accion == "nuevo":
-                # Si el código ya existe en otro producto, no lo asignamos para evitar violación unique
+                # Código: usar el del catálogo si está disponible; si ya existe en otro producto, no asignar
                 codigo_a_asignar = None
                 if codigo_cat:
                     ya_existe = db.query(Producto.id).filter(Producto.codigo == codigo_cat).first()
                     codigo_a_asignar = None if ya_existe else codigo_cat
 
+                # Si el catálogo no trae código, generar uno automático
+                if not codigo_a_asignar:
+                    import re as _re
+                    letras  = _re.sub(r'[^A-Za-z]', '', nombre).upper()[:3].ljust(3, 'X')
+                    prefijo = letras + '-'
+                    nums    = [int(m.group(1)) for (c,) in db.query(Producto.codigo).filter(
+                                   Producto.codigo.like(f"{prefijo}%")).all()
+                               if c and (m := _re.search(r'(\d+)$', c))]
+                    codigo_a_asignar = f"{prefijo}{(max(nums)+1 if nums else 1):03d}"
+
                 nuevo = Producto(
                     nombre          = nombre,
                     codigo          = codigo_a_asignar,
+                    proveedor_id    = proveedor_id,
                     departamento_id = depto_id,
                     categoria_id    = cat_id,
                     costo_usd       = costo,
@@ -844,6 +855,8 @@ def importar_catalogo(
                     continue
                 if nombre and nombre != prod.nombre:
                     prod.nombre = nombre
+                if prod.proveedor_id is None:
+                    prod.proveedor_id = proveedor_id
 
             else:
                 sp.rollback()
