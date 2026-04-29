@@ -677,54 +677,79 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
 # Extrae: código, descripción y precio de cada producto del catálogo.
 # ---------------------------------------------------------------------------
 
+def _pdf_paginas_base64(contenido: bytes) -> list[tuple[str, str]]:
+    """Convierte todas las páginas de un PDF a imágenes base64 usando PyMuPDF."""
+    try:
+        import fitz
+    except ImportError:
+        raise HTTPException(status_code=500, detail="pymupdf no está instalado.")
+    doc    = fitz.open(stream=contenido, filetype="pdf")
+    paginas = []
+    for pagina in doc:
+        mat  = fitz.Matrix(2.0, 2.0)  # 2x zoom = ~150 DPI efectivo
+        pix  = pagina.get_pixmap(matrix=mat, alpha=False)
+        img  = io.BytesIO(pix.tobytes("jpeg", jpg_quality=90))
+        paginas.append((base64.standard_b64encode(img.getvalue()).decode("utf-8"), "image/jpeg"))
+    doc.close()
+    return paginas
+
+
 @router.post("/escanear-catalogo")
 async def escanear_catalogo(archivo: UploadFile = File(...)):
     client       = anthropic.Anthropic(api_key=API_KEY)
     contenido    = await archivo.read()
     content_type = (archivo.content_type or "").lower().split(";")[0].strip()
 
+    # Construir bloques de contenido visual
+    bloques_imagen: list[dict] = []
     if content_type == "application/pdf":
-        imagen_b64, media_type = _pdf_a_imagen_base64(contenido)
+        for img_b64, mtype in _pdf_paginas_base64(contenido):
+            bloques_imagen.append({
+                "type": "image",
+                "source": {"type": "base64", "media_type": mtype, "data": img_b64},
+            })
     elif content_type in TIPOS_IMAGEN:
-        imagen_b64 = base64.standard_b64encode(contenido).decode("utf-8")
-        media_type = MEDIA_TYPE_MAP.get(content_type, content_type)
+        bloques_imagen.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": MEDIA_TYPE_MAP.get(content_type, content_type),
+                "data": base64.standard_b64encode(contenido).decode("utf-8"),
+            },
+        })
     else:
         raise HTTPException(status_code=400, detail=f"Formato no soportado: {content_type}")
 
+    texto_prompt = {
+        "type": "text",
+        "text": (
+            "Estás analizando un CATÁLOGO DE PRODUCTOS DE PROVEEDOR. "
+            "NO es una factura ni una orden de compra.\n"
+            "El catálogo tiene columnas: CÓDIGO, DESCRIPCIÓN y PRECIO.\n"
+            "El nombre del proveedor aparece en el encabezado del documento.\n\n"
+            "Extrae TODOS los productos de TODAS las páginas que ves.\n"
+            "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
+            "{\n"
+            '  "proveedor": "nombre del proveedor o cadena vacía",\n'
+            '  "productos": [\n'
+            "    {\n"
+            '      "codigo": "código del producto o cadena vacía",\n'
+            '      "descripcion": "nombre o descripción del producto",\n'
+            '      "precio": numero o null\n'
+            "    }\n"
+            "  ]\n"
+            "}\n"
+            "IMPORTANTE: precio es el costo de compra al proveedor. "
+            "No omitas ningún producto. No agregues texto fuera del JSON."
+        ),
+    }
+
     mensaje = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[{
             "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": imagen_b64},
-                },
-                {
-                    "type": "text",
-                    "text": (
-                        "Estás analizando un CATÁLOGO DE PRODUCTOS DE PROVEEDOR. "
-                        "NO es una factura ni una orden de compra.\n"
-                        "El catálogo tiene 3 columnas: CÓDIGO, DESCRIPCIÓN y PRECIO.\n"
-                        "El nombre del proveedor aparece en el encabezado.\n\n"
-                        "Extrae TODOS los productos visibles del catálogo.\n"
-                        "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
-                        "{\n"
-                        '  "proveedor": "nombre del proveedor o vacío",\n'
-                        '  "productos": [\n'
-                        "    {\n"
-                        '      "codigo": "código del producto (primera columna) o vacío",\n'
-                        '      "descripcion": "nombre/descripción del producto (segunda columna)",\n'
-                        '      "precio": numero o null\n'
-                        "    }\n"
-                        "  ]\n"
-                        "}\n"
-                        "IMPORTANTE: precio es el costo de compra del producto al proveedor. "
-                        "Extrae absolutamente todos los productos de la página, ninguno debe omitirse."
-                    ),
-                },
-            ],
+            "content": bloques_imagen + [texto_prompt],
         }],
     )
 

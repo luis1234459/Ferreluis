@@ -12,3 +12,4 @@ openpyxl
 pandas
 reportlab
 python-jose[cryptography]
+pymupdf
