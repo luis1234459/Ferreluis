@@ -796,6 +796,7 @@ def importar_catalogo(
     errores   = []
 
     for item in items:
+        sp = db.begin_nested()  # SAVEPOINT por item — garantiza atomicidad
         try:
             codigo_cat  = str(item.get("codigo_catalogo", "")).strip() or None
             nombre      = str(item.get("nombre_final", "")).strip()
@@ -806,14 +807,20 @@ def importar_catalogo(
             costo       = float(item.get("costo_final") or 0)
 
             if not nombre:
+                sp.rollback()
                 errores.append({"item": item, "motivo": "nombre vacío"})
                 continue
 
             if accion == "nuevo":
-                # Crear producto nuevo
+                # Si el código ya existe en otro producto, no lo asignamos para evitar violación unique
+                codigo_a_asignar = None
+                if codigo_cat:
+                    ya_existe = db.query(Producto.id).filter(Producto.codigo == codigo_cat).first()
+                    codigo_a_asignar = None if ya_existe else codigo_cat
+
                 nuevo = Producto(
                     nombre          = nombre,
-                    codigo          = codigo_cat if codigo_cat else None,
+                    codigo          = codigo_a_asignar,
                     departamento_id = depto_id,
                     categoria_id    = cat_id,
                     costo_usd       = costo,
@@ -824,20 +831,19 @@ def importar_catalogo(
                 db.add(nuevo)
                 db.flush()
                 prod_id = nuevo.id
-                creados += 1
 
             elif accion == "vincular" and prod_id_ext:
                 prod_id = int(prod_id_ext)
                 prod    = db.query(Producto).filter(Producto.id == prod_id).first()
                 if not prod:
+                    sp.rollback()
                     errores.append({"item": item, "motivo": "producto existente no encontrado"})
                     continue
-                # Actualizar nombre si cambió
                 if nombre and nombre != prod.nombre:
                     prod.nombre = nombre
-                vinculados += 1
 
             else:
+                sp.rollback()
                 errores.append({"item": item, "motivo": "acción desconocida o producto no especificado"})
                 continue
 
@@ -858,12 +864,18 @@ def importar_catalogo(
                     precio_referencia_usd = costo,
                 ))
             else:
-                # Actualizar precio; código es inamovible si ya estaba establecido
                 existente.precio_referencia_usd = costo
                 if not existente.codigo_proveedor and codigo_cat:
                     existente.codigo_proveedor = codigo_cat
 
+            sp.commit()  # Libera el savepoint — producto + enlace quedan atómicos
+            if accion == "nuevo":
+                creados += 1
+            else:
+                vinculados += 1
+
         except Exception as e:
+            sp.rollback()  # Revierte solo este item; la sesión sigue usable
             errores.append({"item": item, "motivo": str(e)})
 
     db.commit()
