@@ -813,6 +813,7 @@ def importar_catalogo(
                 # Crear producto nuevo
                 nuevo = Producto(
                     nombre          = nombre,
+                    codigo          = codigo_cat if codigo_cat else None,
                     departamento_id = depto_id,
                     categoria_id    = cat_id,
                     costo_usd       = costo,

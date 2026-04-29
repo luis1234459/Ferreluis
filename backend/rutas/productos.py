@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
@@ -113,9 +113,11 @@ def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float) -> di
 
 
 def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
-                variantes: list = None, plantilla: PlantillaGarantia = None) -> dict:
+                variantes: list = None, plantilla: PlantillaGarantia = None,
+                tiene_catalogo: bool = False) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance))
+    d["tiene_catalogo"]    = tiene_catalogo
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
     d["variantes_resumen"] = [
@@ -500,8 +502,16 @@ def listar_productos(
     if plantilla_ids:
         for pl in db.query(PlantillaGarantia).filter(PlantillaGarantia.id.in_(plantilla_ids)).all():
             plantillas_map[pl.id] = pl
+    catalogo_ids: set = set()
+    if ids:
+        for (pid,) in db.query(CatalogoProveedor.producto_id).filter(
+            CatalogoProveedor.producto_id.in_(ids)
+        ).distinct().all():
+            catalogo_ids.add(pid)
     productos = [
-        _enriquecer(p, bcv, binance, variantes_map.get(p.id, []), plantillas_map.get(p.plantilla_garantia_id))
+        _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
+                    plantillas_map.get(p.plantilla_garantia_id),
+                    tiene_catalogo=(p.id in catalogo_ids))
         for p in lista
     ]
     return {"total": total, "productos": productos}
