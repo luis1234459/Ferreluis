@@ -75,10 +75,11 @@ class Producto(Base):
     requiere_serial         = Column(Boolean, default=False)
     plantilla_garantia_id   = Column(Integer, nullable=True)   # FK → PlantillaGarantia
 
+    pricing_policy_override = Column(String, nullable=True)   # None → hereda del Proveedor
+
     # Precios calculados (NO se guardan, se computan al vuelo):
-    #   precio_base_usd        = costo_usd * (1 + margen)
-    #   precio_referencial_usd = precio_base_usd * (tasa_binance / tasa_bcv)
-    #   precio_bs              = precio_base_usd * tasa_binance
+    #   MARKET_FACTOR: precio_referencial = precio_base * (binance/BCV); precio_bs = base * binance
+    #   BCV_DIRECT:    precio_referencial = precio_base;                  precio_bs = base * BCV
 
 
 class VarianteProducto(Base):
@@ -301,9 +302,11 @@ class Proveedor(Base):
     contacto         = Column(String,  nullable=True)
     activo           = Column(Boolean, default=True)
     fecha_registro   = Column(DateTime, default=datetime.now)
-    dias_credito       = Column(Integer,  default=0)   # días de crédito que otorga
-    credito_disponible = Column(Float,    default=0)   # crédito a favor por devoluciones
+    dias_credito       = Column(Integer,  default=0)
+    credito_disponible = Column(Float,    default=0)
     codigo             = Column(String,   nullable=True, unique=True, index=True)
+    pricing_policy     = Column(String,   default="MARKET_FACTOR")   # MARKET_FACTOR | BCV_DIRECT
+    ajuste_divisa_pct  = Column(Float,    default=0.0)               # ajuste USD para proveedores BCV_DIRECT
 
 
 class CatalogoProveedor(Base):

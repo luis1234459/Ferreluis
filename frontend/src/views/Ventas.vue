@@ -1107,28 +1107,21 @@ export default {
       this.factor      = r.data.factor || 1
     },
 
-    precioBase(p)     { return Number(p.costo_usd || 0) * (1 + Number(p.margen || 0)) },
-    precioRef(p)      { return this.precioBase(p) * this.factor },
-    precioBs(p)       { return this.precioBase(p) * (this.tasaBinance || 0) },
+    precioBase(p) { return Number(p.precio_base_usd        ?? 0) },
+    precioRef(p)  { return Number(p.precio_referencial_usd ?? 0) },
+    precioBs(p)   { return Number(p.precio_bs              ?? 0) },
 
-    variantePrecioBase(v) {
-      // Usar precio_base_usd precalculado por el backend (incluye costo/margen propios de la variante)
-      if (v.precio_base_usd != null) return Number(v.precio_base_usd)
-      // Fallback para datos incompletos
-      const costo = v.costo_efectivo ?? v.precio_override_usd ?? (this.productoVariantes?.costo_usd || 0)
-      const margen = v.margen_efectivo ?? (this.productoVariantes?.margen || 0)
-      return Number(costo) * (1 + Number(margen))
-    },
-    variantePrecioRef(v)  { return this.variantePrecioBase(v) * this.factor },
-    variantePrecioBs(v)   { return this.variantePrecioBase(v) * (this.tasaBinance || 0) },
+    variantePrecioBase(v) { return Number(v.precio_base_usd        ?? 0) },
+    variantePrecioRef(v)  { return Number(v.precio_referencial_usd ?? 0) },
+    variantePrecioBs(v)   { return Number(v.precio_bs              ?? 0) },
     precioParaTier(p) { return this.tipoPrecio === 'base' ? this.precioBase(p) : this.precioRef(p) },
 
     cambiarTipoPrecio(nuevo) {
       this.tipoPrecio = nuevo
       this.carrito.forEach(item => {
-        const p = this.productos.find(x => x.id === item.id)
-        if (!p) return
-        const precio = this.precioParaTier(p)
+        const precio = nuevo === 'base'
+          ? Number(item.precio_base_usd        || 0)
+          : Number(item.precio_referencial_usd || 0)
         item.precio_original = precio
         item.precio_unitario = precio
       })
@@ -1165,23 +1158,27 @@ export default {
       const existe = this.carrito.find(i => i._key === key)
       if (existe) { existe.cantidad++; return }
 
-      // Usar costo/margen efectivos de la variante (pueden diferir del padre)
-      const costoBase   = variante?.costo_efectivo ?? variante?.precio_override_usd ?? p.costo_usd
-      const margenBase  = variante?.margen_efectivo ?? p.margen
-      const productoMod = { ...p, costo_usd: costoBase, margen: margenBase }
-      const precio      = this.precioParaTier(productoMod)
+      const precioBase = variante
+        ? Number(variante.precio_base_usd        ?? p.precio_base_usd        ?? 0)
+        : Number(p.precio_base_usd        ?? 0)
+      const precioRef = variante
+        ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
+        : Number(p.precio_referencial_usd ?? 0)
+      const precio = this.tipoPrecio === 'base' ? precioBase : precioRef
 
       this.carrito.push({
         ...p,
-        _key:            key,
-        variante_id:     variante?.id     || null,
-        variante_label:  variante ? `${variante.clase}${variante.color ? ' · ' + variante.color : ''}` : null,
-        variante_codigo: variante?.codigo || null,
-        stock:           variante?.stock  ?? p.stock,
-        costo_usd:       costoBase,
-        cantidad:        1,
-        precio_original: precio,
-        precio_unitario: precio,
+        _key:                   key,
+        variante_id:            variante?.id     || null,
+        variante_label:         variante ? `${variante.clase}${variante.color ? ' · ' + variante.color : ''}` : null,
+        variante_codigo:        variante?.codigo || null,
+        stock:                  variante?.stock  ?? p.stock,
+        costo_usd:              variante?.costo_efectivo ?? p.costo_usd,
+        precio_base_usd:        precioBase,
+        precio_referencial_usd: precioRef,
+        cantidad:               1,
+        precio_original:        precio,
+        precio_unitario:        precio,
       })
     },
 

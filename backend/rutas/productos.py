@@ -2,7 +2,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor
+from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
@@ -98,25 +99,26 @@ class OfertaSchema(BaseModel):
 # Helpers internos
 # ============================================================================
 
-def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float) -> dict:
-    """Retorna los precios calculados de un producto dado las tasas actuales."""
-    factor      = round(tasa_binance / tasa_bcv, 6) if tasa_bcv > 0 else 1.0
-    precio_base = round(float(p.costo_usd or 0) * (1 + float(p.margen or 0)), 4)
-    precio_ref  = round(precio_base * factor, 4)
-    precio_bs   = round(precio_base * tasa_binance, 2)
-    return {
-        "precio_base_usd":        precio_base,
-        "precio_referencial_usd": precio_ref,
-        "precio_bs":              precio_bs,
-        "factor":                 factor,
-    }
+def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float,
+                         policy: str = "MARKET_FACTOR",
+                         ajuste_divisa_pct: float = 0.0) -> dict:
+    return calcular_precios(
+        costo_usd         = float(p.costo_usd or 0),
+        margen            = float(p.margen or 0),
+        tasa_bcv          = tasa_bcv,
+        tasa_binance      = tasa_binance,
+        policy            = policy,
+        ajuste_divisa_pct = ajuste_divisa_pct,
+    )
 
 
 def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 variantes: list = None, plantilla: PlantillaGarantia = None,
-                tiene_catalogo: bool = False) -> dict:
+                tiene_catalogo: bool = False,
+                policy: str = "MARKET_FACTOR",
+                ajuste_divisa_pct: float = 0.0) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
-    d.update(_precios_computados(p, tasa_bcv, tasa_binance))
+    d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
@@ -508,12 +510,28 @@ def listar_productos(
             CatalogoProveedor.producto_id.in_(ids)
         ).distinct().all():
             catalogo_ids.add(pid)
-    productos = [
-        _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
-                    plantillas_map.get(p.plantilla_garantia_id),
-                    tiene_catalogo=(p.id in catalogo_ids))
-        for p in lista
-    ]
+    prov_ids = {p.proveedor_id for p in lista if p.proveedor_id}
+    prov_policy_map: dict = {}
+    if prov_ids:
+        for prov in db.query(Proveedor).filter(Proveedor.id.in_(prov_ids)).all():
+            prov_policy_map[prov.id] = (
+                prov.pricing_policy or "MARKET_FACTOR",
+                float(prov.ajuste_divisa_pct or 0.0),
+            )
+    productos = []
+    for p in lista:
+        policy, ajuste = resolver_policy(
+            pricing_policy_override=p.pricing_policy_override,
+            proveedor_id=p.proveedor_id,
+            prov_policy_map=prov_policy_map,
+        )
+        productos.append(
+            _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
+                        plantillas_map.get(p.plantilla_garantia_id),
+                        tiene_catalogo=(p.id in catalogo_ids),
+                        policy=policy,
+                        ajuste_divisa_pct=ajuste)
+        )
     return {"total": total, "productos": productos}
 
 
@@ -879,15 +897,39 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    bcv, binance = _tasas_actuales(db)
+    prov_policy_map: dict = {}
+    if p.proveedor_id:
+        prov = db.query(Proveedor).filter(Proveedor.id == p.proveedor_id).first()
+        if prov:
+            prov_policy_map[prov.id] = (
+                prov.pricing_policy or "MARKET_FACTOR",
+                float(prov.ajuste_divisa_pct or 0.0),
+            )
+    policy, ajuste = resolver_policy(
+        pricing_policy_override=p.pricing_policy_override,
+        proveedor_id=p.proveedor_id,
+        prov_policy_map=prov_policy_map,
+    )
     variantes = db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).all()
     resultado = []
     for v in variantes:
         d = {c.name: getattr(v, c.name) for c in v.__table__.columns}
-        d["costo_efectivo"]  = float(v.costo_usd  if v.costo_usd  is not None else (p.costo_usd  or 0))
-        d["margen_efectivo"] = float(v.margen      if v.margen     is not None else (p.margen     or 0))
-        d["precio_base_usd"] = round(d["costo_efectivo"] * (1 + d["margen_efectivo"]), 4)
+        d["costo_efectivo"]  = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
+        d["margen_efectivo"] = float(v.margen     if v.margen    is not None else (p.margen    or 0))
+        precios = calcular_precios(
+            costo_usd         = d["costo_efectivo"],
+            margen            = d["margen_efectivo"],
+            tasa_bcv          = bcv,
+            tasa_binance      = binance,
+            policy            = policy,
+            ajuste_divisa_pct = ajuste,
+        )
+        d["precio_base_usd"]        = precios["precio_base_usd"]
+        d["precio_referencial_usd"] = precios["precio_referencial_usd"]
+        d["precio_bs"]              = precios["precio_bs"]
         resultado.append(d)
     return resultado
 
