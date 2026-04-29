@@ -126,10 +126,20 @@ def inicializar_datos():
         migrar(
             ["ALTER TABLE proveedores ADD COLUMN dias_credito INTEGER DEFAULT 0",
              "ALTER TABLE proveedores ADD COLUMN credito_disponible FLOAT DEFAULT 0",
-             "ALTER TABLE proveedores ADD COLUMN codigo TEXT"],
+             "ALTER TABLE proveedores ADD COLUMN codigo TEXT",
+             "ALTER TABLE proveedores ADD COLUMN pricing_policy TEXT DEFAULT 'MARKET_FACTOR'",
+             "ALTER TABLE proveedores ADD COLUMN ajuste_divisa_pct FLOAT DEFAULT 0.0"],
             ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS dias_credito INTEGER DEFAULT 0",
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS credito_disponible FLOAT DEFAULT 0",
-             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS codigo TEXT"],
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS codigo TEXT",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS pricing_policy TEXT DEFAULT 'MARKET_FACTOR'",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS ajuste_divisa_pct FLOAT DEFAULT 0.0"],
+        )
+
+        # ── productos: pricing_policy_override ───────────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN pricing_policy_override TEXT"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS pricing_policy_override TEXT"],
         )
 
         # ── recepciones_compra ───────────────────────────────────────────────
