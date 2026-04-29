@@ -669,3 +669,176 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         "saldo_pendiente": round(saldo_pend, 2),
         "mensaje":        f"Compra registrada: {orden.numero}",
     }
+
+
+# ---------------------------------------------------------------------------
+# POST /facturas/escanear-catalogo
+# Lee un PDF de catálogo de proveedor (NO es una factura/compra).
+# Extrae: código, descripción y precio de cada producto del catálogo.
+# ---------------------------------------------------------------------------
+
+@router.post("/escanear-catalogo")
+async def escanear_catalogo(archivo: UploadFile = File(...)):
+    client       = anthropic.Anthropic(api_key=API_KEY)
+    contenido    = await archivo.read()
+    content_type = (archivo.content_type or "").lower().split(";")[0].strip()
+
+    if content_type == "application/pdf":
+        imagen_b64, media_type = _pdf_a_imagen_base64(contenido)
+    elif content_type in TIPOS_IMAGEN:
+        imagen_b64 = base64.standard_b64encode(contenido).decode("utf-8")
+        media_type = MEDIA_TYPE_MAP.get(content_type, content_type)
+    else:
+        raise HTTPException(status_code=400, detail=f"Formato no soportado: {content_type}")
+
+    mensaje = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=4096,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": imagen_b64},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "Estás analizando un CATÁLOGO DE PRODUCTOS DE PROVEEDOR. "
+                        "NO es una factura ni una orden de compra.\n"
+                        "El catálogo tiene 3 columnas: CÓDIGO, DESCRIPCIÓN y PRECIO.\n"
+                        "El nombre del proveedor aparece en el encabezado.\n\n"
+                        "Extrae TODOS los productos visibles del catálogo.\n"
+                        "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
+                        "{\n"
+                        '  "proveedor": "nombre del proveedor o vacío",\n'
+                        '  "productos": [\n'
+                        "    {\n"
+                        '      "codigo": "código del producto (primera columna) o vacío",\n'
+                        '      "descripcion": "nombre/descripción del producto (segunda columna)",\n'
+                        '      "precio": numero o null\n'
+                        "    }\n"
+                        "  ]\n"
+                        "}\n"
+                        "IMPORTANTE: precio es el costo de compra del producto al proveedor. "
+                        "Extrae absolutamente todos los productos de la página, ninguno debe omitirse."
+                    ),
+                },
+            ],
+        }],
+    )
+
+    texto = mensaje.content[0].text.strip()
+    if texto.startswith("```"):
+        lineas = texto.splitlines()
+        texto = "\n".join(lineas[1:-1] if lineas[-1].strip() == "```" else lineas[1:])
+
+    try:
+        return json.loads(texto)
+    except Exception as e:
+        return {"error": str(e), "respuesta": texto}
+
+
+# ---------------------------------------------------------------------------
+# POST /facturas/importar-catalogo
+# Crea o vincula productos en inventario desde un catálogo.
+# Regla inamovible: código_proveedor queda enlazado de forma permanente.
+# ---------------------------------------------------------------------------
+
+from fastapi import Body as _Body
+
+@router.post("/importar-catalogo")
+def importar_catalogo(
+    datos: dict = _Body(...),
+    db: Session = Depends(get_db),
+):
+    proveedor_id = datos.get("proveedor_id")
+    items        = datos.get("items", [])
+
+    if not proveedor_id:
+        raise HTTPException(400, "proveedor_id requerido")
+
+    prov = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+    if not prov:
+        raise HTTPException(404, "Proveedor no encontrado")
+
+    creados   = 0
+    vinculados = 0
+    errores   = []
+
+    for item in items:
+        try:
+            codigo_cat  = str(item.get("codigo_catalogo", "")).strip() or None
+            nombre      = str(item.get("nombre_final", "")).strip()
+            depto_id    = item.get("departamento_id")
+            cat_id      = item.get("categoria_id")
+            accion      = item.get("accion", "nuevo")
+            prod_id_ext = item.get("producto_id_existente")
+            costo       = float(item.get("costo_final") or 0)
+
+            if not nombre:
+                errores.append({"item": item, "motivo": "nombre vacío"})
+                continue
+
+            if accion == "nuevo":
+                # Crear producto nuevo
+                nuevo = Producto(
+                    nombre          = nombre,
+                    departamento_id = depto_id,
+                    categoria_id    = cat_id,
+                    costo_usd       = costo,
+                    margen          = 0.30,
+                    stock           = 0,
+                    activo          = True,
+                )
+                db.add(nuevo)
+                db.flush()
+                prod_id = nuevo.id
+                creados += 1
+
+            elif accion == "vincular" and prod_id_ext:
+                prod_id = int(prod_id_ext)
+                prod    = db.query(Producto).filter(Producto.id == prod_id).first()
+                if not prod:
+                    errores.append({"item": item, "motivo": "producto existente no encontrado"})
+                    continue
+                # Actualizar nombre si cambió
+                if nombre and nombre != prod.nombre:
+                    prod.nombre = nombre
+                vinculados += 1
+
+            else:
+                errores.append({"item": item, "motivo": "acción desconocida o producto no especificado"})
+                continue
+
+            # ── Regla inamovible: enlace código/proveedor ─────────────────────
+            existente = db.query(CatalogoProveedor).filter(
+                CatalogoProveedor.proveedor_id == proveedor_id,
+                CatalogoProveedor.producto_id  == prod_id,
+                CatalogoProveedor.variante_id  == None,
+            ).first()
+
+            if not existente:
+                db.add(CatalogoProveedor(
+                    proveedor_id          = proveedor_id,
+                    producto_id           = prod_id,
+                    variante_id           = None,
+                    nombre_producto       = nombre,
+                    codigo_proveedor      = codigo_cat,
+                    precio_referencia_usd = costo,
+                ))
+            else:
+                # Actualizar precio; código es inamovible si ya estaba establecido
+                existente.precio_referencia_usd = costo
+                if not existente.codigo_proveedor and codigo_cat:
+                    existente.codigo_proveedor = codigo_cat
+
+        except Exception as e:
+            errores.append({"item": item, "motivo": str(e)})
+
+    db.commit()
+    return {
+        "creados":    creados,
+        "vinculados": vinculados,
+        "errores":    errores,
+    }

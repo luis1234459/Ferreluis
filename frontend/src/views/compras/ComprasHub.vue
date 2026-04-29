@@ -15,6 +15,11 @@
             <span class="hub-label">Escanear factura con IA</span>
             <span class="hub-desc">Sube una foto o PDF de la factura</span>
           </button>
+          <button class="hub-btn hub-btn-catalogo" @click="$router.push('/compras/catalogo')">
+            <span class="hub-icon">📋</span>
+            <span class="hub-label">Catálogo IA</span>
+            <span class="hub-desc">Importa productos desde catálogo de proveedor</span>
+          </button>
           <button class="hub-btn" @click="$router.push('/compras/ordenes')">
             <span class="hub-icon">✏️</span>
             <span class="hub-label">Crear orden manual</span>
@@ -148,12 +153,22 @@ export default {
 <style scoped>
 .hub-acciones {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1.25rem;
   margin-bottom: 1.5rem;
-  max-width: 700px;
+  max-width: 900px;
 }
-@media (max-width: 600px) { .hub-acciones { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .hub-acciones { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 500px) { .hub-acciones { grid-template-columns: 1fr; } }
+
+.hub-btn-catalogo {
+  border-color: #BFDBFE;
+  background: #EFF6FF;
+}
+.hub-btn-catalogo:hover {
+  border-color: #1D4ED8;
+  background: #DBEAFE;
+}
 
 .hub-btn {
   background: #FFFFFF;

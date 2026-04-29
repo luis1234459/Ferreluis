@@ -49,6 +49,12 @@ const routes = [
     component: () => import('../views/compras/FacturasIA.vue'),
     meta: { requiresAuth: true, permiso: 'compras' }
   },
+  {
+    path: '/compras/catalogo',
+    name: 'CatalogoIA',
+    component: () => import('../views/compras/CatalogoIA.vue'),
+    meta: { requiresAuth: true, permiso: 'compras' }
+  },
   { path: '/reportes',  name: 'Reportes',  component: Reportes,  meta: { permiso: 'reportes' } },
   { path: '/clientes',  name: 'Clientes',  component: Clientes,  meta: { permiso: 'clientes' } },
   { path: '/fidelidad', name: 'Fidelidad', component: Fidelidad, meta: { permiso: 'fidelidad' } },
