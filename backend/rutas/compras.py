@@ -154,6 +154,12 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
             setattr(p, k, datos[k])
     if "dias_credito" in datos:
         p.dias_credito = int(datos["dias_credito"] or 0)
+    if "pricing_policy" in datos:
+        policy = datos["pricing_policy"]
+        if policy in ("MARKET_FACTOR", "BCV_DIRECT"):
+            p.pricing_policy = policy
+    if "ajuste_divisa_pct" in datos:
+        p.ajuste_divisa_pct = float(datos["ajuste_divisa_pct"] or 0)
     db.commit()
     db.refresh(p)
     return p

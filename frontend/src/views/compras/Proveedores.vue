@@ -13,7 +13,7 @@
         <div class="tabla-container">
           <table>
             <thead>
-              <tr><th>Código</th><th>Nombre</th><th>RIF</th><th>Teléfono</th><th>Contacto</th><th>Email</th><th>Crédito</th><th>Acciones</th></tr>
+              <tr><th>Código</th><th>Nombre</th><th>RIF</th><th>Teléfono</th><th>Contacto</th><th>Email</th><th>Crédito</th><th>Precio</th><th>Acciones</th></tr>
             </thead>
             <tbody>
               <tr v-for="p in proveedores" :key="p.id">
@@ -24,6 +24,14 @@
                 <td>{{ p.contacto || '—' }}</td>
                 <td>{{ p.email || '—' }}</td>
                 <td>{{ p.dias_credito ? p.dias_credito + ' días' : '—' }}</td>
+                <td>
+                  <span :class="['badge-policy', p.pricing_policy === 'BCV_DIRECT' ? 'badge-bcv' : 'badge-mf']">
+                    {{ p.pricing_policy === 'BCV_DIRECT' ? 'BCV Directo' : 'Market' }}
+                  </span>
+                  <span v-if="p.pricing_policy === 'BCV_DIRECT' && p.ajuste_divisa_pct" class="badge-ajuste">
+                    +{{ (p.ajuste_divisa_pct * 100).toFixed(1) }}%
+                  </span>
+                </td>
                 <td>
                   <button class="btn-editar" @click="editar(p)">Editar</button>
                   <button class="btn-catalogo" @click="verCatalogo(p)">Catálogo</button>
@@ -72,6 +80,40 @@
               <div class="field">
                 <label>Días de crédito</label>
                 <input v-model.number="form.dias_credito" type="number" min="0" placeholder="0 = sin crédito" />
+              </div>
+
+              <!-- Política de pricing -->
+              <div class="field field-wide pricing-section">
+                <label class="section-label">Política de precios</label>
+                <div class="policy-toggle">
+                  <button
+                    :class="['policy-btn', form.pricing_policy === 'MARKET_FACTOR' ? 'policy-active' : '']"
+                    @click="form.pricing_policy = 'MARKET_FACTOR'"
+                    type="button"
+                  >
+                    <span class="policy-icon">📈</span>
+                    <span class="policy-name">Market Factor</span>
+                    <span class="policy-desc">precio_base × (Binance ÷ BCV)</span>
+                  </button>
+                  <button
+                    :class="['policy-btn', form.pricing_policy === 'BCV_DIRECT' ? 'policy-active' : '']"
+                    @click="form.pricing_policy = 'BCV_DIRECT'"
+                    type="button"
+                  >
+                    <span class="policy-icon">🏦</span>
+                    <span class="policy-name">BCV Directo</span>
+                    <span class="policy-desc">precio_base sin factor paralelo</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field" v-if="form.pricing_policy === 'BCV_DIRECT'">
+                <label>Ajuste divisa % <span class="label-hint">(recargo USD para cobros en divisas)</span></label>
+                <div class="input-pct-wrap">
+                  <input v-model.number="form.ajuste_divisa_pct_display" type="number" min="0" max="100" step="0.5" placeholder="0" />
+                  <span class="pct-suffix">%</span>
+                </div>
+                <span class="field-hint">Ej: 3 → precio divisa = precio_base × 1.03</span>
               </div>
             </div>
             <div class="form-botones">
@@ -155,7 +197,7 @@ export default {
       editandoId:          null,
       guardando:           false,
       error:               '',
-      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0 },
+      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_divisa_pct_display: 0 },
       proveedorCatalogo:   null,
       catalogoItems:       [],
       nuevoItem: { producto_id: '', nombre_producto: '', codigo_proveedor: '', precio_referencia_usd: '' },
@@ -186,12 +228,22 @@ export default {
     },
     abrirNuevo() {
       this.editandoId = null
-      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0 }
+      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_divisa_pct_display: 0 }
       this.mostrarForm = true
     },
     editar(p) {
       this.editandoId = p.id
-      this.form = { nombre: p.nombre, rif: p.rif || '', telefono: p.telefono || '', email: p.email || '', contacto: p.contacto || '', direccion: p.direccion || '', dias_credito: p.dias_credito || 0 }
+      this.form = {
+        nombre:                  p.nombre,
+        rif:                     p.rif            || '',
+        telefono:                p.telefono        || '',
+        email:                   p.email           || '',
+        contacto:                p.contacto        || '',
+        direccion:               p.direccion       || '',
+        dias_credito:            p.dias_credito    || 0,
+        pricing_policy:          p.pricing_policy  || 'MARKET_FACTOR',
+        ajuste_divisa_pct_display: Math.round((p.ajuste_divisa_pct || 0) * 100 * 10) / 10,
+      }
       this.mostrarForm = true
     },
     cerrarForm() { this.mostrarForm = false; this.error = '' },
@@ -199,10 +251,15 @@ export default {
       if (!this.form.nombre) { this.error = 'El nombre es obligatorio'; return }
       this.guardando = true; this.error = ''
       try {
+        const payload = {
+          ...this.form,
+          ajuste_divisa_pct: (this.form.ajuste_divisa_pct_display || 0) / 100,
+        }
+        delete payload.ajuste_divisa_pct_display
         if (this.editandoId) {
-          await axios.put(`/compras/proveedores/${this.editandoId}`, this.form)
+          await axios.put(`/compras/proveedores/${this.editandoId}`, payload)
         } else {
-          await axios.post('/compras/proveedores/', this.form)
+          await axios.post('/compras/proveedores/', payload)
         }
         await this.cargar()
         this.cerrarForm()
@@ -260,4 +317,32 @@ export default {
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
 
 .codigo-prv { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; }
+
+/* Badges política en tabla */
+.badge-policy { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; white-space: nowrap; }
+.badge-mf  { background: #DBEAFE; color: #1E40AF; }
+.badge-bcv { background: #D1FAE5; color: #065F46; }
+.badge-ajuste { font-size: 0.7rem; color: #065F46; margin-left: 0.3rem; font-weight: 600; }
+
+/* Selector de política en modal */
+.pricing-section { margin-top: 0.5rem; }
+.section-label { font-size: 0.8rem; font-weight: 700; color: var(--texto-secundario); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem; }
+.policy-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.policy-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; text-align: left;
+  border: 2px solid var(--borde); background: var(--fondo); transition: all 0.15s;
+}
+.policy-btn:hover { border-color: #94A3B8; }
+.policy-btn.policy-active { border-color: #1A1A1A; background: #F8F9FA; }
+.policy-icon { font-size: 1.1rem; }
+.policy-name { font-size: 0.85rem; font-weight: 700; color: var(--texto-principal); }
+.policy-desc { font-size: 0.72rem; color: var(--texto-secundario); }
+
+/* Campo ajuste % */
+.input-pct-wrap { display: flex; align-items: center; gap: 0.4rem; }
+.input-pct-wrap input { width: 100px; }
+.pct-suffix { font-weight: 700; color: var(--texto-secundario); }
+.label-hint { font-size: 0.72rem; color: var(--texto-secundario); font-weight: 400; }
+.field-hint { font-size: 0.72rem; color: var(--texto-secundario); display: block; margin-top: 0.25rem; }
 </style>
