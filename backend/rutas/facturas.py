@@ -695,7 +695,10 @@ def _pdf_paginas_base64(contenido: bytes) -> list[tuple[str, str]]:
 
 
 @router.post("/escanear-catalogo")
-async def escanear_catalogo(archivo: UploadFile = File(...)):
+async def escanear_catalogo(
+    archivo: UploadFile = File(...),
+    proveedor_nombre: str = Form(""),
+):
     client       = anthropic.Anthropic(api_key=API_KEY)
     contenido    = await archivo.read()
     content_type = (archivo.content_type or "").lower().split(";")[0].strip()
@@ -720,17 +723,18 @@ async def escanear_catalogo(archivo: UploadFile = File(...)):
     else:
         raise HTTPException(status_code=400, detail=f"Formato no soportado: {content_type}")
 
+    prov_ctx = f'El catálogo pertenece al proveedor: "{proveedor_nombre}".\n' if proveedor_nombre.strip() else ""
     texto_prompt = {
         "type": "text",
         "text": (
             "Estás analizando un CATÁLOGO DE PRODUCTOS DE PROVEEDOR. "
             "NO es una factura ni una orden de compra.\n"
-            "El catálogo tiene columnas: CÓDIGO, DESCRIPCIÓN y PRECIO.\n"
-            "El nombre del proveedor aparece en el encabezado del documento.\n\n"
+            f"{prov_ctx}"
+            "El catálogo tiene columnas: CÓDIGO, DESCRIPCIÓN y PRECIO.\n\n"
             "Extrae TODOS los productos de TODAS las páginas que ves.\n"
             "Devuelve SOLO un JSON con este formato exacto, sin texto adicional:\n"
             "{\n"
-            '  "proveedor": "nombre del proveedor o cadena vacía",\n'
+            f'  "proveedor": "{proveedor_nombre or "nombre del proveedor"}",\n'
             '  "productos": [\n'
             "    {\n"
             '      "codigo": "código del producto o cadena vacía",\n'

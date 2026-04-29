@@ -346,6 +346,7 @@ export default {
       try {
         const fd = new FormData()
         fd.append('archivo', this.archivoSeleccionado)
+        fd.append('proveedor_nombre', this.proveedorBusq || '')
         const r = await axios.post('/facturas/escanear-catalogo', fd)
         if (r.data.error) {
           this.errorScan = `Error de IA: ${r.data.error}`
