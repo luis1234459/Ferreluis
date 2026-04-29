@@ -36,7 +36,11 @@
                 </li>
               </ul>
             </div>
-            <div v-if="proveedorId" class="prov-ok">✓ {{ proveedorBusq }}</div>
+            <div v-if="proveedorId" class="prov-ok">
+              ✓ {{ proveedorBusq }}
+              <span v-if="proveedorRif" class="prov-rif">· RIF: {{ proveedorRif }}</span>
+              <span v-else class="prov-sin-rif">⚠ Sin RIF — agrégalo en Proveedores antes de importar</span>
+            </div>
           </div>
 
           <!-- Upload PDF -->
@@ -67,7 +71,7 @@
           <div class="paso1-acciones">
             <button
               class="btn-escanear"
-              :disabled="!archivoSeleccionado || !proveedorId || escaneando"
+              :disabled="!archivoSeleccionado || !proveedorId || !proveedorRif || escaneando"
               @click="escanear"
             >
               <span v-if="escaneando">⏳ Leyendo catálogo...</span>
@@ -258,6 +262,7 @@ export default {
       // Proveedor
       proveedorBusq:    '',
       proveedorId:      null,
+      proveedorRif:     '',
       provResultados:   [],
       provAbierta:      false,
 
@@ -303,6 +308,7 @@ export default {
   methods: {
     // ── Proveedor ──────────────────────────────────────────────────────
     async buscarProveedor() {
+      if (!this.proveedorBusq) { this.proveedorId = null; this.proveedorRif = ''; this.provResultados = []; return }
       if (this.proveedorBusq.length < 2) { this.provResultados = []; return }
       const r = await axios.get('/facturas/buscar-proveedor', { params: { nombre: this.proveedorBusq } })
       this.provResultados = r.data
@@ -310,6 +316,7 @@ export default {
     seleccionarProveedor(p) {
       this.proveedorId   = p.id
       this.proveedorBusq = p.nombre
+      this.proveedorRif  = p.rif || ''
       this.provAbierta   = false
       this.provResultados = []
     },
@@ -515,8 +522,10 @@ export default {
 .btn-escanear:not(:disabled):hover { background: #333; }
 .prov-ok {
   margin-top: 0.4rem; font-size: 0.82rem;
-  color: #15803D; font-weight: 600;
+  color: #15803D; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
 }
+.prov-rif { color: #166534; font-weight: 700; background: #DCFCE7; padding: 0.1rem 0.45rem; border-radius: 4px; }
+.prov-sin-rif { color: #92400E; font-weight: 600; background: #FEF3C7; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.78rem; }
 
 /* ── Paso 2 header ── */
 .paso2-header {

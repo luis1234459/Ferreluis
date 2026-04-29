@@ -790,7 +790,10 @@ def importar_catalogo(
     prov = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
     if not prov:
         raise HTTPException(404, "Proveedor no encontrado")
+    if not prov.rif:
+        raise HTTPException(400, "El proveedor no tiene RIF registrado. Agréguelo en Proveedores antes de importar un catálogo.")
 
+    rif_prov  = prov.rif
     creados   = 0
     vinculados = 0
     errores   = []
@@ -848,6 +851,7 @@ def importar_catalogo(
                 continue
 
             # ── Regla inamovible: enlace código/proveedor ─────────────────────
+            # Clave de cruce: (codigo_proveedor, rif_proveedor) — no el nombre
             existente = db.query(CatalogoProveedor).filter(
                 CatalogoProveedor.proveedor_id == proveedor_id,
                 CatalogoProveedor.producto_id  == prod_id,
@@ -857,6 +861,7 @@ def importar_catalogo(
             if not existente:
                 db.add(CatalogoProveedor(
                     proveedor_id          = proveedor_id,
+                    rif_proveedor         = rif_prov,
                     producto_id           = prod_id,
                     variante_id           = None,
                     nombre_producto       = nombre,
@@ -865,6 +870,7 @@ def importar_catalogo(
                 ))
             else:
                 existente.precio_referencia_usd = costo
+                existente.rif_proveedor         = rif_prov   # retroalimentar si faltaba
                 if not existente.codigo_proveedor and codigo_cat:
                     existente.codigo_proveedor = codigo_cat
 

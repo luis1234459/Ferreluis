@@ -19,7 +19,10 @@
               <tr v-for="p in proveedores" :key="p.id">
                 <td><span class="codigo-prv">{{ p.codigo || '—' }}</span></td>
                 <td style="font-weight:600">{{ p.nombre }}</td>
-                <td>{{ p.rif || '—' }}</td>
+                <td>
+                  <span v-if="p.rif">{{ p.rif }}</span>
+                  <span v-else class="rif-ausente" title="Sin RIF — requerido para importar catálogos">⚠ Sin RIF</span>
+                </td>
                 <td>{{ p.telefono || '—' }}</td>
                 <td>{{ p.contacto || '—' }}</td>
                 <td>{{ p.email || '—' }}</td>
@@ -317,6 +320,7 @@ export default {
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
 
 .codigo-prv { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; }
+.rif-ausente { font-size: 0.75rem; font-weight: 600; color: #92400E; background: #FEF3C7; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: default; }
 
 /* Badges política en tabla */
 .badge-policy { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; white-space: nowrap; }

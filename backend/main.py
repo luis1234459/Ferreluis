@@ -166,6 +166,12 @@ def inicializar_datos():
              "ALTER TABLE detalle_devolucion_cliente ADD COLUMN IF NOT EXISTS variante_id INTEGER"],
         )
 
+        # ── catalogo_proveedor: rif_proveedor como clave de cruce ───────────
+        migrar(
+            ["ALTER TABLE catalogo_proveedor ADD COLUMN rif_proveedor TEXT"],
+            ["ALTER TABLE catalogo_proveedor ADD COLUMN IF NOT EXISTS rif_proveedor TEXT"],
+        )
+
         # ── variantes_producto.codigo + variante_id en tablas de compras ─────
         migrar(
             ["ALTER TABLE variantes_producto ADD COLUMN codigo TEXT",

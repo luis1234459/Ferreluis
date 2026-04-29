@@ -314,6 +314,7 @@ class CatalogoProveedor(Base):
 
     id                    = Column(Integer, primary_key=True, index=True)
     proveedor_id          = Column(Integer, index=True)
+    rif_proveedor         = Column(String,  nullable=True, index=True)  # clave de cruce: codigo+rif identifica unívocamente el ítem
     producto_id           = Column(Integer, nullable=True)   # None si producto aún no existe
     variante_id           = Column(Integer, nullable=True)   # None si es producto sin variantes
     nombre_producto       = Column(String)
