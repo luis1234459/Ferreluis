@@ -850,8 +850,22 @@ def importar_catalogo(
                 errores.append({"item": item, "motivo": "acción desconocida o producto no especificado"})
                 continue
 
-            # ── Regla inamovible: enlace código/proveedor ─────────────────────
-            # Clave de cruce: (codigo_proveedor, rif_proveedor) — no el nombre
+            # ── Regla inamovible: (codigo_proveedor, rif_proveedor) → un solo producto ──
+            # Verificar que el par código+RIF no esté ya vinculado a OTRO producto distinto
+            if codigo_cat and rif_prov:
+                conflicto = db.query(CatalogoProveedor).filter(
+                    CatalogoProveedor.codigo_proveedor == codigo_cat,
+                    CatalogoProveedor.rif_proveedor    == rif_prov,
+                    CatalogoProveedor.producto_id      != prod_id,
+                ).first()
+                if conflicto:
+                    sp.rollback()
+                    errores.append({
+                        "item":   item,
+                        "motivo": f"Código '{codigo_cat}' (RIF {rif_prov}) ya está vinculado a otro producto — cruce inmutable.",
+                    })
+                    continue
+
             existente = db.query(CatalogoProveedor).filter(
                 CatalogoProveedor.proveedor_id == proveedor_id,
                 CatalogoProveedor.producto_id  == prod_id,
@@ -871,6 +885,7 @@ def importar_catalogo(
             else:
                 existente.precio_referencia_usd = costo
                 existente.rif_proveedor         = rif_prov   # retroalimentar si faltaba
+                # codigo_proveedor NO se sobreescribe si ya existe (inmutable)
                 if not existente.codigo_proveedor and codigo_cat:
                     existente.codigo_proveedor = codigo_cat
 
