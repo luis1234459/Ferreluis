@@ -102,6 +102,7 @@
               v-for="(linea, idx) in lineas"
               :key="idx"
               :class="['linea-card', estaLista(linea) ? 'linea-lista' : 'linea-pendiente']"
+              :style="linea._busqAbierta ? { zIndex: 20, position: 'relative' } : {}"
             >
               <!-- Cabecera de la línea -->
               <div class="linea-header">
@@ -549,7 +550,7 @@ export default {
 
 .linea-card {
   background: #FFFFFF; border: 1px solid var(--borde);
-  border-radius: 10px; overflow: hidden;
+  border-radius: 10px;
 }
 .linea-lista    { border-left: 4px solid #16A34A; }
 .linea-pendiente{ border-left: 4px solid #D1D5DB; }
