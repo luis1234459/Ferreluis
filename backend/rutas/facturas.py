@@ -395,7 +395,9 @@ def buscar_producto(
             Producto.nombre.ilike(f"%{busq}%")
         ).limit(10).all()
         for p in prods:
-            for r in _expandir(p, "", False):
+            # Preserve the invoice code so confirmar_compra can learn it
+            codigo_prov_p3 = codigo.strip() if codigo else ""
+            for r in _expandir(p, codigo_prov_p3, False):
                 key = (p.id, r["variante_id"])
                 if key not in ids_ya:
                     resultados.append(r)
@@ -550,6 +552,10 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
     db.add(recepcion)
     db.flush()
 
+    # ── RIF del proveedor para indexar catálogo ──────────────────────────────
+    prov_obj_rif = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
+    rif_prov = (prov_obj_rif.rif or "").strip() if prov_obj_rif else ""
+
     # ── Detalles de recepción + stock + costo ─────────────────────────────────
     for p in productos_data:
         prod_id     = p.get("producto_id")
@@ -618,12 +624,15 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                     variante_id           = variante_id,
                     nombre_producto       = nombre_prod,
                     codigo_proveedor      = codigo_prov if codigo_prov else None,
+                    rif_proveedor         = rif_prov if rif_prov else None,
                     precio_referencia_usd = precio,
                 ))
             else:
                 existente_catalogo.precio_referencia_usd = precio
                 if not existente_catalogo.codigo_proveedor and codigo_prov:
                     existente_catalogo.codigo_proveedor = codigo_prov
+                if not existente_catalogo.rif_proveedor and rif_prov:
+                    existente_catalogo.rif_proveedor = rif_prov
 
     # ── Movimientos bancarios por cada pago ──────────────────────────────────
     pagos_data = datos.get("pagos", [])
