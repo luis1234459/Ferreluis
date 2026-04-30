@@ -321,6 +321,7 @@ class CatalogoProveedor(Base):
     codigo_proveedor      = Column(String,  nullable=True)
     codigo_huella         = Column(String,  nullable=True, index=True)  # primeros5+ultimos5 normalizado; tolera variaciones OCR en el centro
     precio_referencia_usd = Column(Float,   nullable=True)
+    bloqueado             = Column(Boolean, default=False)              # True tras primera compra confirmada — asociacion inamovible
 
 
 class OrdenCompra(Base):

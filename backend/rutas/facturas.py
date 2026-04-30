@@ -434,20 +434,21 @@ def buscar_producto(
                         resultados.append(r)
                         ids_ya.add(key)
 
-    # Prioridad 3: buscar por nombre en inventario
-    busq = nombre or codigo
-    if len(busq) >= 2:
-        prods = db.query(Producto).filter(
-            Producto.nombre.ilike(f"%{busq}%")
-        ).limit(10).all()
-        for p in prods:
-            # Preserve the invoice code so confirmar_compra can learn it
-            codigo_prov_p3 = codigo.strip() if codigo else ""
-            for r in _expandir(p, codigo_prov_p3, False):
-                key = (p.id, r["variante_id"])
-                if key not in ids_ya:
-                    resultados.append(r)
-                    ids_ya.add(key)
+    # Prioridad 3: buscar por nombre — SOLO si no hay código de proveedor para cruzar.
+    # Cuando hay proveedor_id + codigo y no hay match en catálogo, el producto es nuevo
+    # y NO debe mezclarse con productos de otros proveedores por similitud de nombre.
+    if not (proveedor_id and codigo):
+        busq = nombre or codigo
+        if len(busq) >= 2:
+            prods = db.query(Producto).filter(
+                Producto.nombre.ilike(f"%{busq}%")
+            ).limit(10).all()
+            for p in prods:
+                for r in _expandir(p, "", False):
+                    key = (p.id, r["variante_id"])
+                    if key not in ids_ya:
+                        resultados.append(r)
+                        ids_ya.add(key)
 
     return resultados[:15]
 
@@ -674,9 +675,11 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                     codigo_huella         = huella_prov,
                     rif_proveedor         = rif_prov if rif_prov else None,
                     precio_referencia_usd = precio,
+                    bloqueado             = True,  # primera compra → asociación inamovible
                 ))
             else:
                 existente_catalogo.precio_referencia_usd = precio
+                existente_catalogo.bloqueado              = True  # confirmar compra bloquea
                 if not existente_catalogo.codigo_proveedor and codigo_prov:
                     existente_catalogo.codigo_proveedor = codigo_prov
                     existente_catalogo.codigo_huella     = huella_prov
@@ -912,6 +915,20 @@ def importar_catalogo(
                 if not prod:
                     sp.rollback()
                     errores.append({"item": item, "motivo": "producto existente no encontrado"})
+                    continue
+                # Bloquear si el producto ya tiene compras confirmadas de OTRO proveedor
+                conflicto_bloqueado = db.query(CatalogoProveedor).filter(
+                    CatalogoProveedor.producto_id  == prod_id,
+                    CatalogoProveedor.bloqueado    == True,
+                    CatalogoProveedor.rif_proveedor != rif_prov,
+                ).first()
+                if conflicto_bloqueado:
+                    sp.rollback()
+                    errores.append({
+                        "item":   item,
+                        "motivo": f"El producto '{prod.nombre}' ya tiene compras confirmadas de otro proveedor "
+                                  f"(RIF {conflicto_bloqueado.rif_proveedor}). Debe crearse como producto nuevo.",
+                    })
                     continue
                 if nombre and nombre != prod.nombre:
                     prod.nombre = nombre

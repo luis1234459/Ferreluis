@@ -880,9 +880,16 @@ export default {
         if (this.proveedorId) params.proveedor_id = this.proveedorId
         const { data } = await axios.get('/facturas/buscar-producto', { params })
         if (data.length > 0 && data[0].match_exacto) {
+          // Código conocido en catálogo → vincular al producto registrado
           linea.match      = data[0]
           linea._busqTexto = data[0].nombre
           linea.esNuevo    = false
+        } else if (codigo && this.proveedorId && data.length === 0) {
+          // Código de proveedor conocido pero no está en catálogo aún →
+          // la norma exige producto nuevo exclusivo para este (código, RIF)
+          linea.esNuevo    = true
+          linea.match      = null
+          linea._busqTexto = ''
         }
       } catch {}
       finally { linea.buscandoMatch = false }
