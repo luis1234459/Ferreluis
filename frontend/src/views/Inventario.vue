@@ -419,19 +419,19 @@
             <div class="opciones-especiales">
               <!-- Genericidad — solo admin -->
               <div class="campo-seccion" v-if="esAdmin">
-                <div class="campo-toggle">
-                  <div class="toggle-info">
-                    <span class="toggle-label">Producto genérico</span>
-                    <span class="toggle-desc">Multi-proveedor — el código interno del sistema es el que manda. Desactiva la asociación inamovible con proveedor.</span>
+                <label class="campo-toggle-row">
+                  <div class="toggle-texto">
+                    <span class="toggle-titulo">Producto genérico (multi-proveedor)</span>
+                    <span class="toggle-subtitulo">El código interno del sistema es el que manda. No se vincula de forma inamovible a ningún proveedor.</span>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" v-model="form.es_generico" />
-                    <span class="slider"></span>
-                  </label>
-                </div>
-                <!-- Si cambia a específico, mostrar campos para fijar asociación -->
-                <div v-if="editando && !form.es_generico && form._cambioGenerico" class="asociacion-fija">
-                  <p class="asociacion-aviso">⚠ Al guardar quedará fija la asociación proveedor + código.</p>
+                  <div class="toggle-switch" :class="{ activo: form.es_generico }" @click="form.es_generico = !form.es_generico">
+                    <div class="toggle-knob"></div>
+                  </div>
+                </label>
+
+                <!-- Solo mostrar si estaba como genérico y el admin lo está cambiando a específico -->
+                <div v-if="editando && form._cambioGenerico && !form.es_generico" class="asociacion-fija-box">
+                  <p class="asociacion-aviso">⚠ Al guardar, este producto quedará vinculado de forma permanente al proveedor y código seleccionados.</p>
                   <div class="campo-fila">
                     <div class="campo">
                       <label>Proveedor a vincular</label>
@@ -2248,5 +2248,68 @@ export default {
   font-size: 0.72rem; font-weight: 800;
   padding: 0.05rem 0.4rem; border-radius: 10px;
   margin-left: 0.35rem;
+}
+.campo-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  padding: 0.75rem 0;
+}
+.toggle-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.toggle-titulo {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--texto-principal);
+}
+.toggle-subtitulo {
+  font-size: 0.78rem;
+  color: var(--texto-muted);
+  max-width: 380px;
+}
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  background: #CCCCCC;
+  border-radius: 999px;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.toggle-switch.activo {
+  background: #FFCC00;
+}
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-switch.activo .toggle-knob {
+  transform: translateX(20px);
+}
+.asociacion-fija-box {
+  background: #FFF9E6;
+  border: 1px solid #FFCC00;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+}
+.asociacion-aviso {
+  color: #996600;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
 }
 </style>
