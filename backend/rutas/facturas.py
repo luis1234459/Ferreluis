@@ -52,6 +52,24 @@ def _next_oc_numero(db: Session) -> str:
     return f"OC-{n:04d}"
 
 
+import re as _re_global
+
+def _huella_codigo(codigo: str) -> str:
+    """
+    Fingerprint tolerante para códigos largos de proveedor.
+    Normaliza (solo alfanuméricos, mayúsculas) y luego:
+      - Si el resultado tiene <= 10 chars: usa el código completo.
+      - Si tiene > 10 chars: usa primeros 5 + últimos 5, ignorando el centro.
+    Así dos extracciones OCR del mismo código que difieran en el centro igual hacen match.
+    """
+    norm = _re_global.sub(r'[^A-Z0-9]', '', codigo.upper())
+    if not norm:
+        return ""
+    if len(norm) <= 10:
+        return norm
+    return norm[:5] + norm[-5:]
+
+
 def _normalizar(texto: str) -> str:
     import re
     texto = texto.upper().strip()
@@ -336,7 +354,7 @@ def buscar_producto(
             return [_res_variante(p, v, codigo_prov, match_exacto) for v in vs]
         return [_res_producto(p, codigo_prov, match_exacto)]
 
-    # Prioridad 1: match exacto por código en catálogo del proveedor
+    # Prioridad 1a: match exacto por código en catálogo del proveedor
     if proveedor_id and codigo:
         cats = db.query(CatalogoProveedor).filter(
             CatalogoProveedor.proveedor_id == proveedor_id,
@@ -361,6 +379,34 @@ def buscar_producto(
                     if key not in ids_ya:
                         resultados.append(r)
                         ids_ya.add(key)
+
+    # Prioridad 1b: match por huella (primeros5+ultimos5) — tolera variaciones OCR en el centro
+    if proveedor_id and codigo and not resultados:
+        huella = _huella_codigo(codigo)
+        if huella:
+            cats = db.query(CatalogoProveedor).filter(
+                CatalogoProveedor.proveedor_id == proveedor_id,
+                CatalogoProveedor.codigo_huella == huella,
+            ).all()
+            for c in cats:
+                if not c.producto_id:
+                    continue
+                p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+                if not p:
+                    continue
+                if c.variante_id:
+                    key = (p.id, c.variante_id)
+                    if key not in ids_ya:
+                        v = db.query(VarianteProducto).filter(VarianteProducto.id == c.variante_id).first()
+                        if v:
+                            resultados.append(_res_variante(p, v, c.codigo_proveedor, True))
+                            ids_ya.add(key)
+                else:
+                    for r in _expandir(p, c.codigo_proveedor, True):
+                        key = (p.id, r["variante_id"])
+                        if key not in ids_ya:
+                            resultados.append(r)
+                            ids_ya.add(key)
 
     # Prioridad 2: match parcial por código en catálogo
     if proveedor_id and codigo and not resultados:
@@ -617,6 +663,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 CatalogoProveedor.producto_id  == prod_id,
                 CatalogoProveedor.variante_id  == variante_id,
             ).first()
+            huella_prov = _huella_codigo(codigo_prov) if codigo_prov else None
             if not existente_catalogo:
                 db.add(CatalogoProveedor(
                     proveedor_id          = proveedor_id,
@@ -624,6 +671,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                     variante_id           = variante_id,
                     nombre_producto       = nombre_prod,
                     codigo_proveedor      = codigo_prov if codigo_prov else None,
+                    codigo_huella         = huella_prov,
                     rif_proveedor         = rif_prov if rif_prov else None,
                     precio_referencia_usd = precio,
                 ))
@@ -631,6 +679,9 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 existente_catalogo.precio_referencia_usd = precio
                 if not existente_catalogo.codigo_proveedor and codigo_prov:
                     existente_catalogo.codigo_proveedor = codigo_prov
+                    existente_catalogo.codigo_huella     = huella_prov
+                elif existente_catalogo.codigo_proveedor and not existente_catalogo.codigo_huella:
+                    existente_catalogo.codigo_huella = _huella_codigo(existente_catalogo.codigo_proveedor)
                 if not existente_catalogo.rif_proveedor and rif_prov:
                     existente_catalogo.rif_proveedor = rif_prov
 
@@ -902,6 +953,7 @@ def importar_catalogo(
                     variante_id           = None,
                     nombre_producto       = nombre,
                     codigo_proveedor      = codigo_cat,
+                    codigo_huella         = _huella_codigo(codigo_cat) if codigo_cat else None,
                     precio_referencia_usd = costo,
                 ))
             else:
@@ -910,6 +962,9 @@ def importar_catalogo(
                 # codigo_proveedor NO se sobreescribe si ya existe (inmutable)
                 if not existente.codigo_proveedor and codigo_cat:
                     existente.codigo_proveedor = codigo_cat
+                    existente.codigo_huella    = _huella_codigo(codigo_cat)
+                elif existente.codigo_proveedor and not existente.codigo_huella:
+                    existente.codigo_huella = _huella_codigo(existente.codigo_proveedor)
 
             sp.commit()  # Libera el savepoint — producto + enlace quedan atómicos
             if accion == "nuevo":

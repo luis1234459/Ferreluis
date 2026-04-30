@@ -319,6 +319,7 @@ class CatalogoProveedor(Base):
     variante_id           = Column(Integer, nullable=True)   # None si es producto sin variantes
     nombre_producto       = Column(String)
     codigo_proveedor      = Column(String,  nullable=True)
+    codigo_huella         = Column(String,  nullable=True, index=True)  # primeros5+ultimos5 normalizado; tolera variaciones OCR en el centro
     precio_referencia_usd = Column(Float,   nullable=True)
 
 
