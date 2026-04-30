@@ -417,6 +417,37 @@
 
             <!-- Opciones especiales -->
             <div class="opciones-especiales">
+              <!-- Genericidad — solo admin -->
+              <div class="campo-seccion" v-if="esAdmin">
+                <div class="campo-toggle">
+                  <div class="toggle-info">
+                    <span class="toggle-label">Producto genérico</span>
+                    <span class="toggle-desc">Multi-proveedor — el código interno del sistema es el que manda. Desactiva la asociación inamovible con proveedor.</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" v-model="form.es_generico" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <!-- Si cambia a específico, mostrar campos para fijar asociación -->
+                <div v-if="editando && !form.es_generico && form._cambioGenerico" class="asociacion-fija">
+                  <p class="asociacion-aviso">⚠ Al guardar quedará fija la asociación proveedor + código.</p>
+                  <div class="campo-fila">
+                    <div class="campo">
+                      <label>Proveedor a vincular</label>
+                      <select v-model="form._proveedor_fijo_id">
+                        <option :value="null">— Seleccionar —</option>
+                        <option v-for="pv in proveedores" :key="pv.id" :value="pv.id">{{ pv.nombre }}</option>
+                      </select>
+                    </div>
+                    <div class="campo">
+                      <label>Código del proveedor</label>
+                      <input v-model="form._codigo_proveedor_fijo" placeholder="Código exacto del proveedor" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <label class="check-opt">
                 <input type="checkbox" v-model="form.es_producto_clave" />
                 <span class="check-label">
@@ -1150,6 +1181,11 @@ export default {
   },
 
   watch: {
+    'form.es_generico'(nuevoVal, anteriorVal) {
+      if (this.editando && nuevoVal !== anteriorVal) {
+        this.form._cambioGenerico = true
+      }
+    },
     busqueda() {
       clearTimeout(this._busquedaTimer)
       this._busquedaTimer = setTimeout(() => {
@@ -1274,6 +1310,7 @@ export default {
         es_producto_clave: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
+        es_generico: false, _cambioGenerico: false, _proveedor_fijo_id: null, _codigo_proveedor_fijo: '',
       }
       this.mostrarForm = true
     },
@@ -1289,6 +1326,10 @@ export default {
         descuento_compuesto_pct: p.descuento_compuesto_pct ?? 0,
         requiere_serial:         p.requiere_serial         ?? false,
         plantilla_garantia_id:   p.plantilla_garantia_id   ?? null,
+        es_generico:             p.es_generico             ?? false,
+        _cambioGenerico:         false,
+        _proveedor_fijo_id:      null,
+        _codigo_proveedor_fijo:  '',
       }
       this.editando    = true
       this.error       = ''
@@ -1314,9 +1355,21 @@ export default {
           codigo:                  this.form.codigo               || null,
           requiere_serial:         Boolean(this.form.requiere_serial),
           plantilla_garantia_id:   this.form.plantilla_garantia_id || null,
+          es_generico:             Boolean(this.form.es_generico),
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)
+          // Si hubo cambio de genericidad, llamar endpoint dedicado
+          if (this.form._cambioGenerico) {
+            await axios.patch(`/productos/${this.form.id}/genericidad`, {
+              es_generico:      this.form.es_generico,
+              proveedor_id:     this.form._proveedor_fijo_id     || null,
+              codigo_proveedor: this.form._codigo_proveedor_fijo || '',
+            })
+            this.form._cambioGenerico        = false
+            this.form._proveedor_fijo_id     = null
+            this.form._codigo_proveedor_fijo = ''
+          }
         } else {
           await axios.post('/productos/', payload)
         }

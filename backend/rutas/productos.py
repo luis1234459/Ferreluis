@@ -38,6 +38,7 @@ class ProductoSchema(BaseModel):
     activo:                  bool            = True
     requiere_serial:         bool            = False
     plantilla_garantia_id:   Optional[int]   = None
+    es_generico:             bool            = False
 
     class Config:
         from_attributes = True
@@ -825,6 +826,54 @@ def actualizar_producto(
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
     return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
+
+
+@router.patch("/{producto_id}/genericidad")
+def cambiar_genericidad(
+    producto_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """
+    Solo admin puede cambiar un producto entre genérico y específico.
+    Si se cambia a específico (es_generico=False), se puede pasar
+    proveedor_id y codigo_proveedor para fijar la asociación inamovible.
+    """
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    es_generico = bool(datos.get("es_generico", False))
+    p.es_generico = es_generico
+
+    # Si cambia a específico y se provee código+proveedor, fijar en catálogo
+    if not es_generico:
+        proveedor_id    = datos.get("proveedor_id")
+        codigo_prov     = (datos.get("codigo_proveedor") or "").strip()
+        nombre_producto = p.nombre
+
+        if proveedor_id and codigo_prov:
+            existente = db.query(CatalogoProveedor).filter(
+                CatalogoProveedor.proveedor_id == proveedor_id,
+                CatalogoProveedor.producto_id  == producto_id,
+            ).first()
+            if not existente:
+                db.add(CatalogoProveedor(
+                    proveedor_id          = proveedor_id,
+                    producto_id           = producto_id,
+                    nombre_producto       = nombre_producto,
+                    codigo_proveedor      = codigo_prov,
+                    precio_referencia_usd = float(p.costo_usd or 0),
+                ))
+            else:
+                # Solo actualizar código si no tenía uno
+                if not existente.codigo_proveedor and codigo_prov:
+                    existente.codigo_proveedor = codigo_prov
+
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "es_generico": p.es_generico}
 
 
 @router.put("/{producto_id}/codigo")

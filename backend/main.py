@@ -109,7 +109,8 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1",
              "ALTER TABLE productos ADD COLUMN codigo TEXT",
              "ALTER TABLE productos ADD COLUMN categoria_id INTEGER",
-             "ALTER TABLE productos ADD COLUMN esquema_variante TEXT"],
+             "ALTER TABLE productos ADD COLUMN esquema_variante TEXT",
+             "ALTER TABLE productos ADD COLUMN es_generico BOOLEAN DEFAULT 0"],
             ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS departamento_id INTEGER",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS proveedor_id INTEGER",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_producto_clave BOOLEAN DEFAULT FALSE",
@@ -119,7 +120,8 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo TEXT",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria_id INTEGER",
-             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS esquema_variante TEXT"],
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS esquema_variante TEXT",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_generico BOOLEAN DEFAULT FALSE"],
         )
 
         # ── proveedores ──────────────────────────────────────────────────────
