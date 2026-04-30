@@ -448,7 +448,9 @@ export default {
       try {
         const res = await axios.get(`/compras/ordenes/${o.id}/recepciones/`)
         this.recepcionesDetalle = res.data
-      } catch {}
+      } catch (e) {
+        console.error('Error cargando recepciones:', e?.response?.status, e?.response?.data)
+      }
     },
     async devolverRecepcion(rec) {
       if (!confirm(`¿Devolver recepción #${rec.id} por $${rec.total_recibido.toFixed(2)}?\nEsto revertirá el stock y los costos actualizados.`)) return
@@ -458,6 +460,7 @@ export default {
         const res = await axios.post(`/compras/recepciones/${rec.id}/devolucion-total`, {
           usuario_rol: this.usuario.rol || ''
         })
+        console.log('Devolucion OK:', res.data)
         // Actualizar estado en la lista y en recepcionesDetalle
         rec.devuelta = true
         if (this.ordenDetalle && res.data.orden_estado) {
