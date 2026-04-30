@@ -184,6 +184,12 @@ def inicializar_datos():
             ["ALTER TABLE catalogo_proveedor ADD COLUMN IF NOT EXISTS bloqueado BOOLEAN DEFAULT FALSE"],
         )
 
+        # ── recepciones_compra: devuelta ─────────────────────────────────────
+        migrar(
+            ["ALTER TABLE recepciones_compra ADD COLUMN devuelta BOOLEAN DEFAULT 0"],
+            ["ALTER TABLE recepciones_compra ADD COLUMN IF NOT EXISTS devuelta BOOLEAN DEFAULT FALSE"],
+        )
+
         # ── variantes_producto.codigo + variante_id en tablas de compras ─────
         migrar(
             ["ALTER TABLE variantes_producto ADD COLUMN codigo TEXT",

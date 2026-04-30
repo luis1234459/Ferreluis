@@ -372,6 +372,7 @@ class RecepcionCompra(Base):
     estado_pago             = Column(String,   default="pendiente")  # pendiente|pagado|vencido
     fecha_pago_real         = Column(DateTime, nullable=True)
     numero_factura          = Column(String,   nullable=True)
+    devuelta                = Column(Boolean,  default=False)        # True cuando admin ejecuta devolución total
 
 
 class DetalleRecepcion(Base):

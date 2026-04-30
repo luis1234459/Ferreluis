@@ -90,6 +90,33 @@
               <span class="total-grande">Total: <strong>${{ ordenDetalle.total.toFixed(2) }}</strong></span>
             </div>
             <p v-if="ordenDetalle.observacion" class="obs">{{ ordenDetalle.observacion }}</p>
+
+            <!-- Recepciones -->
+            <div v-if="recepcionesDetalle.length > 0" class="recepciones-section">
+              <h3 class="rec-titulo">Recepciones registradas</h3>
+              <div
+                v-for="r in recepcionesDetalle" :key="r.id"
+                class="rec-item"
+                :class="{ 'rec-devuelta': r.devuelta }"
+              >
+                <div class="rec-row">
+                  <span class="rec-id">Rec. #{{ r.id }}</span>
+                  <span class="rec-fecha">{{ formatFecha(r.fecha_recepcion) }}</span>
+                  <span v-if="r.numero_factura" class="rec-factura">Factura: {{ r.numero_factura }}</span>
+                  <span class="rec-total">${{ r.total_recibido.toFixed(2) }}</span>
+                  <span v-if="r.devuelta" class="badge badge-devuelta">Devuelta</span>
+                  <button
+                    v-if="esAdmin && !r.devuelta"
+                    class="btn-devolver"
+                    :disabled="devolviendo === r.id"
+                    @click="devolverRecepcion(r)"
+                  >
+                    {{ devolviendo === r.id ? 'Procesando...' : '↩ Devolver todo' }}
+                  </button>
+                </div>
+                <p v-if="errorDevolucion && devolviendo === null" class="msg-error-dev">{{ errorDevolucion }}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -195,6 +222,9 @@ export default {
       ordenes:            [],
       proveedores:        [],
       productosRaw:       [],
+      recepcionesDetalle: [],
+      devolviendo:        null,
+      errorDevolucion:    '',
       departamentos:      [],
       filtroEstado:       '',
       filtroProveedor:    '',
@@ -411,7 +441,37 @@ export default {
         alert(e?.response?.data?.detail || 'Error al anular')
       }
     },
-    verDetalle(o) { this.ordenDetalle = o },
+    async verDetalle(o) {
+      this.ordenDetalle    = o
+      this.recepcionesDetalle = []
+      this.errorDevolucion = ''
+      try {
+        const res = await axios.get(`/compras/ordenes/${o.id}/recepciones/`)
+        this.recepcionesDetalle = res.data
+      } catch {}
+    },
+    async devolverRecepcion(rec) {
+      if (!confirm(`¿Devolver recepción #${rec.id} por $${rec.total_recibido.toFixed(2)}?\nEsto revertirá el stock y los costos actualizados.`)) return
+      this.devolviendo     = rec.id
+      this.errorDevolucion = ''
+      try {
+        const res = await axios.post(`/compras/recepciones/${rec.id}/devolucion-total`, {
+          usuario_rol: this.usuario.rol || ''
+        })
+        // Actualizar estado en la lista y en recepcionesDetalle
+        rec.devuelta = true
+        if (this.ordenDetalle && res.data.orden_estado) {
+          this.ordenDetalle.estado = res.data.orden_estado
+          const enLista = this.ordenes.find(o => o.id === this.ordenDetalle.id)
+          if (enLista) enLista.estado = res.data.orden_estado
+        }
+        alert(res.data.mensaje)
+      } catch (e) {
+        this.errorDevolucion = e?.response?.data?.detail || 'Error al devolver'
+      } finally {
+        this.devolviendo = null
+      }
+    },
     labelEstado(e) {
       return { borrador:'Borrador', aprobada:'Aprobada', recibida_parcial:'Parcial', cerrada:'Cerrada', anulada:'Anulada' }[e] || e
     },
@@ -438,6 +498,21 @@ export default {
 .modal-totales strong { color: var(--texto-principal); }
 .total-grande strong { color: #16A34A; font-size: 1.1rem; }
 .obs { color: var(--texto-sec); font-size: 0.88rem; font-style: italic; margin-top: 0.75rem; }
+
+/* ── Recepciones en modal ── */
+.recepciones-section { margin-top: 1.25rem; border-top: 1px solid var(--borde); padding-top: 0.75rem; }
+.rec-titulo { font-size: 0.88rem; font-weight: 700; color: var(--texto-sec); margin: 0 0 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.rec-item { background: var(--fondo-tabla-alt, #F8F8F4); border-radius: 7px; padding: 0.55rem 0.8rem; margin-bottom: 0.4rem; }
+.rec-devuelta { opacity: 0.55; }
+.rec-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.rec-id    { font-weight: 700; font-size: 0.85rem; color: var(--texto-principal); }
+.rec-fecha { font-size: 0.82rem; color: var(--texto-muted); }
+.rec-factura { font-size: 0.8rem; color: var(--texto-sec); }
+.rec-total { font-weight: 700; color: #16A34A; margin-left: auto; }
+.badge-devuelta { background: #FEE2E2; color: #DC2626; border-radius: 4px; font-size: 0.72rem; padding: 0.1rem 0.45rem; font-weight: 700; }
+.btn-devolver { background: #DC2626; color: #fff; border: none; padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.btn-devolver:disabled { opacity: 0.5; cursor: not-allowed; }
+.msg-error-dev { color: #DC2626; font-size: 0.82rem; margin: 0.25rem 0 0; }
 
 /* ── modal form ancho ── */
 .modal-form { max-width: 1080px !important; width: 96vw !important; padding: 1.5rem !important; }

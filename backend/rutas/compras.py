@@ -384,7 +384,9 @@ def listar_recepciones(orden_id: int, db: Session = Depends(get_db)):
             "fecha_recepcion": r.fecha_recepcion.isoformat() if r.fecha_recepcion else None,
             "recibido_por":    r.recibido_por,
             "observacion":     r.observacion,
+            "numero_factura":  r.numero_factura or "",
             "total_recibido":  round(float(r.total_recibido or 0), 2),
+            "devuelta":        bool(r.devuelta),
             "detalles": [
                 {
                     "detalle_orden_id":        d.detalle_orden_id,
@@ -562,6 +564,70 @@ def obtener_recepcion(recepcion_id: int, db: Session = Depends(get_db)):
             }
             for d in detalles
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# DEVOLUCIÓN TOTAL DE RECEPCIÓN (solo admin)
+# ---------------------------------------------------------------------------
+
+@router.post("/recepciones/{recepcion_id}/devolucion-total")
+def devolucion_total_recepcion(recepcion_id: int, datos: dict, db: Session = Depends(get_db)):
+    usuario_rol = datos.get("usuario_rol", "")
+    if usuario_rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar una devolución total")
+
+    recepcion = db.query(RecepcionCompra).filter(RecepcionCompra.id == recepcion_id).first()
+    if not recepcion:
+        raise HTTPException(status_code=404, detail="Recepción no encontrada")
+    if recepcion.devuelta:
+        raise HTTPException(status_code=400, detail="Esta recepción ya fue devuelta")
+
+    orden = db.query(OrdenCompra).filter(OrdenCompra.id == recepcion.orden_id).first()
+
+    detalles = db.query(DetalleRecepcion).filter(DetalleRecepcion.recepcion_id == recepcion_id).all()
+    items_revertidos = 0
+
+    for d in detalles:
+        if not d.producto_id:
+            continue
+        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        if not prod:
+            continue
+
+        cantidad = float(d.cantidad_recibida or 0)
+        if d.variante_id:
+            variante = db.query(VarianteProducto).filter(VarianteProducto.id == d.variante_id).first()
+            if variante:
+                variante.stock = max(0.0, float(variante.stock or 0) - cantidad)
+        else:
+            tiene_variantes = db.query(VarianteProducto).filter(
+                VarianteProducto.producto_id == d.producto_id
+            ).first() is not None
+            if not tiene_variantes:
+                prod.stock = max(0, int(prod.stock or 0) - int(cantidad))
+
+        if d.actualizo_costo and d.costo_anterior is not None:
+            prod.costo_usd = d.costo_anterior
+
+        items_revertidos += 1
+
+    recepcion.devuelta = True
+
+    # Recalcular estado de la orden
+    if orden:
+        todas = db.query(RecepcionCompra).filter(RecepcionCompra.orden_id == orden.id).all()
+        activas = [r for r in todas if not r.devuelta and r.id != recepcion_id]
+        if not activas:
+            orden.estado = "aprobada"
+        else:
+            orden.estado = "recibida_parcial"
+
+    db.commit()
+    return {
+        "mensaje":          f"Recepción #{recepcion_id} devuelta. {items_revertidos} ítem(s) revertido(s).",
+        "items_revertidos": items_revertidos,
+        "orden_estado":     orden.estado if orden else None,
     }
 
 
