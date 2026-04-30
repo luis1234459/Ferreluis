@@ -100,15 +100,13 @@ class OfertaSchema(BaseModel):
 # ============================================================================
 
 def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float,
-                         policy: str = "MARKET_FACTOR",
-                         ajuste_divisa_pct: float = 0.0) -> dict:
+                         policy: str = "MARKET_FACTOR") -> dict:
     return calcular_precios(
-        costo_usd         = float(p.costo_usd or 0),
-        margen            = float(p.margen or 0),
-        tasa_bcv          = tasa_bcv,
-        tasa_binance      = tasa_binance,
-        policy            = policy,
-        ajuste_divisa_pct = ajuste_divisa_pct,
+        costo_usd    = float(p.costo_usd or 0),
+        margen       = float(p.margen or 0),
+        tasa_bcv     = tasa_bcv,
+        tasa_binance = tasa_binance,
+        policy       = policy,
     )
 
 
@@ -116,10 +114,9 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 variantes: list = None, plantilla: PlantillaGarantia = None,
                 tiene_catalogo: bool = False,
                 policy: str = "MARKET_FACTOR",
-                ajuste_divisa_pct: float = 0.0,
                 codigo_proveedor: str = "") -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
-    d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_divisa_pct))
+    d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy))
     d["tiene_catalogo"]    = tiene_catalogo
     d["codigo_proveedor"]  = codigo_proveedor  # código del proveedor vinculado (inamovible tras 1ª compra)
     vs = variantes or []
@@ -531,7 +528,7 @@ def listar_productos(
             )
     productos = []
     for p in lista:
-        policy, ajuste = resolver_policy(
+        policy, _ = resolver_policy(
             pricing_policy_override=p.pricing_policy_override,
             proveedor_id=p.proveedor_id,
             prov_policy_map=prov_policy_map,
@@ -541,7 +538,6 @@ def listar_productos(
                         plantillas_map.get(p.plantilla_garantia_id),
                         tiene_catalogo=(p.id in catalogo_ids),
                         policy=policy,
-                        ajuste_divisa_pct=ajuste,
                         codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
         )
     return {"total": total, "productos": productos}
@@ -924,7 +920,7 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
                 prov.pricing_policy or "MARKET_FACTOR",
                 float(prov.ajuste_divisa_pct or 0.0),
             )
-    policy, ajuste = resolver_policy(
+    policy, _ = resolver_policy(
         pricing_policy_override=p.pricing_policy_override,
         proveedor_id=p.proveedor_id,
         prov_policy_map=prov_policy_map,
@@ -938,12 +934,11 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
         d["costo_efectivo"]  = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
         d["margen_efectivo"] = float(v.margen     if v.margen    is not None else (p.margen    or 0))
         precios = calcular_precios(
-            costo_usd         = d["costo_efectivo"],
-            margen            = d["margen_efectivo"],
-            tasa_bcv          = bcv,
-            tasa_binance      = binance,
-            policy            = policy,
-            ajuste_divisa_pct = ajuste,
+            costo_usd    = d["costo_efectivo"],
+            margen       = d["margen_efectivo"],
+            tasa_bcv     = bcv,
+            tasa_binance = binance,
+            policy       = policy,
         )
         d["precio_base_usd"]        = precios["precio_base_usd"]
         d["precio_referencial_usd"] = precios["precio_referencial_usd"]
