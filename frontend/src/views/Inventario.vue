@@ -128,14 +128,16 @@
                       <span class="codigo-padre-tag" title="Los códigos pertenecen a cada variante">variantes</span>
                     </template>
                     <template v-else>
-                      <!-- Código de catálogo: inmutable -->
-                      <span v-if="p.tiene_catalogo" class="codigo-tag codigo-catalogo" title="Código asignado por catálogo de proveedor — inmutable">
-                        {{ p.codigo || '—' }} 🔒
+                      <!-- Código de proveedor (inamovible tras 1ª compra) -->
+                      <span v-if="p.codigo_proveedor" class="codigo-tag codigo-prov" :title="`Código del proveedor: ${p.codigo_proveedor}`">
+                        {{ p.codigo_proveedor }} 🔒
                       </span>
-                      <!-- Código interno: editable -->
-                      <template v-else>
+                      <!-- Código interno del sistema -->
+                      <span v-if="p.codigo" class="codigo-interno-tag">{{ p.codigo }}</span>
+                      <!-- Sin ningún código: editable -->
+                      <template v-if="!p.codigo_proveedor && !p.codigo">
                         <span v-if="codigoEditando !== p.id" class="codigo-tag" @click="iniciarEditCodigo(p)" title="Clic para editar código">
-                          {{ p.codigo || '—' }}
+                          —
                         </span>
                         <span v-else class="codigo-edit-wrap">
                           <input v-model="codigoTemp" class="input-codigo" @keyup.enter="guardarCodigo(p)" @keyup.escape="codigoEditando = null" placeholder="Ej: HRR-001" />
@@ -1985,6 +1987,9 @@ export default {
 .codigo-tag:hover { background: var(--amarillo); }
 .codigo-catalogo { background: #EDE9FE; color: #5B21B6; cursor: default; }
 .codigo-catalogo:hover { background: #EDE9FE; }
+.codigo-prov { background: #DCFCE7; color: #15803D; cursor: default; display: block; margin-bottom: 2px; }
+.codigo-prov:hover { background: #DCFCE7; }
+.codigo-interno-tag { font-size: 0.72rem; color: var(--texto-muted); background: #F3F4F6; padding: 0.1rem 0.35rem; border-radius: 3px; white-space: nowrap; }
 .codigo-edit-wrap { display: flex; align-items: center; gap: 0.25rem; }
 .input-codigo { width: 90px; padding: 0.2rem 0.4rem; font-size: 0.8rem; border: 1px solid var(--amarillo); border-radius: 4px; }
 .btn-ok-codigo     { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }

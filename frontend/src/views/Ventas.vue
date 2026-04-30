@@ -203,7 +203,8 @@
                 <div class="pi-nombre">
                   <span class="pi-nombre-texto">
                     {{ p.nombre }}
-                    <span v-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
+                    <span v-if="p.codigo_proveedor" class="cod-tag-prov" :title="`Cód. proveedor: ${p.codigo_proveedor}`">{{ p.codigo_proveedor }}</span>
+                    <span v-else-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
                   </span>
                   <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo)" class="pi-vcods">
                     <span
@@ -2105,7 +2106,8 @@ export default {
 .cuenta-unica { color: #16A34A; font-size: 0.82rem; align-self: center; white-space: nowrap; font-weight: 600; }
 
 /* ── Código tag ── */
-.cod-tag-v { font-size: 0.72rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
+.cod-tag-v    { font-size: 0.72rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
+.cod-tag-prov { font-size: 0.72rem; font-weight: 700; color: #15803D;  background: #DCFCE7;    padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.25rem; }
 
 /* ── Ubicaciones popup ── */
 .btn-ubicar-v { background: transparent; border: none; cursor: pointer; font-size: 0.8rem; padding: 0 0.1rem; opacity: 0.5; flex-shrink: 0; }

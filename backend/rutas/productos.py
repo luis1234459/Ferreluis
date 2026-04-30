@@ -116,10 +116,12 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 variantes: list = None, plantilla: PlantillaGarantia = None,
                 tiene_catalogo: bool = False,
                 policy: str = "MARKET_FACTOR",
-                ajuste_divisa_pct: float = 0.0) -> dict:
+                ajuste_divisa_pct: float = 0.0,
+                codigo_proveedor: str = "") -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
+    d["codigo_proveedor"]  = codigo_proveedor  # código del proveedor vinculado (inamovible tras 1ª compra)
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
     d["variantes_resumen"] = [
@@ -478,10 +480,15 @@ def listar_productos(
         variante_ids = db.query(VarianteProducto.producto_id).filter(
             VarianteProducto.codigo.ilike(f"%{busqueda}%")
         ).subquery()
+        catalogo_ids_busq = db.query(CatalogoProveedor.producto_id).filter(
+            CatalogoProveedor.codigo_proveedor.ilike(f"%{busqueda}%")
+        ).subquery()
         q = q.filter(
             or_(
                 Producto.nombre.ilike(f"%{busqueda}%"),
+                Producto.codigo.ilike(f"%{busqueda}%"),
                 Producto.id.in_(variante_ids),
+                Producto.id.in_(catalogo_ids_busq),
             )
         )
     if departamento_id is not None:
@@ -505,11 +512,15 @@ def listar_productos(
         for pl in db.query(PlantillaGarantia).filter(PlantillaGarantia.id.in_(plantilla_ids)).all():
             plantillas_map[pl.id] = pl
     catalogo_ids: set = set()
+    catalogo_codigo_map: dict = {}  # producto_id -> codigo_proveedor
     if ids:
-        for (pid,) in db.query(CatalogoProveedor.producto_id).filter(
-            CatalogoProveedor.producto_id.in_(ids)
-        ).distinct().all():
-            catalogo_ids.add(pid)
+        for c in db.query(CatalogoProveedor).filter(
+            CatalogoProveedor.producto_id.in_(ids),
+            CatalogoProveedor.codigo_proveedor != None,
+        ).all():
+            catalogo_ids.add(c.producto_id)
+            if c.producto_id not in catalogo_codigo_map:
+                catalogo_codigo_map[c.producto_id] = c.codigo_proveedor or ""
     prov_ids = {p.proveedor_id for p in lista if p.proveedor_id}
     prov_policy_map: dict = {}
     if prov_ids:
@@ -530,7 +541,8 @@ def listar_productos(
                         plantillas_map.get(p.plantilla_garantia_id),
                         tiene_catalogo=(p.id in catalogo_ids),
                         policy=policy,
-                        ajuste_divisa_pct=ajuste)
+                        ajuste_divisa_pct=ajuste,
+                        codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
         )
     return {"total": total, "productos": productos}
 
@@ -766,7 +778,13 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
     variantes = db.query(VarianteProducto).filter(VarianteProducto.producto_id == p.id).all()
-    return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db))
+    cat = db.query(CatalogoProveedor).filter(
+        CatalogoProveedor.producto_id == p.id,
+        CatalogoProveedor.codigo_proveedor != None,
+    ).first()
+    return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db),
+                       tiene_catalogo=(cat is not None),
+                       codigo_proveedor=cat.codigo_proveedor if cat else "")
 
 
 @router.put("/edicion-masiva")
