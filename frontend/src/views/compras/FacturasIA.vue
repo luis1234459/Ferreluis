@@ -372,6 +372,49 @@
                 </small>
               </div>
 
+              <!-- Cargos adicionales (flete / IVA / otros) -->
+              <div class="field-group ajuste-cargo-box" style="margin-top:1rem">
+                <label class="field-label">¿Hay cargos adicionales al costo?</label>
+                <small class="txt-muted">Flete, IVA, seguro u otro cargo que encarezca el producto</small>
+                <div class="btn-group" style="margin-top:0.4rem">
+                  <button
+                    :class="['btn-condicion', !tieneCargo ? 'active' : '']"
+                    @click="tieneCargo = false; cargoPct = 0; cargoEtiqueta = ''"
+                  >No</button>
+                  <button
+                    :class="['btn-condicion', tieneCargo ? 'active cargo-activo' : '']"
+                    @click="tieneCargo = true"
+                  >Sí</button>
+                </div>
+              </div>
+              <div v-if="tieneCargo" class="field-group" style="margin-top:0.5rem">
+                <label class="field-label">Tipo de cargo</label>
+                <div class="cargo-tipos">
+                  <button
+                    v-for="t in cargoTipos" :key="t"
+                    :class="['btn-cargo-tipo', cargoEtiqueta === t ? 'active' : '']"
+                    @click="cargoEtiqueta = t"
+                  >{{ t }}</button>
+                </div>
+                <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem">
+                  <input
+                    v-model.number="cargoPct"
+                    type="number" min="0" max="200" step="0.1"
+                    class="input-field" placeholder="0.0" style="max-width:100px"
+                  />
+                  <span class="txt-muted">%</span>
+                  <button
+                    class="btn-condicion active btn-cargo-aplicar"
+                    :disabled="!cargoPct"
+                    @click="aplicarCargo"
+                  >Aplicar</button>
+                </div>
+                <small class="txt-muted cargo-preview" v-if="cargoPct > 0">
+                  +{{ cargoPct }}% sobre cada producto
+                  <span v-if="cargoEtiqueta"> — {{ cargoEtiqueta }}</span>
+                </small>
+              </div>
+
               <!-- Pagos múltiples -->
               <div v-if="condicionPago !== 'credito_completo'" style="margin-top:1rem">
                 <label class="field-label">Pagos</label>
@@ -521,6 +564,11 @@ export default {
       // Paso 2 — descuento
       tieneDescuento: false,
       descuentoPct: 0,
+      // Paso 2 — cargos adicionales
+      tieneCargo:    false,
+      cargoPct:      0,
+      cargoEtiqueta: '',
+      cargoTipos:    ['Flete', 'IVA', 'Seguro', 'Otro'],
       // Paso 2 — condición de pago
       condicionPago: 'credito_completo',
       condicionOpciones: [
@@ -667,6 +715,9 @@ export default {
       this.fechaFactura   = data.fecha || new Date().toISOString().slice(0, 10)
       this.tieneDescuento = false
       this.descuentoPct   = 0
+      this.tieneCargo     = false
+      this.cargoPct       = 0
+      this.cargoEtiqueta  = ''
       this.proveedorBusq     = data.proveedor || ''
       this.proveedorId       = null
       this.proveedorNombreIA = data.proveedor || ''
@@ -705,6 +756,18 @@ export default {
       })
       this.tieneDescuento = false
       this.descuentoPct   = 0
+    },
+
+    // ── Cargo adicional % (flete / IVA / otro) ────────────────────────
+    aplicarCargo() {
+      if (!this.tieneCargo || !this.cargoPct) return
+      const factor = 1 + (this.cargoPct / 100)
+      this.lineas.forEach(l => {
+        l.precio_unitario = Math.round(Number(l.precio_unitario) * factor * 10000) / 10000
+      })
+      this.tieneCargo    = false
+      this.cargoPct      = 0
+      this.cargoEtiqueta = ''
     },
 
     // ── Proveedor ─────────────────────────────────────────────────────
@@ -978,6 +1041,9 @@ export default {
       this.fechaFactura        = ''
       this.tieneDescuento      = false
       this.descuentoPct        = 0
+      this.tieneCargo          = false
+      this.cargoPct            = 0
+      this.cargoEtiqueta       = ''
       this.condicionPago       = 'credito_completo'
       this.pagos               = []
       this.nuevoPagoMonto      = ''
@@ -1285,6 +1351,22 @@ select.input-field { cursor: pointer; }
 
 .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .txt-muted { color: var(--texto-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem; }
+
+/* Cargos adicionales */
+.ajuste-cargo-box { border-top: 1px dashed var(--borde); padding-top: 0.85rem; margin-top: 1rem; }
+.cargo-tipos { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem; }
+.btn-cargo-tipo {
+  border: 1px solid var(--borde); background: #FFFFFF;
+  border-radius: 5px; padding: 0.3rem 0.7rem;
+  cursor: pointer; font-size: 0.78rem; color: var(--texto-sec);
+  transition: all 0.15s;
+}
+.btn-cargo-tipo.active { background: #D97706; color: #fff; border-color: #D97706; font-weight: 600; }
+.btn-cargo-tipo:not(.active):hover { border-color: #D97706; }
+.btn-condicion.cargo-activo { background: #D97706; color: #fff; border-color: #D97706; }
+.btn-cargo-aplicar { background: #D97706 !important; border-color: #D97706 !important; }
+.btn-cargo-aplicar:disabled { opacity: 0.45; cursor: not-allowed; }
+.cargo-preview { color: #D97706; font-weight: 600; }
 
 /* Pagos múltiples */
 .pago-item {

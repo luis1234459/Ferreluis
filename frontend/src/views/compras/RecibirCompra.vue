@@ -126,6 +126,51 @@
             </div>
           </div>
 
+          <!-- Cargos adicionales (flete / IVA / otros) -->
+          <div class="cargo-adicional-box">
+            <div class="cargo-header">
+              <span class="cargo-titulo">¿Hay cargos adicionales al costo?</span>
+              <small>Flete, IVA, seguro u otro cargo que encarezca el producto</small>
+            </div>
+            <div class="btn-group-rc">
+              <button
+                :class="['btn-rc', !tieneCargo ? 'active' : '']"
+                @click="tieneCargo = false; cargoPct = 0; cargoEtiqueta = ''"
+              >No</button>
+              <button
+                :class="['btn-rc', tieneCargo ? 'active cargo-activo' : '']"
+                @click="tieneCargo = true"
+              >Sí</button>
+            </div>
+            <div v-if="tieneCargo" class="cargo-form">
+              <div class="cargo-tipos">
+                <button
+                  v-for="t in cargoTipos" :key="t"
+                  :class="['btn-cargo-tipo', cargoEtiqueta === t ? 'active' : '']"
+                  @click="cargoEtiqueta = t"
+                >{{ t }}</button>
+              </div>
+              <div class="cargo-input-row">
+                <input
+                  v-model.number="cargoPct"
+                  type="number" min="0" max="200" step="0.1"
+                  placeholder="0.0" class="input-sm"
+                  style="max-width:100px"
+                />
+                <span class="cargo-pct-label">%</span>
+                <button
+                  class="btn-rc active btn-cargo-aplicar"
+                  :disabled="!cargoPct"
+                  @click="aplicarCargo"
+                >Aplicar a todos</button>
+              </div>
+              <small class="cargo-preview" v-if="cargoPct > 0">
+                +{{ cargoPct }}% sobre el precio real de cada producto
+                <span v-if="cargoEtiqueta"> — {{ cargoEtiqueta }}</span>
+              </small>
+            </div>
+          </div>
+
           <div class="field" style="max-width:400px;margin-top:1rem">
             <label>Observación</label>
             <input v-model="observacion" placeholder="Notas de la recepción..." />
@@ -182,6 +227,11 @@ export default {
       confirmando:        false,
       error:              '',
       resultado:          null,
+      // Cargos adicionales
+      tieneCargo:    false,
+      cargoPct:      0,
+      cargoEtiqueta: '',
+      cargoTipos:    ['Flete', 'IVA', 'Seguro', 'Otro'],
       // Ubicaciones
       areas:    [],
       pasillos: [],
@@ -269,6 +319,16 @@ export default {
         _estante_id:  '',
         _nivel:       1,
       }))
+    },
+    aplicarCargo() {
+      if (!this.tieneCargo || !this.cargoPct) return
+      const factor = 1 + (this.cargoPct / 100)
+      this.items.forEach(i => {
+        i.precio_unitario_real_usd = Math.round(Number(i.precio_unitario_real_usd) * factor * 10000) / 10000
+      })
+      this.tieneCargo    = false
+      this.cargoPct      = 0
+      this.cargoEtiqueta = ''
     },
     subtotalItem(item) {
       return (Number(item.cantidad_recibida) || 0) * (Number(item.precio_unitario_real_usd) || 0)
@@ -399,4 +459,34 @@ export default {
 .ubic-resultado-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .ubic-resultado-tabla th { text-align: left; padding: 0.3rem 0.6rem; color: var(--texto-muted); font-weight: 700; border-bottom: 1px solid #16A34A44; }
 .ubic-resultado-tabla td { padding: 0.3rem 0.6rem; color: var(--texto-principal); border-bottom: 1px solid #16A34A22; }
+
+/* Cargos adicionales */
+.cargo-adicional-box {
+  margin-top: 1.25rem; padding: 0.9rem 1rem;
+  background: #FFFBF0; border: 1px dashed #D97706;
+  border-radius: 8px;
+}
+.cargo-header { margin-bottom: 0.5rem; }
+.cargo-titulo { font-weight: 600; font-size: 0.9rem; color: var(--texto-principal); display: block; margin-bottom: 0.15rem; }
+.btn-group-rc { display: flex; gap: 0.5rem; }
+.btn-rc {
+  border: 1px solid var(--borde); background: #fff;
+  border-radius: 6px; padding: 0.4rem 0.85rem;
+  cursor: pointer; font-size: 0.85rem; color: var(--texto-sec); transition: all 0.15s;
+}
+.btn-rc.active { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; font-weight: 600; }
+.btn-rc.cargo-activo { background: #D97706; color: #fff; border-color: #D97706; }
+.cargo-form { margin-top: 0.65rem; }
+.cargo-tipos { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.btn-cargo-tipo {
+  border: 1px solid #D9770655; background: #fff;
+  border-radius: 5px; padding: 0.28rem 0.65rem;
+  cursor: pointer; font-size: 0.78rem; color: var(--texto-sec); transition: all 0.15s;
+}
+.btn-cargo-tipo.active { background: #D97706; color: #fff; border-color: #D97706; font-weight: 600; }
+.cargo-input-row { display: flex; gap: 0.5rem; align-items: center; }
+.cargo-pct-label { color: var(--texto-muted); font-size: 0.85rem; }
+.btn-cargo-aplicar { background: #D97706 !important; color: #fff !important; border-color: #D97706 !important; }
+.btn-cargo-aplicar:disabled { opacity: 0.45; cursor: not-allowed; }
+.cargo-preview { display: block; margin-top: 0.35rem; color: #D97706; font-weight: 600; font-size: 0.8rem; }
 </style>
