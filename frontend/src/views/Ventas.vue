@@ -1162,9 +1162,12 @@ export default {
       const precioBase = variante
         ? Number(variante.precio_base_usd        ?? p.precio_base_usd        ?? 0)
         : Number(p.precio_base_usd        ?? 0)
-      const precioRef = variante
-        ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
-        : Number(p.precio_referencial_usd ?? 0)
+      // Para BCV_DIRECT usar precio_divisa_usd como precio referencial
+      const precioRef = p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd
+        ? Number(p.precio_divisa_usd)
+        : variante
+          ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
+          : Number(p.precio_referencial_usd ?? 0)
       const precio = this.tipoPrecio === 'base' ? precioBase : precioRef
 
       this.carrito.push({
