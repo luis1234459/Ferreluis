@@ -908,10 +908,21 @@ export default {
       } catch {}
     },
     seleccionarMatch(linea, prod) {
+      // Vincular inmediatamente sin esperar verificación
       linea.match           = prod
       linea._busqTexto      = prod.nombre
       linea._busqAbierta    = false
       linea._busqResultados = []
+      linea._busqVisible    = false
+
+      // Verificar genericidad en segundo plano
+      axios.get(`/productos/${prod.id}`).then(res => {
+        if (res.data.es_generico) {
+          this.lineaGenericaPendiente = linea
+          this.proveedorGenericoOpc   = this.proveedorId
+          this.modalGenerico          = true
+        }
+      }).catch(() => {})
     },
     limpiarMatch(linea) {
       linea.match            = null
