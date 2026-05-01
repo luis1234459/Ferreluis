@@ -4,7 +4,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias
+from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias, admin
 from database import engine, SessionLocal
 from database import Base
 from config import ENVIRONMENT
@@ -55,6 +55,7 @@ app.include_router(devoluciones.router)
 app.include_router(ubicaciones.router)
 app.include_router(claves.router)
 app.include_router(garantias.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")
