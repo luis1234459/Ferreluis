@@ -107,14 +107,14 @@
                 <tr>
                   <th>Código</th>
                   <th>Nombre</th>
+                  <th>Stock</th>
+                  <th>P. Base</th>
+                  <th>P. Ref.</th>
+                  <th>Bs</th>
                   <th>Depto.</th>
                   <th>Categoría</th>
                   <th>Costo</th>
                   <th>Margen</th>
-                  <th>P. Base</th>
-                  <th>P. Ref.</th>
-                  <th>Bs</th>
-                  <th>Stock</th>
                   <th>{{ modoEdicion ? 'Activo' : 'Ubic.' }}</th>
                   <th>Acciones</th>
                 </tr>
@@ -163,6 +163,35 @@
                     </template>
                   </td>
 
+                  <!-- Stock -->
+                  <td>
+                    <template v-if="p.tiene_variantes && p.variantes_resumen && p.variantes_resumen.length > 0">
+                      <div class="stock-variantes">
+                        <span
+                          v-for="v in p.variantes_resumen" :key="v.id"
+                          :class="['sv-chip', v.stock < 5 ? 'sv-bajo' : '', !v.activo ? 'sv-inactiva' : '']"
+                          :title="v.activo ? '' : 'Variante inactiva'"
+                        >
+                          {{ v.clase }}<template v-if="v.color"> · {{ v.color }}</template>: <strong>{{ v.stock }}</strong>
+                          <span v-if="v.codigo" class="sv-codigo">{{ v.codigo }}</span>
+                        </span>
+                      </div>
+                    </template>
+                    <template v-else-if="modoEdicion">
+                      <input class="celda-input celda-num" type="number" min="0"
+                        v-model.number="borradorEdicion[p.id].stock"
+                        @input="marcarModificado(p.id)" />
+                    </template>
+                    <template v-else>
+                      <span :class="{ 'txt-rojo': p.stock < 5 }">{{ p.stock }}</span>
+                    </template>
+                  </td>
+
+                  <!-- Precios calculados — siempre solo lectura -->
+                  <td>${{ Number(p.precio_base_usd).toFixed(2) }}</td>
+                  <td class="txt-usd">${{ Number(p.precio_referencial_usd).toFixed(2) }}</td>
+                  <td style="color:#996600;font-weight:600">Bs. {{ Number(p.precio_bs).toFixed(2) }}</td>
+
                   <!-- Depto -->
                   <td>
                     <template v-if="modoEdicion && borradorEdicion[p.id]">
@@ -177,6 +206,7 @@
                       <span class="txt-muted">{{ nombreDepartamento(p.departamento_id) }}</span>
                     </template>
                   </td>
+
                   <!-- Categoría -->
                   <td>
                     <template v-if="modoEdicion && borradorEdicion[p.id]">
@@ -210,35 +240,6 @@
                         @input="marcarModificado(p.id)" placeholder="%" />
                     </template>
                     <template v-else>{{ (Number(p.margen) * 100).toFixed(0) }}%</template>
-                  </td>
-
-                  <!-- Precios calculados — siempre solo lectura -->
-                  <td>${{ Number(p.precio_base_usd).toFixed(2) }}</td>
-                  <td class="txt-usd">${{ Number(p.precio_referencial_usd).toFixed(2) }}</td>
-                  <td style="color:#996600;font-weight:600">Bs. {{ Number(p.precio_bs).toFixed(2) }}</td>
-
-                  <!-- Stock -->
-                  <td>
-                    <template v-if="p.tiene_variantes && p.variantes_resumen && p.variantes_resumen.length > 0">
-                      <div class="stock-variantes">
-                        <span
-                          v-for="v in p.variantes_resumen" :key="v.id"
-                          :class="['sv-chip', v.stock < 5 ? 'sv-bajo' : '', !v.activo ? 'sv-inactiva' : '']"
-                          :title="v.activo ? '' : 'Variante inactiva'"
-                        >
-                          {{ v.clase }}<template v-if="v.color"> · {{ v.color }}</template>: <strong>{{ v.stock }}</strong>
-                          <span v-if="v.codigo" class="sv-codigo">{{ v.codigo }}</span>
-                        </span>
-                      </div>
-                    </template>
-                    <template v-else-if="modoEdicion">
-                      <input class="celda-input celda-num" type="number" min="0"
-                        v-model.number="borradorEdicion[p.id].stock"
-                        @input="marcarModificado(p.id)" />
-                    </template>
-                    <template v-else>
-                      <span :class="{ 'txt-rojo': p.stock < 5 }">{{ p.stock }}</span>
-                    </template>
                   </td>
 
                   <!-- Ubicación / Activo -->
