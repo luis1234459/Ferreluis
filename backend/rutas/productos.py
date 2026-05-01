@@ -40,6 +40,11 @@ class ProductoSchema(BaseModel):
     plantilla_garantia_id:   Optional[int]   = None
     es_generico:             bool            = False
 
+    unidad_medida:       str            = 'unidad'
+    unidades_por_paquete: int           = 1
+    nombre_paquete:      Optional[str]  = None
+    precio_paquete_usd:  Optional[float]= None
+
     class Config:
         from_attributes = True
 

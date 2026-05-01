@@ -145,6 +145,18 @@ def inicializar_datos():
             ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS pricing_policy_override TEXT"],
         )
 
+        # ── productos: unidades de medida y paquete ──────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidad'",
+             "ALTER TABLE productos ADD COLUMN unidades_por_paquete INTEGER DEFAULT 1",
+             "ALTER TABLE productos ADD COLUMN nombre_paquete TEXT",
+             "ALTER TABLE productos ADD COLUMN precio_paquete_usd FLOAT"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS unidad_medida TEXT DEFAULT 'unidad'",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS unidades_por_paquete INTEGER DEFAULT 1",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS nombre_paquete TEXT",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS precio_paquete_usd FLOAT"],
+        )
+
         # ── recepciones_compra ───────────────────────────────────────────────
         migrar(
             ["ALTER TABLE recepciones_compra ADD COLUMN fecha_vencimiento_pago DATE",

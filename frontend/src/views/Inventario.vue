@@ -490,6 +490,38 @@
               </div>
             </div>
 
+            <!-- Unidad de medida y paquete -->
+            <div class="opciones-especiales" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+              <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Unidad de medida</p>
+              <div class="campo-fila">
+                <div class="field" style="flex:1">
+                  <label>Unidad</label>
+                  <select v-model="form.unidad_medida">
+                    <option value="unidad">Unidad</option>
+                    <option value="metro">Metro</option>
+                    <option value="kilo">Kilo</option>
+                    <option value="litro">Litro</option>
+                  </select>
+                </div>
+                <div class="field" style="flex:1">
+                  <label>Uds. por paquete <small>(1 = sin paquete)</small></label>
+                  <input v-model.number="form.unidades_por_paquete" type="number" min="1" step="1" placeholder="1" />
+                </div>
+              </div>
+              <template v-if="(form.unidades_por_paquete || 1) > 1">
+                <div class="campo-fila" style="margin-top:0.5rem">
+                  <div class="field" style="flex:1">
+                    <label>Nombre del paquete</label>
+                    <input v-model="form.nombre_paquete" placeholder="rollo, caja, saco…" />
+                  </div>
+                  <div class="field" style="flex:1">
+                    <label>Precio paquete USD <small>(vacío = base × N)</small></label>
+                    <input v-model.number="form.precio_paquete_usd" type="number" min="0" step="0.01" placeholder="Auto" />
+                  </div>
+                </div>
+              </template>
+            </div>
+
             <!-- Preview precios -->
             <div class="preview-precios" v-if="form.costo_usd > 0 && form.margen > 0">
               <p class="preview-titulo">Vista previa de precios</p>
@@ -1311,6 +1343,7 @@ export default {
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
         es_generico: false, _cambioGenerico: false, _proveedor_fijo_id: null, _codigo_proveedor_fijo: '',
+        unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '', precio_paquete_usd: null,
       }
       this.mostrarForm = true
     },
@@ -1330,6 +1363,10 @@ export default {
         _cambioGenerico:         false,
         _proveedor_fijo_id:      null,
         _codigo_proveedor_fijo:  '',
+        unidad_medida:           p.unidad_medida           ?? 'unidad',
+        unidades_por_paquete:    p.unidades_por_paquete    ?? 1,
+        nombre_paquete:          p.nombre_paquete          ?? '',
+        precio_paquete_usd:      p.precio_paquete_usd      ?? null,
       }
       this.editando    = true
       this.error       = ''
@@ -1356,6 +1393,10 @@ export default {
           requiere_serial:         Boolean(this.form.requiere_serial),
           plantilla_garantia_id:   this.form.plantilla_garantia_id || null,
           es_generico:             Boolean(this.form.es_generico),
+          unidad_medida:           this.form.unidad_medida        || 'unidad',
+          unidades_por_paquete:    Number(this.form.unidades_por_paquete || 1),
+          nombre_paquete:          this.form.nombre_paquete       || null,
+          precio_paquete_usd:      this.form.precio_paquete_usd   ? Number(this.form.precio_paquete_usd) : null,
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)

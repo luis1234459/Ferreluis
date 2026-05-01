@@ -78,6 +78,11 @@ class Producto(Base):
     pricing_policy_override = Column(String, nullable=True)   # None → hereda del Proveedor
     es_generico             = Column(Boolean, default=False)  # True = multi-proveedor, código interno manda
 
+    unidad_medida        = Column(String,  default='unidad')  # metro | kilo | litro | unidad
+    unidades_por_paquete = Column(Integer, default=1)         # 1 = sin paquete; N = unidades/paquete
+    nombre_paquete       = Column(String,  nullable=True)     # rollo | caja | saco | …
+    precio_paquete_usd   = Column(Float,   nullable=True)     # None → precio_base * N
+
     # Precios calculados (NO se guardan, se computan al vuelo):
     #   MARKET_FACTOR: precio_referencial = precio_base * (binance/BCV); precio_bs = base * binance
     #   BCV_DIRECT:    precio_referencial = precio_base;                  precio_bs = base * BCV

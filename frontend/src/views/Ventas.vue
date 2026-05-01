@@ -250,6 +250,7 @@
                   <span class="item-nombre">
                     {{ item.nombre }}
                     <span v-if="item.variante_label" class="variante-tag">{{ item.variante_label }}</span>
+                    <span v-if="item._esPaquete" class="tag-paquete">{{ item._nombrePaquete }}</span>
                     <span v-if="item.variante_codigo" class="cod-tag-v">{{ item.variante_codigo }}</span>
                     <span v-else-if="item.codigo && !item.variante_id" class="cod-tag-v">{{ item.codigo }}</span>
                   </span>
@@ -736,6 +737,31 @@
       </div>
     </div>
 
+    <!-- Modal modo venta (unidad vs paquete) -->
+    <div class="cobro-modal-overlay" v-if="modoVentaModal" @click.self="modoVentaModal = false">
+      <div class="cobro-modal" style="max-width:360px">
+        <div class="cobro-modal-header">
+          <h3>{{ productoParaVenta?.nombre }}</h3>
+          <button class="cobro-modal-cerrar" @click="modoVentaModal = false">✕</button>
+        </div>
+        <div class="cobro-modal-body">
+          <p style="color:var(--texto-muted);font-size:0.85rem;margin:0 0 1rem">¿Cómo deseas venderlo?</p>
+          <div class="modos-venta">
+            <button class="modo-venta-btn" @click="seleccionarModoVenta(false)">
+              <span class="modo-venta-titulo">Por {{ productoParaVenta?.unidad_medida || 'unidad' }}</span>
+              <span class="modo-venta-precio">${{ precioRefProducto(productoParaVenta).toFixed(2) }}</span>
+            </button>
+            <button class="modo-venta-btn modo-paquete-btn" @click="seleccionarModoVenta(true)">
+              <span class="modo-venta-titulo">
+                Por {{ productoParaVenta?.nombre_paquete || ((productoParaVenta?.unidades_por_paquete || 1) + ' ' + (productoParaVenta?.unidad_medida || 'uds')) }}
+              </span>
+              <span class="modo-venta-precio">${{ precioPaquete(productoParaVenta).toFixed(2) }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal garantías -->
     <ModalGarantia
       v-if="modalGarantia"
@@ -929,6 +955,10 @@ export default {
       modalGarantia:       false,
       itemsGarantia:       [],
       garantiasPendientes: [],  // se llena al confirmar el modal
+
+      // Modal modo venta (unidad vs paquete)
+      modoVentaModal:    false,
+      productoParaVenta: null,
     }
   },
   computed: {
@@ -1146,6 +1176,11 @@ export default {
         this._avisoSinStock(`Sin stock: "${p.nombre}"`)
         return
       }
+      if ((p.unidades_por_paquete || 1) > 1) {
+        this.productoParaVenta = p
+        this.modoVentaModal    = true
+        return
+      }
       this._agregarDirecto(p)
     },
     _avisoSinStock(msg) {
@@ -1154,8 +1189,8 @@ export default {
       this._avisoTimer = setTimeout(() => { this.avisoSinStock = '' }, 2500)
     },
 
-    _agregarDirecto(p, variante = null) {
-      const key    = variante ? `${p.id}-${variante.id}` : String(p.id)
+    _agregarDirecto(p, variante = null, esPaquete = false) {
+      const key    = variante ? `${p.id}-${variante.id}` : esPaquete ? `${p.id}-paq` : String(p.id)
       const existe = this.carrito.find(i => i._key === key)
       if (existe) { existe.cantidad++; return }
 
@@ -1168,18 +1203,29 @@ export default {
         : variante
           ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
           : Number(p.precio_referencial_usd ?? 0)
-      const precio = this.tipoPrecio === 'base' ? precioBase : precioRef
+
+      let precio = this.tipoPrecio === 'base' ? precioBase : precioRef
+      let nombrePaquete = ''
+      if (esPaquete) {
+        const n = p.unidades_por_paquete || 1
+        precio = p.precio_paquete_usd
+          ? Number(p.precio_paquete_usd)
+          : Number((precioBase * n).toFixed(4))
+        nombrePaquete = p.nombre_paquete || `${n} ${p.unidad_medida || 'uds'}`
+      }
 
       this.carrito.push({
         ...p,
         _key:                   key,
+        _esPaquete:             esPaquete,
+        _nombrePaquete:         nombrePaquete,
         variante_id:            variante?.id     || null,
         variante_label:         variante ? `${variante.clase}${variante.color ? ' · ' + variante.color : ''}` : null,
         variante_codigo:        variante?.codigo || null,
         stock:                  variante?.stock  ?? p.stock,
         costo_usd:              variante?.costo_efectivo ?? p.costo_usd,
-        precio_base_usd:        precioBase,
-        precio_referencial_usd: precioRef,
+        precio_base_usd:        esPaquete ? precio : precioBase,
+        precio_referencial_usd: esPaquete ? precio : precioRef,
         cantidad:               1,
         precio_original:        precio,
         precio_unitario:        precio,
@@ -1192,6 +1238,23 @@ export default {
       this.productoVariantes = null
       this.variantes         = []
       this.$refs.inputBuscador?.focus()
+    },
+    seleccionarModoVenta(esPaquete) {
+      this._agregarDirecto(this.productoParaVenta, null, esPaquete)
+      this.modoVentaModal    = false
+      this.productoParaVenta = null
+      this.$refs.inputBuscador?.focus()
+    },
+    precioRefProducto(p) {
+      if (!p) return 0
+      return p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd
+        ? Number(p.precio_divisa_usd)
+        : Number(p.precio_referencial_usd ?? 0)
+    },
+    precioPaquete(p) {
+      if (!p) return 0
+      if (p.precio_paquete_usd) return Number(p.precio_paquete_usd)
+      return Number((Number(p.precio_base_usd ?? 0) * (p.unidades_por_paquete || 1)).toFixed(4))
     },
     sumar(i)  { this.carrito[i].cantidad++ },
     restar(i) {
@@ -2358,4 +2421,36 @@ export default {
   border-radius: 3px;
   margin-left: 0.25rem;
 }
+.tag-paquete {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7C3AED;
+  background: #EDE9FE;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  margin-left: 0.25rem;
+}
+.modos-venta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.modo-venta-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  background: #F9F9F9;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.modo-venta-btn:hover { background: #EBEBEB; border-color: #AAAAAA; }
+.modo-venta-titulo { font-size: 0.92rem; font-weight: 600; color: var(--texto-principal); }
+.modo-venta-precio { font-size: 1rem; font-weight: 800; color: #16A34A; }
+.modo-paquete-btn { border-color: #7C3AED; }
+.modo-paquete-btn:hover { background: #F5F3FF; border-color: #6D28D9; }
+.modo-paquete-btn .modo-venta-titulo { color: #7C3AED; }
 </style>
