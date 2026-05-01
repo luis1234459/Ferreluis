@@ -514,9 +514,15 @@
                     <label>Nombre del paquete</label>
                     <input v-model="form.nombre_paquete" placeholder="rollo, caja, saco…" />
                   </div>
-                  <div class="field" style="flex:1">
-                    <label>Precio paquete USD <small>(vacío = base × N)</small></label>
-                    <input v-model.number="form.precio_paquete_usd" type="number" min="0" step="0.01" placeholder="Auto" />
+                </div>
+                <div class="campo-fila" v-if="form.unidad_medida !== 'unidad'" style="margin-top:0.5rem">
+                  <div class="campo">
+                    <label>Precio {{ form.nombre_paquete || 'paquete' }} base USD</label>
+                    <input v-model.number="form.precio_paquete_base_usd" type="number" min="0" step="0.01" class="input-field" placeholder="0.00" />
+                  </div>
+                  <div class="campo">
+                    <label>Precio {{ form.nombre_paquete || 'paquete' }} referencial USD</label>
+                    <input v-model.number="form.precio_paquete_ref_usd" type="number" min="0" step="0.01" class="input-field" placeholder="0.00" />
                   </div>
                 </div>
               </template>
@@ -1343,7 +1349,8 @@ export default {
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
         es_generico: false, _cambioGenerico: false, _proveedor_fijo_id: null, _codigo_proveedor_fijo: '',
-        unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '', precio_paquete_usd: null,
+        unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '',
+        precio_paquete_base_usd: null, precio_paquete_ref_usd: null,
       }
       this.mostrarForm = true
     },
@@ -1363,10 +1370,11 @@ export default {
         _cambioGenerico:         false,
         _proveedor_fijo_id:      null,
         _codigo_proveedor_fijo:  '',
-        unidad_medida:           p.unidad_medida           ?? 'unidad',
-        unidades_por_paquete:    p.unidades_por_paquete    ?? 1,
-        nombre_paquete:          p.nombre_paquete          ?? '',
-        precio_paquete_usd:      p.precio_paquete_usd      ?? null,
+        unidad_medida:           p.unidad_medida               ?? 'unidad',
+        unidades_por_paquete:    p.unidades_por_paquete        ?? 1,
+        nombre_paquete:          p.nombre_paquete              ?? '',
+        precio_paquete_base_usd: p.precio_paquete_base_usd     ?? null,
+        precio_paquete_ref_usd:  p.precio_paquete_ref_usd      ?? null,
       }
       this.editando    = true
       this.error       = ''
@@ -1393,10 +1401,11 @@ export default {
           requiere_serial:         Boolean(this.form.requiere_serial),
           plantilla_garantia_id:   this.form.plantilla_garantia_id || null,
           es_generico:             Boolean(this.form.es_generico),
-          unidad_medida:           this.form.unidad_medida        || 'unidad',
-          unidades_por_paquete:    Number(this.form.unidades_por_paquete || 1),
-          nombre_paquete:          this.form.nombre_paquete       || null,
-          precio_paquete_usd:      this.form.precio_paquete_usd   ? Number(this.form.precio_paquete_usd) : null,
+          unidad_medida:           this.form.unidad_medida                 || 'unidad',
+          unidades_por_paquete:    Number(this.form.unidades_por_paquete   || 1),
+          nombre_paquete:          this.form.nombre_paquete                || null,
+          precio_paquete_base_usd: this.form.precio_paquete_base_usd ? Number(this.form.precio_paquete_base_usd) : null,
+          precio_paquete_ref_usd:  this.form.precio_paquete_ref_usd  ? Number(this.form.precio_paquete_ref_usd)  : null,
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)

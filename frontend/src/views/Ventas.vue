@@ -1208,9 +1208,15 @@ export default {
       let nombrePaquete = ''
       if (esPaquete) {
         const n = p.unidades_por_paquete || 1
-        precio = p.precio_paquete_usd
-          ? Number(p.precio_paquete_usd)
-          : Number((precioBase * n).toFixed(4))
+        if (this.tipoPrecio === 'base') {
+          precio = p.precio_paquete_base_usd
+            ? Number(p.precio_paquete_base_usd)
+            : Number((precioBase * n).toFixed(4))
+        } else {
+          precio = p.precio_paquete_ref_usd
+            ? Number(p.precio_paquete_ref_usd)
+            : Number((precioRef * n).toFixed(4))
+        }
         nombrePaquete = p.nombre_paquete || `${n} ${p.unidad_medida || 'uds'}`
       }
 
@@ -1253,8 +1259,15 @@ export default {
     },
     precioPaquete(p) {
       if (!p) return 0
-      if (p.precio_paquete_usd) return Number(p.precio_paquete_usd)
-      return Number((Number(p.precio_base_usd ?? 0) * (p.unidades_por_paquete || 1)).toFixed(4))
+      const n = p.unidades_por_paquete || 1
+      if (this.tipoPrecio === 'base') {
+        return p.precio_paquete_base_usd
+          ? Number(p.precio_paquete_base_usd)
+          : Number((Number(p.precio_base_usd ?? 0) * n).toFixed(4))
+      }
+      return p.precio_paquete_ref_usd
+        ? Number(p.precio_paquete_ref_usd)
+        : Number((Number(p.precio_referencial_usd ?? 0) * n).toFixed(4))
     },
     sumar(i)  { this.carrito[i].cantidad++ },
     restar(i) {
