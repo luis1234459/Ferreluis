@@ -128,12 +128,22 @@ const GRUPOS = [
     ],
   },
   {
+    key: 'comunicacion',
+    icono: '📢',
+    nombre: 'Comunicación',
+    rutas: ['/avisos'],
+    items: [
+      { ruta: '/avisos', label: 'Avisos', siempre: true },
+    ],
+  },
+  {
     key: 'admin',
     icono: '⚙️',
     nombre: 'Admin',
-    rutas: ['/usuarios', '/configuracion'],
+    rutas: ['/usuarios', '/configuracion', '/radar-demanda'],
     items: [
       { ruta: '/usuarios',                       label: 'Usuarios',       soloAdmin: true },
+      { ruta: '/radar-demanda',                  label: 'Radar Demanda',  soloAdmin: true },
       { ruta: '/configuracion/claves',          label: 'Claves Auth',    soloAdmin: true },
       { ruta: '/configuracion/garantias',       label: 'Garantías',      soloAdmin: true },
       { ruta: '/configuracion/mantenimiento',   label: 'Mantenimiento',  soloAdmin: true },

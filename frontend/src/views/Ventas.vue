@@ -229,6 +229,12 @@
                     <span class="pi-stock">{{ (p.variantes_resumen || []).filter(v => v.activo).reduce((s, v) => s + (v.stock || 0), 0) }} uds</span>
                   </template>
                   <button class="btn-ubicar-v" @click.stop="abrirUbicPop(p)" title="Ver ubicaciones">📍</button>
+                  <button
+                    v-if="p.stock <= 0"
+                    class="btn-demanda"
+                    @click.stop="abrirModalDemanda(p)"
+                    title="Registrar demanda"
+                  >📋</button>
                 </span>
               </div>
               <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroProveedor)" class="prod-sin-res">Sin resultados</div>
@@ -494,6 +500,49 @@
 
       </div><!-- /contenido-inner -->
     </main>
+
+    <!-- ══════════════════════════════ Modal: Radar de Demanda ══════════════════════════════ -->
+    <div v-if="modalDemanda" class="modal-overlay-dem" @click.self="modalDemanda = false">
+      <div class="modal-dem">
+        <div class="modal-dem-header">
+          <h3>📋 Registrar demanda</h3>
+          <button @click="modalDemanda = false" class="btn-cerrar-dem">✕</button>
+        </div>
+        <div class="modal-dem-body">
+          <p class="dem-producto">{{ productoDemanda?.nombre }}</p>
+
+          <div class="dem-tipos">
+            <button :class="['btn-tipo', demandaForm.tipo === 'consulta' ? 'active-consulta' : '']"
+              @click="demandaForm.tipo = 'consulta'">🟡 Cliente preguntó</button>
+            <button :class="['btn-tipo', demandaForm.tipo === 'venta_perdida' ? 'active-perdida' : '']"
+              @click="demandaForm.tipo = 'venta_perdida'">🔴 Venta perdida</button>
+            <button :class="['btn-tipo', demandaForm.tipo === 'alerta_precio' ? 'active-alerta' : '']"
+              @click="demandaForm.tipo = 'alerta_precio'">💬 Precio competencia</button>
+          </div>
+
+          <div v-if="demandaForm.tipo === 'venta_perdida'" class="dem-campo">
+            <label>Cantidad que quería</label>
+            <input v-model.number="demandaForm.cantidad" type="number" min="1" class="dem-input" placeholder="0" />
+          </div>
+
+          <div v-if="demandaForm.tipo === 'alerta_precio'" class="dem-campo">
+            <label>Nombre de la competencia</label>
+            <input v-model="demandaForm.competencia" class="dem-input" placeholder="Ej: Ferremax" />
+            <label style="margin-top:0.5rem">Precio que ofrecen</label>
+            <input v-model.number="demandaForm.precio_competencia" type="number" step="0.01" class="dem-input" placeholder="0.00" />
+          </div>
+
+          <div class="dem-campo">
+            <label>Observación (opcional)</label>
+            <input v-model="demandaForm.observacion" class="dem-input" placeholder="Detalles adicionales..." />
+          </div>
+        </div>
+        <div class="modal-dem-footer">
+          <button class="btn-cancelar-dem" @click="modalDemanda = false">Cancelar</button>
+          <button class="btn-enviar-dem" @click="enviarDemanda">Registrar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ══════════════════════════════ Modal: Cobro ══════════════════════════════ -->
     <div class="cobro-modal-overlay" v-if="modalCobro" @click.self="modalCobro = false">
@@ -959,6 +1008,17 @@ export default {
       // Modal modo venta (unidad vs paquete)
       modoVentaModal:    false,
       productoParaVenta: null,
+
+      // Modal Radar de Demanda
+      modalDemanda:    false,
+      productoDemanda: null,
+      demandaForm: {
+        tipo:               'consulta',
+        cantidad:           null,
+        competencia:        '',
+        precio_competencia: null,
+        observacion:        '',
+      },
     }
   },
   computed: {
@@ -1800,6 +1860,27 @@ export default {
       this.cargarProductos()
     },
 
+    abrirModalDemanda(producto) {
+      this.productoDemanda = producto
+      this.demandaForm = { tipo: 'consulta', cantidad: null, competencia: '', precio_competencia: null, observacion: '' }
+      this.modalDemanda = true
+    },
+    async enviarDemanda() {
+      try {
+        await axios.post('/notificaciones/demanda', {
+          tipo:               this.demandaForm.tipo,
+          producto_id:        this.productoDemanda?.id || null,
+          nombre_producto:    this.productoDemanda?.nombre || '',
+          cantidad:           this.demandaForm.cantidad || null,
+          competencia:        this.demandaForm.competencia || null,
+          precio_competencia: this.demandaForm.precio_competencia || null,
+          observacion:        this.demandaForm.observacion || null,
+          vendedor:           this.usuario.usuario || '',
+        })
+        this.modalDemanda = false
+      } catch {}
+    },
+
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -2466,4 +2547,51 @@ export default {
 .modo-paquete-btn { border-color: #7C3AED; }
 .modo-paquete-btn:hover { background: #F5F3FF; border-color: #6D28D9; }
 .modo-paquete-btn .modo-venta-titulo { color: #7C3AED; }
+
+/* ── Radar de Demanda ── */
+.btn-demanda {
+  background: #FEF9C3; border: 1px solid #F59E0B;
+  border-radius: 5px; padding: 0.15rem 0.4rem;
+  cursor: pointer; font-size: 0.8rem; margin-left: 0.3rem;
+}
+.modal-overlay-dem {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 9999; display: flex; align-items: center; justify-content: center;
+}
+.modal-dem {
+  background: #FFFFFF; border-radius: 12px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+}
+.modal-dem-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--borde);
+}
+.modal-dem-header h3 { margin: 0; font-size: 0.95rem; color: var(--texto-principal); }
+.btn-cerrar-dem { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--texto-muted); }
+.modal-dem-body { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.dem-producto { font-weight: 700; color: var(--texto-principal); margin: 0; font-size: 0.95rem; }
+.dem-tipos { display: flex; flex-direction: column; gap: 0.4rem; }
+.btn-tipo {
+  border: 1px solid var(--borde); background: #FFFFFF;
+  border-radius: 8px; padding: 0.5rem 0.75rem;
+  cursor: pointer; font-size: 0.85rem; color: var(--texto-sec);
+  text-align: left; transition: all 0.15s;
+}
+.active-consulta { background: #FEF9C3; border-color: #F59E0B; color: #854D0E; font-weight: 600; }
+.active-perdida  { background: #FEE2E2; border-color: #DC2626; color: #DC2626; font-weight: 600; }
+.active-alerta   { background: #EDE9FE; border-color: #7C3AED; color: #7C3AED; font-weight: 600; }
+.dem-campo { display: flex; flex-direction: column; gap: 0.3rem; }
+.dem-campo label { font-size: 0.75rem; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; }
+.dem-input {
+  border: 1px solid var(--borde); border-radius: 6px;
+  padding: 0.45rem 0.65rem; font-size: 0.875rem;
+  color: var(--texto-principal); background: var(--fondo-app); width: 100%; box-sizing: border-box;
+}
+.modal-dem-footer {
+  padding: 0.75rem 1.25rem; border-top: 1px solid var(--borde);
+  display: flex; justify-content: flex-end; gap: 0.75rem;
+}
+.btn-cancelar-dem { background: none; border: 1px solid var(--borde); border-radius: 6px; padding: 0.45rem 1rem; cursor: pointer; color: var(--texto-sec); font-size: 0.85rem; }
+.btn-enviar-dem { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
 </style>

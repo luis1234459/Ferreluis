@@ -760,3 +760,35 @@ class GarantiaVenta(Base):
     meses_garantia       = Column(Integer,  nullable=True)   # copiado de la plantilla
     condiciones_snapshot = Column(String,   nullable=True)   # texto copiado al momento de venta
     fecha                = Column(DateTime, default=datetime.now)
+
+
+# ---------------------------------------------------------------------------
+# Módulo de Notificaciones y Radar de Demanda
+# ---------------------------------------------------------------------------
+
+class Aviso(Base):
+    __tablename__ = "avisos"
+
+    id           = Column(Integer,  primary_key=True, index=True)
+    titulo       = Column(String,   nullable=False)
+    mensaje      = Column(String,   nullable=False)
+    creado_por   = Column(String,   nullable=False)
+    fecha        = Column(DateTime, default=datetime.now)
+    activo       = Column(Boolean,  default=True)
+    destinatario = Column(String,   nullable=True)  # None = todos, o nombre usuario específico
+
+
+class DemandaRegistro(Base):
+    __tablename__ = "demanda_registro"
+
+    id                 = Column(Integer,  primary_key=True, index=True)
+    tipo               = Column(String,   nullable=False)  # "venta_perdida" | "consulta" | "alerta_precio"
+    producto_id        = Column(Integer,  nullable=True)
+    nombre_producto    = Column(String,   nullable=False)
+    cantidad           = Column(Float,    nullable=True)   # para venta_perdida
+    competencia        = Column(String,   nullable=True)   # nombre competencia para alerta_precio
+    precio_competencia = Column(Float,    nullable=True)   # precio que ofrece la competencia
+    vendedor           = Column(String,   nullable=False)
+    fecha              = Column(DateTime, default=datetime.now)
+    visto_por_admin    = Column(Boolean,  default=False)
+    observacion        = Column(String,   nullable=True)

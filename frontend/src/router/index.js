@@ -27,6 +27,8 @@ import Creditos           from '../views/Creditos.vue'
 import Claves             from '../views/Configuracion/Claves.vue'
 import Garantias          from '../views/Configuracion/Garantias.vue'
 import Mantenimiento      from '../views/Configuracion/Mantenimiento.vue'
+import Avisos       from '../views/Avisos.vue'
+import RadarDemanda from '../views/RadarDemanda.vue'
 
 const routes = [
   { path: '/',          redirect: '/login' },
@@ -79,6 +81,8 @@ const routes = [
   { path: '/configuracion/claves',     name: 'Claves',     component: Claves,     meta: { soloAdmin: true } },
   { path: '/configuracion/garantias',      name: 'Garantias',      component: Garantias,      meta: { soloAdmin: true } },
   { path: '/configuracion/mantenimiento', name: 'Mantenimiento', component: Mantenimiento, meta: { soloAdmin: true } },
+  { path: '/avisos',        name: 'Avisos',       component: Avisos,       meta: { requiresAuth: true } },
+  { path: '/radar-demanda', name: 'RadarDemanda',  component: RadarDemanda, meta: { soloAdmin: true } },
 ]
 
 const router = createRouter({
