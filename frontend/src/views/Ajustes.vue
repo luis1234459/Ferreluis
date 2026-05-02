@@ -27,6 +27,10 @@
             @click="cambiarTabHistorial">
             Historial
           </button>
+          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'trazabilidad' }"
+            @click="tabActivo = 'trazabilidad'">
+            Trazabilidad
+          </button>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -351,6 +355,84 @@
 
         </div>
 
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- Tab: Trazabilidad                                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <div v-show="tabActivo === 'trazabilidad'">
+
+          <!-- Filtros -->
+          <div class="filtros-bar" style="flex-wrap:wrap;gap:0.6rem">
+            <select v-model="filtroTrazDepto" @change="filtroTrazCategoria = ''; cargarCategoriasTraz()">
+              <option value="">Todos los departamentos</option>
+              <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+            </select>
+            <select v-model="filtroTrazCategoria" :disabled="!filtroTrazDepto">
+              <option value="">Todas las categorías</option>
+              <option v-for="c in categoriasTraz" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+            <div style="position:relative">
+              <input
+                v-model="busquedaProducto"
+                class="input-busq-prod"
+                placeholder="Buscar producto específico..."
+                @input="buscarProductoTraz"
+              />
+              <ul v-if="productosSearch.length" class="dropdown-prod">
+                <li v-for="p in productosSearch" :key="p.id" @mousedown="seleccionarProductoTraz(p)">
+                  {{ p.nombre }}
+                </li>
+              </ul>
+              <span v-if="filtroTrazProducto" class="prod-sel-tag">
+                ✓ {{ busquedaProducto }}
+                <span @click="limpiarProductoTraz" style="cursor:pointer;margin-left:4px">✕</span>
+              </span>
+            </div>
+            <input type="date" v-model="filtroTrazDesde" />
+            <input type="date" v-model="filtroTrazHasta" />
+            <button class="btn-cargar" @click="cargarTrazabilidad" :disabled="cargandoTraz">
+              {{ cargandoTraz ? 'Cargando...' : 'Consultar' }}
+            </button>
+          </div>
+
+          <!-- Tabla -->
+          <div v-if="trazabilidad.length > 0" class="tabla-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Producto</th>
+                  <th style="text-align:right">Cantidad</th>
+                  <th style="text-align:right">Precio USD</th>
+                  <th>Referencia</th>
+                  <th>Detalle</th>
+                  <th>Usuario</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(m, i) in trazabilidad" :key="i" :class="'fila-' + m.tipo">
+                  <td class="txt-muted">{{ formatFecha(m.fecha) }}</td>
+                  <td><span :class="'badge-traz badge-traz-' + m.tipo">{{ labelTipo(m.tipo) }}</span></td>
+                  <td style="font-weight:600">{{ m.producto_nombre }}</td>
+                  <td style="text-align:right" :class="m.cantidad >= 0 ? 'txt-verde' : 'txt-danger'">
+                    {{ m.cantidad >= 0 ? '+' : '' }}{{ m.cantidad }}
+                  </td>
+                  <td style="text-align:right" class="txt-muted">
+                    {{ m.precio_usd != null ? '$' + Number(m.precio_usd).toFixed(4) : '—' }}
+                  </td>
+                  <td class="txt-muted">{{ m.referencia }}</td>
+                  <td class="txt-muted">{{ m.detalle }}</td>
+                  <td class="txt-muted">{{ m.usuario }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else-if="!cargandoTraz" class="sin-datos-tab">
+            Selecciona filtros y haz clic en "Consultar"
+          </div>
+
+        </div>
+
       </div><!-- /contenido-inner -->
     </main>
   </div>
@@ -407,6 +489,18 @@ export default {
       filtroHistHasta:    '',
       filtroHistTipo:     '',
       cargandoHistorial:  false,
+
+      // ── Tab Trazabilidad ─────────────────────────────────────────────────
+      trazabilidad:         [],
+      cargandoTraz:         false,
+      filtroTrazProducto:   null,
+      filtroTrazDepto:      '',
+      filtroTrazCategoria:  '',
+      filtroTrazDesde:      '',
+      filtroTrazHasta:      '',
+      busquedaProducto:     '',
+      productosSearch:      [],
+      categoriasTraz:       [],
     }
   },
 
@@ -689,6 +783,56 @@ export default {
       } catch { alert('Error al exportar PDF') }
     },
 
+    // ── Tab Trazabilidad ───────────────────────────────────────────────────
+    async cargarCategoriasTraz() {
+      if (!this.filtroTrazDepto) { this.categoriasTraz = []; return }
+      try {
+        const { data } = await axios.get('/productos/categorias', {
+          params: { departamento_id: this.filtroTrazDepto }
+        })
+        this.categoriasTraz = data
+      } catch { this.categoriasTraz = [] }
+    },
+    async buscarProductoTraz() {
+      const q = this.busquedaProducto.trim()
+      if (q.length < 2) { this.productosSearch = []; return }
+      try {
+        const { data } = await axios.get('/productos/', { params: { busqueda: q, limit: 10 } })
+        this.productosSearch = data.productos || []
+      } catch { this.productosSearch = [] }
+    },
+    seleccionarProductoTraz(p) {
+      this.filtroTrazProducto = p.id
+      this.busquedaProducto   = p.nombre
+      this.productosSearch    = []
+    },
+    limpiarProductoTraz() {
+      this.filtroTrazProducto = null
+      this.busquedaProducto   = ''
+      this.productosSearch    = []
+    },
+    async cargarTrazabilidad() {
+      this.cargandoTraz = true
+      this.trazabilidad = []
+      try {
+        const params = {}
+        if (this.filtroTrazProducto)  params.producto_id     = this.filtroTrazProducto
+        if (this.filtroTrazDepto)     params.departamento_id = this.filtroTrazDepto
+        if (this.filtroTrazCategoria) params.categoria_id    = this.filtroTrazCategoria
+        if (this.filtroTrazDesde)     params.fecha_desde     = this.filtroTrazDesde
+        if (this.filtroTrazHasta)     params.fecha_hasta     = this.filtroTrazHasta
+        const { data } = await axios.get('/ajustes/trazabilidad', { params, headers: this._headers() })
+        this.trazabilidad = data
+      } catch (e) {
+        console.error(e)
+      } finally {
+        this.cargandoTraz = false
+      }
+    },
+    labelTipo(t) {
+      return { venta: 'Venta', compra: 'Compra', ajuste: 'Ajuste', devolucion: 'Devolución' }[t] || t
+    },
+
     // ── Utilidades ─────────────────────────────────────────────────────────
     formatFecha(iso) {
       if (!iso) return '—'
@@ -763,4 +907,38 @@ export default {
 .txt-danger  { color: var(--danger); font-weight: 600; }
 .sin-datos   { text-align: center; color: var(--texto-muted); padding: 1.5rem; }
 .sin-datos-tab { text-align: center; color: var(--texto-muted); padding: 3rem; font-size: 0.92rem; }
+
+/* ── Trazabilidad ── */
+.input-busq-prod {
+  padding: 0.45rem 0.75rem; border: 1px solid var(--borde);
+  border-radius: 7px; background: #fff;
+  color: var(--texto-principal); font-size: 0.88rem; width: 220px;
+}
+.dropdown-prod {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 999;
+  background: #FFFFFF; border: 1px solid var(--borde);
+  border-radius: 6px; max-height: 200px; overflow-y: auto;
+  list-style: none; padding: 0; margin: 2px 0 0;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+.dropdown-prod li {
+  padding: 0.45rem 0.75rem; cursor: pointer; font-size: 0.85rem;
+  border-bottom: 1px solid var(--borde);
+}
+.dropdown-prod li:hover { background: #FFFDF0; }
+.prod-sel-tag {
+  display: inline-block; margin-top: 0.3rem;
+  font-size: 0.78rem; color: #15803D; font-weight: 600;
+}
+.badge-traz {
+  font-size: 0.73rem; padding: 0.15rem 0.5rem;
+  border-radius: 4px; font-weight: 700;
+}
+.badge-traz-venta      { background: #FEE2E2; color: #DC2626; }
+.badge-traz-compra     { background: #DCFCE7; color: #15803D; }
+.badge-traz-ajuste     { background: #FEF9C3; color: #854D0E; }
+.badge-traz-devolucion { background: #EDE9FE; color: #7C3AED; }
+.fila-compra    { background: #F0FDF4; }
+.fila-ajuste    { background: #FFFBEB; }
+.fila-devolucion{ background: #F5F3FF; }
 </style>

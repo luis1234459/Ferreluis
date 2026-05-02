@@ -424,3 +424,139 @@ def exportar_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=historial_ajustes.pdf"},
     )
+
+
+# ── Trazabilidad por producto ─────────────────────────────────────────────────
+
+@router.get("/trazabilidad")
+def trazabilidad_producto(
+    producto_id:     Optional[int]  = None,
+    departamento_id: Optional[int]  = None,
+    categoria_id:    Optional[int]  = None,
+    fecha_desde:     Optional[date] = None,
+    fecha_hasta:     Optional[date] = None,
+    db: Session      = Depends(get_db),
+    _: None          = Depends(require_admin),
+):
+    """
+    Historial completo de movimientos de un producto:
+    compras, ventas, ajustes de stock y devoluciones.
+    """
+    from models import (
+        DetalleVenta, Venta, DetalleRecepcion, RecepcionCompra,
+        OrdenCompra, DevolucionCliente, DetalleDevolucionCliente,
+        Proveedor,
+    )
+
+    ids_productos = []
+    if producto_id:
+        ids_productos = [producto_id]
+    else:
+        q = db.query(Producto.id)
+        if departamento_id:
+            q = q.filter(Producto.departamento_id == departamento_id)
+        if categoria_id:
+            q = q.filter(Producto.categoria_id == categoria_id)
+        ids_productos = [r[0] for r in q.all()]
+
+    if not ids_productos:
+        return []
+
+    movimientos = []
+
+    # ── Ventas ────────────────────────────────────────────────────────────
+    q_ventas = db.query(DetalleVenta, Venta).join(
+        Venta, DetalleVenta.venta_id == Venta.id
+    ).filter(DetalleVenta.producto_id.in_(ids_productos))
+    if fecha_desde:
+        q_ventas = q_ventas.filter(Venta.fecha >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        q_ventas = q_ventas.filter(Venta.fecha <= datetime.combine(fecha_hasta, datetime.max.time()))
+    for dv, v in q_ventas.all():
+        prod = db.query(Producto).filter(Producto.id == dv.producto_id).first()
+        movimientos.append({
+            "fecha":          v.fecha.isoformat() if v.fecha else None,
+            "tipo":           "venta",
+            "producto_id":    dv.producto_id,
+            "producto_nombre":prod.nombre if prod else f"ID {dv.producto_id}",
+            "cantidad":       -abs(float(dv.cantidad or 0)),
+            "referencia":     f"Venta #{v.id}",
+            "usuario":        v.usuario,
+            "precio_usd":     float(dv.precio_unitario or 0),
+            "detalle":        f"Venta #{v.id} — {v.usuario}",
+        })
+
+    # ── Compras (recepciones) ─────────────────────────────────────────────
+    q_compras = db.query(DetalleRecepcion, RecepcionCompra, OrdenCompra).join(
+        RecepcionCompra, DetalleRecepcion.recepcion_id == RecepcionCompra.id
+    ).join(
+        OrdenCompra, RecepcionCompra.orden_id == OrdenCompra.id
+    ).filter(DetalleRecepcion.producto_id.in_(ids_productos))
+    if fecha_desde:
+        q_compras = q_compras.filter(RecepcionCompra.fecha_recepcion >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        q_compras = q_compras.filter(RecepcionCompra.fecha_recepcion <= datetime.combine(fecha_hasta, datetime.max.time()))
+    for dr, rc, oc in q_compras.all():
+        prod = db.query(Producto).filter(Producto.id == dr.producto_id).first()
+        prov = db.query(Proveedor).filter(Proveedor.id == oc.proveedor_id).first()
+        movimientos.append({
+            "fecha":          rc.fecha_recepcion.isoformat() if rc.fecha_recepcion else None,
+            "tipo":           "compra",
+            "producto_id":    dr.producto_id,
+            "producto_nombre":prod.nombre if prod else f"ID {dr.producto_id}",
+            "cantidad":       abs(float(dr.cantidad_recibida or 0)),
+            "referencia":     oc.numero,
+            "usuario":        rc.recibido_por,
+            "precio_usd":     float(dr.precio_unitario_real_usd or 0),
+            "detalle":        f"{oc.numero} — {prov.nombre if prov else ''}",
+        })
+
+    # ── Ajustes de stock ──────────────────────────────────────────────────
+    q_ajustes = db.query(HistorialAjuste).filter(HistorialAjuste.tipo == "stock")
+    if fecha_desde:
+        q_ajustes = q_ajustes.filter(HistorialAjuste.fecha >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        q_ajustes = q_ajustes.filter(HistorialAjuste.fecha <= datetime.combine(fecha_hasta, datetime.max.time()))
+    for aj in q_ajustes.all():
+        try:
+            detalles = json.loads(aj.detalle_json or "[]")
+            for d in detalles:
+                if d.get("producto_id") in ids_productos:
+                    diff = (d.get("stock_nuevo", 0) or 0) - (d.get("stock_anterior", 0) or 0)
+                    movimientos.append({
+                        "fecha":          aj.fecha.isoformat() if aj.fecha else None,
+                        "tipo":           "ajuste",
+                        "producto_id":    d["producto_id"],
+                        "producto_nombre":d.get("nombre", ""),
+                        "cantidad":       diff,
+                        "referencia":     f"Ajuste #{aj.id}",
+                        "usuario":        aj.usuario,
+                        "precio_usd":     None,
+                        "detalle":        d.get("motivo", aj.descripcion),
+                    })
+        except Exception:
+            pass
+
+    # ── Devoluciones de clientes ───────────────────────────────────────────
+    q_devs = db.query(DetalleDevolucionCliente, DevolucionCliente).join(
+        DevolucionCliente, DetalleDevolucionCliente.devolucion_id == DevolucionCliente.id
+    ).filter(DetalleDevolucionCliente.producto_id.in_(ids_productos))
+    if fecha_desde:
+        q_devs = q_devs.filter(DevolucionCliente.fecha >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        q_devs = q_devs.filter(DevolucionCliente.fecha <= datetime.combine(fecha_hasta, datetime.max.time()))
+    for dd, dev in q_devs.all():
+        movimientos.append({
+            "fecha":          dev.fecha.isoformat() if dev.fecha else None,
+            "tipo":           "devolucion",
+            "producto_id":    dd.producto_id,
+            "producto_nombre":dd.nombre_producto,
+            "cantidad":       abs(float(dd.cantidad or 0)) if dd.vuelve_inventario else 0,
+            "referencia":     f"Dev #{dev.id}",
+            "usuario":        dev.usuario,
+            "precio_usd":     float(dd.precio_unitario or 0),
+            "detalle":        f"Devolución — {dev.motivo}",
+        })
+
+    movimientos.sort(key=lambda x: x["fecha"] or "", reverse=True)
+    return movimientos
