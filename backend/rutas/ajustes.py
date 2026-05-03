@@ -435,6 +435,7 @@ def trazabilidad_producto(
     categoria_id:    Optional[int]  = None,
     fecha_desde:     Optional[date] = None,
     fecha_hasta:     Optional[date] = None,
+    tipo:            Optional[str]  = None,
     db: Session      = Depends(get_db),
     _: None          = Depends(require_admin),
 ):
@@ -559,4 +560,6 @@ def trazabilidad_producto(
         })
 
     movimientos.sort(key=lambda x: x["fecha"] or "", reverse=True)
+    if tipo:
+        movimientos = [m for m in movimientos if m["tipo"] == tipo]
     return movimientos

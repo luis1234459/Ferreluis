@@ -389,6 +389,13 @@
             </div>
             <input type="date" v-model="filtroTrazDesde" />
             <input type="date" v-model="filtroTrazHasta" />
+            <select v-model="filtroTrazTipo">
+              <option value="">Todos los movimientos</option>
+              <option value="compra">Compras</option>
+              <option value="venta">Ventas</option>
+              <option value="ajuste">Ajustes de stock</option>
+              <option value="devolucion">Devoluciones</option>
+            </select>
             <button class="btn-cargar" @click="cargarTrazabilidad" :disabled="cargandoTraz">
               {{ cargandoTraz ? 'Cargando...' : 'Consultar' }}
             </button>
@@ -501,6 +508,7 @@ export default {
       busquedaProducto:     '',
       productosSearch:      [],
       categoriasTraz:       [],
+      filtroTrazTipo:       '',
     }
   },
 
@@ -821,6 +829,7 @@ export default {
         if (this.filtroTrazCategoria) params.categoria_id    = this.filtroTrazCategoria
         if (this.filtroTrazDesde)     params.fecha_desde     = this.filtroTrazDesde
         if (this.filtroTrazHasta)     params.fecha_hasta     = this.filtroTrazHasta
+        if (this.filtroTrazTipo)      params.tipo            = this.filtroTrazTipo
         const { data } = await axios.get('/ajustes/trazabilidad', { params, headers: this._headers() })
         this.trazabilidad = data
       } catch (e) {
