@@ -474,6 +474,7 @@ def listar_productos(
     departamento_id: Optional[int] = None,
     categoria_id: Optional[int] = None,
     proveedor_id: Optional[int] = None,
+    stock_cero: bool = False,
     db: Session = Depends(get_db),
 ):
     q = db.query(Producto)
@@ -501,6 +502,8 @@ def listar_productos(
         q = q.filter(Producto.categoria_id == categoria_id)
     if proveedor_id is not None:
         q = q.filter(Producto.proveedor_id == proveedor_id)
+    if stock_cero:
+        q = q.filter(Producto.stock <= 0)
     total = q.count()
     bcv, binance = _tasas_actuales(db)
     q = q.order_by(func.length(Producto.nombre), Producto.nombre)

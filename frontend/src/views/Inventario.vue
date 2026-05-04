@@ -98,6 +98,11 @@
               @click="toggleInactivos">
               {{ mostrarInactivos ? '👁 Ocultando inactivos' : '👁 Mostrar inactivos' }}
             </button>
+            <button v-if="esAdmin"
+              :class="['btn-toggle-inactivos', filtroStockCero ? 'activo' : '']"
+              @click="toggleStockCero">
+              {{ filtroStockCero ? '📦 Stock 0 activo' : '📦 Ver stock 0' }}
+            </button>
           </div>
 
           <!-- Tabla -->
@@ -1129,6 +1134,7 @@ export default {
 
       // Visibilidad de inactivos (solo admin)
       mostrarInactivos: false,
+      filtroStockCero:  false,
 
       // Modo edición masiva
       modoEdicion:      false,
@@ -1281,6 +1287,7 @@ export default {
     async cargarProductos() {
       const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
+      if (this.esAdmin && this.filtroStockCero)  params.stock_cero        = true
       if (this.busqueda)           params.busqueda        = this.busqueda
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
@@ -1542,6 +1549,11 @@ export default {
     // ── Estado activo/inactivo ────────────────────────────────────────────────
     async toggleInactivos() {
       this.mostrarInactivos = !this.mostrarInactivos
+      this.paginaActual = 1
+      await this.cargarProductos()
+    },
+    async toggleStockCero() {
+      this.filtroStockCero = !this.filtroStockCero
       this.paginaActual = 1
       await this.cargarProductos()
     },
