@@ -118,7 +118,9 @@ const MODULOS = [
   { key: 'clientes',    label: 'Clientes' },
   { key: 'fidelidad',   label: 'Fidelidad' },
   { key: 'mi_comision', label: 'Mi Comisión' },
-  { key: 'proveedores', label: 'Proveedores (Compras)' },
+  { key: 'proveedores',  label: 'Proveedores (Compras)' },
+  { key: 'presupuestos', label: 'Presupuestos' },
+  { key: 'devoluciones', label: 'Devoluciones' },
 ]
 
 export default {
