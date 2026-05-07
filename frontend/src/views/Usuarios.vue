@@ -83,6 +83,16 @@
         <div class="campo" v-if="form.rol !== 'admin'">
           <label>Módulos permitidos</label>
           <p class="campo-nota">Deja todos sin marcar para acceso completo (sin restricciones).</p>
+          <div class="plantillas-bar">
+            <span class="plantillas-label">Plantilla:</span>
+            <button
+              v-for="p in PLANTILLAS"
+              :key="p.label"
+              type="button"
+              class="btn-plantilla"
+              @click="aplicarPlantilla(p)"
+            >{{ p.label }}</button>
+          </div>
           <div class="permisos-grid">
             <label v-for="mod in MODULOS" :key="mod.key" class="permiso-check">
               <input type="checkbox" :value="mod.key" v-model="form.permisos" />
@@ -123,6 +133,21 @@ const MODULOS = [
   { key: 'devoluciones', label: 'Devoluciones' },
 ]
 
+const PLANTILLAS = [
+  {
+    label: 'Vendedor básico',
+    permisos: ['ventas', 'cierre', 'mi_comision'],
+  },
+  {
+    label: 'Vendedor completo',
+    permisos: ['ventas', 'cierre', 'mi_comision', 'presupuestos', 'devoluciones', 'clientes'],
+  },
+  {
+    label: 'Gestionador',
+    permisos: ['ventas', 'cierre', 'mi_comision', 'presupuestos', 'devoluciones', 'clientes', 'reportes', 'tasa'],
+  },
+]
+
 export default {
   components: { AppSidebar },
   name: 'Usuarios',
@@ -143,6 +168,7 @@ export default {
       errorModal: '',
       guardando:  false,
       MODULOS,
+      PLANTILLAS,
     }
   },
   computed: {
@@ -256,6 +282,9 @@ export default {
         alert(e.response?.data?.detail || 'Error al eliminar usuario.')
       }
     },
+    aplicarPlantilla(plantilla) {
+      this.form.permisos = [...plantilla.permisos]
+    },
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -293,4 +322,23 @@ export default {
 .btn-activar    { background: #DCFCE7; color: #15803D; }
 .btn-desactivar { background: #FEF9C3; color: #854D0E; }
 .acciones-celda { display: flex; gap: 0.4rem; align-items: center; }
+
+.plantillas-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.plantillas-label { font-size: 0.78rem; color: var(--texto-muted); }
+.btn-plantilla {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--acento);
+  background: transparent;
+  color: var(--acento);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.btn-plantilla:hover { background: var(--acento); color: #fff; }
 </style>
