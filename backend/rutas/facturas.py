@@ -31,18 +31,17 @@ MEDIA_TYPE_MAP = {
 
 def _pdf_a_imagen_base64(contenido: bytes) -> tuple[str, str]:
     try:
-        from pdf2image import convert_from_bytes
+        import fitz
     except ImportError:
-        raise HTTPException(
-            status_code=500,
-            detail="pdf2image no está instalado. Ejecuta: pip install pdf2image",
-        )
+        raise HTTPException(status_code=500, detail="pymupdf no está instalado.")
     try:
-        paginas = convert_from_bytes(contenido, first_page=1, last_page=1, dpi=200)
+        doc    = fitz.open(stream=contenido, filetype="pdf")
+        pagina = doc[0]
+        mat    = fitz.Matrix(2.0, 2.0)
+        pix    = pagina.get_pixmap(matrix=mat, alpha=False)
+        buffer = io.BytesIO(pix.tobytes("jpeg", jpg_quality=90))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo convertir el PDF: {e}")
-    buffer = io.BytesIO()
-    paginas[0].save(buffer, format="JPEG", quality=90)
     return base64.standard_b64encode(buffer.getvalue()).decode("utf-8"), "image/jpeg"
 
 
