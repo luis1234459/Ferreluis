@@ -465,6 +465,15 @@ def eliminar_oferta(
 # Registrados DESPUÉS de todas las rutas con segmentos literales
 # ============================================================================
 
+@router.delete("/stock-cero", dependencies=[Depends(require_admin)])
+def eliminar_productos_stock_cero(db: Session = Depends(get_db)):
+    productos = db.query(Producto).filter(Producto.stock <= 0).all()
+    cantidad = len(productos)
+    for p in productos:
+        db.delete(p)
+    db.commit()
+    return {"eliminados": cantidad}
+
 @router.get("/")
 def listar_productos(
     incluir_inactivos: bool = False,

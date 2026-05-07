@@ -103,6 +103,9 @@
               @click="toggleStockCero">
               {{ filtroStockCero ? '📦 Stock 0 activo' : '📦 Ver stock 0' }}
             </button>
+            <button v-if="esAdmin" class="btn-eliminar-stock0" @click="eliminarStockCero">
+              🗑 Eliminar stock 0
+            </button>
           </div>
 
           <!-- Tabla -->
@@ -1557,6 +1560,17 @@ export default {
       this.paginaActual = 1
       await this.cargarProductos()
     },
+    async eliminarStockCero() {
+      const res = await axios.get('/productos/', { params: { stock_cero: true, limit: 1 } })
+      const total = res.data.total
+      if (total === 0) { alert('No hay productos con stock 0.'); return }
+      if (!confirm(`¿Eliminar definitivamente ${total} producto(s) con stock 0? Esta acción no se puede deshacer.`)) return
+      const r = await axios.delete('/productos/stock-cero')
+      alert(`Se eliminaron ${r.data.eliminados} producto(s).`)
+      this.paginaActual = 1
+      this.filtroStockCero = false
+      await this.cargarProductos()
+    },
     async cambiarEstado(producto, estado) {
       const accion = estado ? 'activar' : 'desactivar'
       if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} "${producto.nombre}"?`)) return
@@ -2093,6 +2107,8 @@ export default {
 /* ── Toggle inactivos y estado ── */
 .btn-toggle-inactivos { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
 .btn-toggle-inactivos.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-eliminar-stock0 { background: #DC26261A; color: #DC2626; border: 1px solid #DC2626; padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.btn-eliminar-stock0:hover { background: #DC2626; color: #fff; }
 .btn-desactivar { background: #DC26261A; color: #DC2626; border: 1px solid #DC2626; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-activar    { background: #16A34A1A; color: #16A34A; border: 1px solid #16A34A; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .badge-inactivo { background: #DC26261A; color: #DC2626; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; text-transform: uppercase; margin-left: 0.25rem; }
