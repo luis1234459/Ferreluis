@@ -254,6 +254,7 @@
             <!-- Cabecera de columnas -->
             <div class="lia-head">
               <span class="lia-h-inv">Producto en inventario</span>
+              <span class="lia-h-ubic">Ubicación</span>
               <span class="lia-h-campos">
                 <span class="lia-h-cod">Cód. prov.</span>
                 <span class="lia-h-cant">Cant.</span>
@@ -313,6 +314,14 @@
                         </li>
                       </ul>
                     </div>
+                  </div>
+                  <!-- Ubicación: departamento / categoría -->
+                  <div class="lia-ubic" @click="abrirPanelDept(linea)">
+                    <span v-if="linea.esNuevo && !linea.departamento_id" class="ubic-badge ubic-sin">Sin asignar</span>
+                    <span v-else-if="linea.departamento_id" class="ubic-badge ubic-ok">
+                      {{ linea.departamento_nombre }}<small v-if="linea.categoria_nombre"> / {{ linea.categoria_nombre }}</small> ✏️
+                    </span>
+                    <span v-else class="ubic-badge ubic-gris">Ver ✏️</span>
                   </div>
                   <!-- Campos numéricos -->
                   <div class="lia-campos">
@@ -504,6 +513,9 @@
               <p v-if="lineasSinDecidir > 0" class="aviso-pendientes">
                 ⚠ {{ lineasSinDecidir }} producto(s) pendiente(s) de vincular.
               </p>
+              <p v-if="lineasNuevasSinDept.length > 0" class="aviso-pendientes">
+                ⚠ {{ lineasNuevasSinDept.length }} producto(s) nuevo(s) sin departamento. Haz clic en cada fila para asignarlo.
+              </p>
               <button
                 class="btn-confirmar"
                 :disabled="!puedeConfirmar || confirmando"
@@ -516,6 +528,43 @@
             </div>
           </div>
         </template>
+
+        <!-- ══ PANEL DEPT/CAT ════════════════════════════════════════ -->
+        <div v-if="panelDeptVisible" class="panel-dept-overlay" @click.self="panelDeptVisible = false">
+          <div class="panel-dept">
+            <div class="panel-dept-header">
+              <h3>Ubicación en inventario</h3>
+              <button class="btn-cerrar-modal" @click="panelDeptVisible = false">✕</button>
+            </div>
+            <div class="panel-dept-body" v-if="panelDeptLinea">
+              <div class="panel-prod-info">
+                <div class="panel-prod-nombre">{{ panelDeptLinea.nombreFinal || panelDeptLinea.match?.nombre || panelDeptLinea.nombre_ia }}</div>
+                <div class="panel-prod-meta">
+                  <span v-if="panelDeptLinea.codigo_proveedor">Cód: {{ panelDeptLinea.codigo_proveedor }}</span>
+                  <span>${{ panelDeptLinea.precio_unitario }} × {{ panelDeptLinea.cantidad }}</span>
+                </div>
+              </div>
+              <div class="field-group" style="margin-top:1rem">
+                <label class="field-label" style="color:#aaa">Departamento</label>
+                <select class="input-field panel-select" v-model="panelDeptSeleccionado" @change="panelCatSeleccionada = null">
+                  <option :value="null">— Seleccionar departamento —</option>
+                  <option v-for="d in departamentos" :key="d.id" :value="d">{{ d.nombre }}</option>
+                </select>
+              </div>
+              <div class="field-group" style="margin-top:0.75rem" v-if="panelDeptSeleccionado && panelDeptSeleccionado.categorias?.length">
+                <label class="field-label" style="color:#aaa">Categoría</label>
+                <select class="input-field panel-select" v-model="panelCatSeleccionada">
+                  <option :value="null">— Sin categoría específica —</option>
+                  <option v-for="c in panelDeptSeleccionado.categorias" :key="c.id" :value="c">{{ c.nombre }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-dept-footer">
+              <button class="btn-condicion" @click="panelDeptVisible = false">Cancelar</button>
+              <button class="btn-guardar-dept" :disabled="!panelDeptSeleccionado" @click="guardarDepartamento">Guardar</button>
+            </div>
+          </div>
+        </div>
 
         <!-- ══ TOAST ÉXITO ═══════════════════════════════════════════ -->
         <div v-if="confirmadoOk" class="toast-exito" @click="confirmadoOk = false">
@@ -606,6 +655,12 @@ export default {
       modalNuevoProd:  false,
       lineaPendiente:  null,
       nombreNuevoProd: '',
+      // Panel departamento/categoría
+      panelDeptVisible:      false,
+      panelDeptLinea:        null,
+      departamentos:         [],
+      panelDeptSeleccionado: null,
+      panelCatSeleccionada:  null,
     }
   },
 
@@ -617,6 +672,10 @@ export default {
     try {
       const t = await axios.get('/tasa/')
       this.tasaBcv = t.data.tasa
+    } catch {}
+    try {
+      const { data } = await axios.get('/productos/departamentos-con-categorias')
+      this.departamentos = data
     } catch {}
   },
 
@@ -640,10 +699,14 @@ export default {
     puedeConfirmar() {
       if (!this.proveedorId) return false
       if (this.lineas.length === 0 || this.totalCalculado <= 0) return false
-      return this.lineas.every(l => l.match || l.esNuevo)
+      if (!this.lineas.every(l => l.match || l.esNuevo)) return false
+      return !this.lineasNuevasSinDept.length
     },
     lineasSinDecidir() {
       return this.lineas.filter(l => !l.match && !l.esNuevo).length
+    },
+    lineasNuevasSinDept() {
+      return this.lineas.filter(l => l.esNuevo && !l.match && !l.departamento_id)
     },
     metodosDisponiblesPago() {
       const USD = [
@@ -737,11 +800,15 @@ export default {
         match:            null,
         esNuevo:          false,
         nombreFinal:      '',
-        buscandoMatch:    false,
-        _busqTexto:       '',
-        _busqResultados:  [],
-        _busqAbierta:     false,
-        _busqVisible:     false,
+        buscandoMatch:       false,
+        _busqTexto:          '',
+        _busqResultados:     [],
+        _busqAbierta:        false,
+        _busqVisible:        false,
+        departamento_id:     null,
+        departamento_nombre: '',
+        categoria_id:        null,
+        categoria_nombre:    '',
       }))
 
       this.lineas.forEach(l => this.autoMatchProducto(l))
@@ -963,6 +1030,8 @@ export default {
         match: null, esNuevo: false, nombreFinal: '',
         buscandoMatch: false,
         _busqTexto: '', _busqResultados: [], _busqAbierta: false, _busqVisible: false,
+        departamento_id: null, departamento_nombre: '',
+        categoria_id: null,    categoria_nombre: '',
       })
     },
 
@@ -1029,6 +1098,8 @@ export default {
           subtotal:            Math.round((Number(l.cantidad) * Number(l.precio_unitario)) * 100) / 100,
           actualizar_costo:    l.actualizar_costo && !!l.match,
           es_nuevo:            l.esNuevo && !l.match,
+          departamento_id:     l.departamento_id  || null,
+          categoria_id:        l.categoria_id     || null,
         })),
       }
 
@@ -1101,14 +1172,18 @@ export default {
         cantidad:         d.cantidad_pedida,
         precio_unitario:  d.precio_unitario_usd,
         actualizar_costo: true,
-        match:            d.producto_id ? { id: d.producto_id, nombre: d.nombre_producto, variante_id: d.variante_id || null } : null,
-        esNuevo:          false,
-        nombreFinal:      '',
-        buscandoMatch:    false,
-        _busqTexto:       d.nombre_producto || '',
-        _busqResultados:  [],
-        _busqAbierta:     false,
-        _busqVisible:     false,
+        match:               d.producto_id ? { id: d.producto_id, nombre: d.nombre_producto, variante_id: d.variante_id || null } : null,
+        esNuevo:             false,
+        nombreFinal:         '',
+        buscandoMatch:       false,
+        _busqTexto:          d.nombre_producto || '',
+        _busqResultados:     [],
+        _busqAbierta:        false,
+        _busqVisible:        false,
+        departamento_id:     null,
+        departamento_nombre: '',
+        categoria_id:        null,
+        categoria_nombre:    '',
       }))
     },
     desvincularOrden() {
@@ -1150,6 +1225,30 @@ export default {
       } finally {
         this.creandoProv = false
       }
+    },
+
+    abrirPanelDept(linea) {
+      this.panelDeptLinea = linea
+      if (linea.departamento_id) {
+        this.panelDeptSeleccionado = this.departamentos.find(d => d.id === linea.departamento_id) || null
+        if (linea.categoria_id && this.panelDeptSeleccionado) {
+          this.panelCatSeleccionada = this.panelDeptSeleccionado.categorias?.find(c => c.id === linea.categoria_id) || null
+        } else {
+          this.panelCatSeleccionada = null
+        }
+      } else {
+        this.panelDeptSeleccionado = null
+        this.panelCatSeleccionada  = null
+      }
+      this.panelDeptVisible = true
+    },
+    guardarDepartamento() {
+      if (!this.panelDeptLinea || !this.panelDeptSeleccionado) return
+      this.panelDeptLinea.departamento_id     = this.panelDeptSeleccionado.id
+      this.panelDeptLinea.departamento_nombre = this.panelDeptSeleccionado.nombre
+      this.panelDeptLinea.categoria_id        = this.panelCatSeleccionada?.id    || null
+      this.panelDeptLinea.categoria_nombre    = this.panelCatSeleccionada?.nombre || ''
+      this.panelDeptVisible = false
     },
 
     fmtUSD(v) {
@@ -1259,6 +1358,7 @@ select.input-field { cursor: pointer; }
   gap: 0;
 }
 .lia-h-inv  { flex: 1; }
+.lia-h-ubic { width: 110px; text-align: center; }
 .lia-h-campos {
   display: flex; gap: 0; align-items: center;
 }
@@ -1309,6 +1409,16 @@ select.input-field { cursor: pointer; }
   flex: 1; min-width: 0;
   font-size: 0.82rem;
 }
+.lia-ubic   { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.ubic-badge {
+  font-size: 0.72rem; padding: 0.2rem 0.45rem; border-radius: 4px;
+  font-weight: 600; text-align: center; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 105px; display: block;
+}
+.ubic-sin { background: #FEE2E2; color: #DC2626; }
+.ubic-ok  { background: #DCFCE7; color: #15803D; }
+.ubic-gris{ background: #F1F5F9; color: #6B7280; }
 .lia-campos {
   display: flex; align-items: center; gap: 0; flex-shrink: 0;
 }
@@ -1559,4 +1669,43 @@ select.input-field { cursor: pointer; }
   padding: 1rem 1.5rem; border-top: 1px solid var(--borde);
   display: flex; justify-content: flex-end; gap: 0.75rem;
 }
+
+/* ── Panel dept/cat ──────────────────────────────────────────────────── */
+.panel-dept-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 9998; display: flex; justify-content: flex-end;
+}
+.panel-dept {
+  background: #1A1A1A; width: 100%; max-width: 380px;
+  height: 100%; display: flex; flex-direction: column;
+  animation: slideInRight 0.25s ease;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.panel-dept-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid #333;
+}
+.panel-dept-header h3 { margin: 0; color: #FFCC00; font-size: 1rem; }
+.panel-dept-header .btn-cerrar-modal { color: #aaa; }
+.panel-dept-header .btn-cerrar-modal:hover { color: #fff; }
+.panel-dept-body { flex: 1; padding: 1.25rem 1.5rem; overflow-y: auto; }
+.panel-prod-info { background: #2a2a2a; border-radius: 8px; padding: 0.85rem 1rem; }
+.panel-prod-nombre { color: #fff; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.4rem; }
+.panel-prod-meta { display: flex; gap: 1rem; color: #aaa; font-size: 0.8rem; }
+.panel-select { background: #2a2a2a; color: #fff; border-color: #444; }
+.panel-select:focus { border-color: #FFCC00; }
+.panel-dept-footer {
+  padding: 1rem 1.5rem; border-top: 1px solid #333;
+  display: flex; justify-content: flex-end; gap: 0.75rem;
+}
+.btn-guardar-dept {
+  background: #FFCC00; color: #1A1A1A; border: none;
+  border-radius: 6px; padding: 0.55rem 1.5rem;
+  font-weight: 700; cursor: pointer; font-size: 0.9rem;
+}
+.btn-guardar-dept:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-guardar-dept:not(:disabled):hover { background: #FFD700; }
 </style>

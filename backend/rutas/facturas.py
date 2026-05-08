@@ -614,16 +614,21 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         nombre_prod = p.get("nombre_producto") or p.get("nombre_ia") or ""
         costo_ant   = None
 
+        dept_id = p.get("departamento_id") or None
+        cat_id  = p.get("categoria_id")  or None
+
         # Si es producto nuevo, crearlo en inventario
         if es_nuevo and not prod_id:
             nuevo_prod = Producto(
-                nombre       = nombre_prod,
-                descripcion  = f"Creado desde factura IA — {numero_factura}",
-                stock        = 0,
-                costo_usd    = precio,
-                margen       = 0.30,
-                proveedor_id = proveedor_id,
-                activo       = True,
+                nombre          = nombre_prod,
+                descripcion     = f"Creado desde factura IA — {numero_factura}",
+                stock           = 0,
+                costo_usd       = precio,
+                margen          = 0.30,
+                proveedor_id    = proveedor_id,
+                departamento_id = dept_id,
+                categoria_id    = cat_id,
+                activo          = True,
             )
             db.add(nuevo_prod)
             db.flush()
@@ -632,6 +637,11 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         if prod_id:
             prod = db.query(Producto).filter(Producto.id == prod_id).first()
             if prod:
+                # Actualizar departamento/categoría si vienen y difieren del actual
+                if dept_id and prod.departamento_id != dept_id:
+                    prod.departamento_id = dept_id
+                if cat_id and prod.categoria_id != cat_id:
+                    prod.categoria_id = cat_id
                 if variante_id:
                     variante = db.query(VarianteProducto).filter(VarianteProducto.id == variante_id).first()
                     if variante:

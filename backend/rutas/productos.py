@@ -205,6 +205,20 @@ def listar_departamentos(db: Session = Depends(get_db)):
     return db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
 
 
+@router.get("/departamentos-con-categorias")
+def departamentos_con_categorias(db: Session = Depends(get_db)):
+    deptos = db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
+    result = []
+    for d in deptos:
+        cats = db.query(Categoria).filter(Categoria.departamento_id == d.id).order_by(Categoria.nombre).all()
+        result.append({
+            "id":         d.id,
+            "nombre":     d.nombre,
+            "categorias": [{"id": c.id, "nombre": c.nombre} for c in cats],
+        })
+    return result
+
+
 @router.post("/departamentos")
 def crear_departamento(
     datos: DepartamentoSchema,
