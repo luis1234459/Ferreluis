@@ -165,16 +165,6 @@
 
             <!-- Acceso rápido -->
             <div v-if="!busqueda && !filtroDepartamento && !filtroCategoria && !filtroProveedor" class="acceso-rapido">
-              <div v-if="ultimosVendidos.length" class="ar-grupo">
-                <span class="ar-titulo">Últimos vendidos</span>
-                <div class="ar-chips">
-                  <button
-                    v-for="p in ultimosVendidos" :key="p.id"
-                    class="ar-chip"
-                    @click="agregarPorId(p.id)"
-                  >{{ p.nombre }}</button>
-                </div>
-              </div>
               <div v-if="masVendidos.length" class="ar-grupo">
                 <span class="ar-titulo">Más vendidos</span>
                 <div class="ar-chips">
@@ -922,7 +912,6 @@ export default {
       filtroCategoria:    null,
       filtroProveedor:    null,
       masVendidos:        [],
-      ultimosVendidos:    [],
 
       monedaVenta:    'USD',
       tipoPrecio:     'referencial',
@@ -1173,7 +1162,6 @@ export default {
       this.cargarProveedores(),
       this.cargarMasVendidos(),
     ])
-    this.cargarUltimosVendidos()
   },
   methods: {
     async cargarProductos() {
@@ -1631,7 +1619,7 @@ export default {
         const snapshotTotalBs = this.subtotalUSD * (this.tasaBcv || 1)
         const snapshotVentaId = res.data.venta_id
 
-        this.guardarUltimosVendidos(this.carrito)
+
         this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
         this.autorizacionClave = ''; this.observacion = ''
         this.clienteSeleccionado = null; this.nuevoMonto = ''
@@ -1828,22 +1816,9 @@ export default {
         this.masVendidos = r.data
       } catch { this.masVendidos = [] }
     },
-    cargarUltimosVendidos() {
-      try {
-        const raw = localStorage.getItem('ultimos_vendidos')
-        this.ultimosVendidos = raw ? JSON.parse(raw) : []
-      } catch { this.ultimosVendidos = [] }
-    },
     npGarantia(productoId) {
       if (!this.notaImpresion?.garantias?.length) return null
       return this.notaImpresion.garantias.find(g => g.producto_id === productoId) || null
-    },
-    guardarUltimosVendidos(carritoSnapshot) {
-      const nuevos  = carritoSnapshot.map(i => ({ id: i.id, nombre: i.nombre }))
-      const previos = this.ultimosVendidos.filter(p => !nuevos.some(n => n.id === p.id))
-      const lista   = [...nuevos, ...previos].slice(0, 10)
-      this.ultimosVendidos = lista
-      localStorage.setItem('ultimos_vendidos', JSON.stringify(lista))
     },
     async agregarPorId(id) {
       const p = this.productos.find(x => x.id === id)
