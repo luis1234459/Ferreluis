@@ -7,7 +7,7 @@ from models import (
     Cliente, VentaCliente, NivelFidelidad,
     Departamento, Proveedor, OrdenCompra, DetalleOrdenCompra, RecepcionCompra,
     VendedorPerfil, ComisionVenta, Usuario,
-    Area, Pasillo, Estante, UbicacionProducto,
+    Area, Pasillo, Estante, UbicacionProducto, CuentaBancaria,
 )
 from datetime import datetime, timedelta, date
 from rutas.usuarios import require_admin
@@ -302,6 +302,111 @@ def ventas_por_vendedor(
             "pct_comision_promedio": round(g["total_comision"] / g["total_usd"] * 100, 2) if g["total_usd"] > 0 else 0,
         })
     return resultado
+
+
+@router.get("/ventas/resumen-dia")
+def ventas_resumen_dia(
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    q = db.query(Venta)
+    if desde: q = q.filter(Venta.fecha >= desde)
+    if hasta: q = q.filter(Venta.fecha <= hasta)
+    ventas = q.filter(Venta.estado != 'anulada').all()
+
+    if not ventas:
+        return {
+            "cantidad_ventas": 0,
+            "total_usd": 0.0,
+            "total_bs": 0.0,
+            "total_usd_equiv": 0.0,
+            "por_metodo_cuenta": [],
+            "por_vendedor": [],
+        }
+
+    venta_ids  = {v.id for v in ventas}
+    ventas_map = {v.id: v for v in ventas}
+
+    total_usd = sum(float(v.total or 0) for v in ventas if v.moneda_venta == "USD")
+    total_bs  = sum(float(v.total or 0) for v in ventas if v.moneda_venta != "USD")
+
+    total_usd_equiv = 0.0
+    for v in ventas:
+        if v.moneda_venta == "USD":
+            total_usd_equiv += float(v.total or 0)
+        else:
+            tasa = float(v.tasa_bcv or 1)
+            total_usd_equiv += float(v.total or 0) / tasa if tasa > 0 else 0.0
+
+    # Pagos agrupados por método + cuenta destino
+    pagos       = db.query(PagoVenta).filter(PagoVenta.venta_id.in_(venta_ids)).all()
+    cuentas_map = {c.id: c for c in db.query(CuentaBancaria).all()}
+
+    por_metodo: dict = {}
+    for p in pagos:
+        label_key = f"{p.metodo_pago}_{p.cuenta_destino_id or 'sin_cuenta'}"
+        if label_key not in por_metodo:
+            cuenta = cuentas_map.get(p.cuenta_destino_id)
+            por_metodo[label_key] = {
+                "metodo":        p.metodo_pago,
+                "label":         LABELS_METODO.get(p.metodo_pago, p.metodo_pago),
+                "cuenta_id":     p.cuenta_destino_id,
+                "cuenta_nombre": cuenta.nombre if cuenta else None,
+                "moneda":        p.moneda_pago,
+                "monto_original": 0.0,
+                "monto_usd":      0.0,
+                "cantidad":       0,
+            }
+        monto = float(p.monto_original or 0)
+        venta = ventas_map.get(p.venta_id)
+        tasa  = float(venta.tasa_bcv or 1) if venta and venta.tasa_bcv else 1.0
+        monto_usd = monto if p.moneda_pago == "USD" else (monto / tasa if tasa > 0 else 0.0)
+        por_metodo[label_key]["monto_original"] += monto
+        por_metodo[label_key]["monto_usd"]      += monto_usd
+        por_metodo[label_key]["cantidad"]        += 1
+
+    for k in por_metodo:
+        por_metodo[k]["monto_original"] = round(por_metodo[k]["monto_original"], 2)
+        por_metodo[k]["monto_usd"]      = round(por_metodo[k]["monto_usd"],      2)
+
+    # Ventas agrupadas por vendedor (v.usuario)
+    detalles = db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(venta_ids)).all()
+    detalles_por_venta: dict = {}
+    for d in detalles:
+        detalles_por_venta.setdefault(d.venta_id, []).append(d)
+
+    por_vendedor: dict = {}
+    for v in ventas:
+        uname = v.usuario or "Sin usuario"
+        if uname not in por_vendedor:
+            por_vendedor[uname] = {
+                "vendedor_nombre": uname,
+                "cantidad_ventas": 0,
+                "subtotal_usd":    0.0,
+                "subtotal_venta":  0.0,
+            }
+        por_vendedor[uname]["cantidad_ventas"] += 1
+        tasa = float(v.tasa_bcv or 1) if v.tasa_bcv else 1.0
+        for d in detalles_por_venta.get(v.id, []):
+            subtotal_usd   = float(d.precio_unitario or 0) * int(d.cantidad or 0)
+            subtotal_venta = subtotal_usd if v.moneda_venta == "USD" else subtotal_usd * tasa
+            por_vendedor[uname]["subtotal_usd"]   += subtotal_usd
+            por_vendedor[uname]["subtotal_venta"] += subtotal_venta
+
+    for k in por_vendedor:
+        por_vendedor[k]["subtotal_usd"]   = round(por_vendedor[k]["subtotal_usd"],   2)
+        por_vendedor[k]["subtotal_venta"] = round(por_vendedor[k]["subtotal_venta"], 2)
+
+    return {
+        "cantidad_ventas":   len(ventas),
+        "total_usd":         round(total_usd,      2),
+        "total_bs":          round(total_bs,        2),
+        "total_usd_equiv":   round(total_usd_equiv, 2),
+        "por_metodo_cuenta": sorted(por_metodo.values(),   key=lambda x: x["monto_usd"],   reverse=True),
+        "por_vendedor":      sorted(por_vendedor.values(), key=lambda x: x["subtotal_usd"], reverse=True),
+    }
 
 
 # ---------------------------------------------------------------------------

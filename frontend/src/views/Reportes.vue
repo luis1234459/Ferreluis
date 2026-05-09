@@ -51,6 +51,50 @@
              VENTAS
         ═══════════════════════════════════════════════════════════════════ -->
 
+        <!-- Ventas → Resumen del día -->
+        <template v-if="tabMain === 'ventas' && tabSub === 'resumen_dia' && !cargando && datos">
+          <div class="kpi-row">
+            <div class="kpi-card"><p class="kpi-label">Ventas del día</p><p class="kpi-valor">{{ datos.cantidad_ventas }}</p></div>
+            <div class="kpi-card"><p class="kpi-label">Total USD</p><p class="kpi-valor txt-verde">${{ datos.total_usd.toFixed(2) }}</p></div>
+            <div class="kpi-card"><p class="kpi-label">Total Bs</p><p class="kpi-valor">Bs. {{ datos.total_bs.toFixed(2) }}</p></div>
+            <div class="kpi-card"><p class="kpi-label">Equiv. USD total</p><p class="kpi-valor txt-verde">${{ datos.total_usd_equiv.toFixed(2) }}</p></div>
+          </div>
+
+          <div class="resumen-dos-col">
+            <!-- Cobros por método + cuenta -->
+            <div>
+              <p class="sub-titulo">Cobros por método</p>
+              <div v-if="datos.por_metodo_cuenta.length === 0" class="sin-datos">Sin pagos registrados</div>
+              <div v-for="m in datos.por_metodo_cuenta" :key="m.metodo + '_' + m.cuenta_id" class="metodo-resumen-row">
+                <div class="metodo-resumen-info">
+                  <span class="metodo-resumen-label">{{ m.label }}</span>
+                  <span v-if="m.cuenta_nombre" class="metodo-resumen-cuenta">{{ m.cuenta_nombre }}</span>
+                </div>
+                <div class="metodo-resumen-montos">
+                  <span class="metodo-resumen-orig">
+                    {{ m.moneda === 'USD' ? '$' : 'Bs.' }} {{ m.monto_original.toFixed(2) }}
+                  </span>
+                  <span v-if="m.moneda !== 'USD'" class="metodo-resumen-usd">${{ m.monto_usd.toFixed(2) }}</span>
+                  <span class="metodo-resumen-cant">{{ m.cantidad }} pago{{ m.cantidad !== 1 ? 's' : '' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Por vendedor -->
+            <div>
+              <p class="sub-titulo">Por vendedor</p>
+              <div v-if="datos.por_vendedor.length === 0" class="sin-datos">Sin vendedores registrados</div>
+              <div v-for="v in datos.por_vendedor" :key="v.vendedor_nombre" class="vendedor-resumen-row">
+                <div class="vendedor-resumen-nombre">{{ v.vendedor_nombre }}</div>
+                <div class="vendedor-resumen-stats">
+                  <span class="vendedor-resumen-ventas">{{ v.cantidad_ventas }} venta{{ v.cantidad_ventas !== 1 ? 's' : '' }}</span>
+                  <span class="vendedor-resumen-usd txt-verde">${{ v.subtotal_usd.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <!-- Ventas → Por período -->
         <template v-if="tabMain === 'ventas' && tabSub === 'periodo' && !cargando && datos">
           <div class="kpi-row">
@@ -438,6 +482,7 @@ const LABELS_METODO = {
 
 const SUBTABS = {
   ventas:     [
+    { key: 'resumen_dia', label: 'Resumen del día' },
     { key: 'periodo',     label: 'Por período' },
     { key: 'metodos',     label: 'Por método' },
     { key: 'departamento',label: 'Por depto.' },
@@ -464,6 +509,7 @@ const SUBTABS = {
 }
 
 const URL_MAP = {
+  'ventas-resumen_dia':      '/reportes/ventas/resumen-dia',
   'ventas-periodo':          '/reportes/ventas',
   'ventas-metodos':          '/reportes/ventas/por-metodo',
   'ventas-departamento':     '/reportes/ventas/por-departamento',
@@ -483,7 +529,7 @@ const URL_MAP = {
 }
 
 const CON_FILTROS = new Set([
-  'ventas-periodo', 'ventas-metodos', 'ventas-departamento',
+  'ventas-resumen_dia', 'ventas-periodo', 'ventas-metodos', 'ventas-departamento',
   'ventas-proveedor', 'ventas-pareto', 'ventas-vendedor', 'ventas-top',
   'compras-proveedor', 'compras-departamento',
   'inventario-pareto', 'inventario-rotacion', 'otros-clientes',
@@ -496,7 +542,7 @@ export default {
     return {
       usuario:  JSON.parse(localStorage.getItem('usuario') || '{}'),
       tabMain:  'ventas',
-      tabSub:   'periodo',
+      tabSub:   'resumen_dia',
       datos:    null,
       cargando: false,
       desde:    '',
@@ -695,4 +741,31 @@ export default {
 /* Misc */
 .pos        { font-weight: 700; color: var(--texto-principal); }
 .sub-titulo { color: var(--texto-principal); font-size: 0.9rem; font-weight: 700; margin: 0 0 0.75rem; }
+
+/* Resumen del día */
+.resumen-dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+@media (max-width: 700px) { .resumen-dos-col { grid-template-columns: 1fr; } }
+
+.metodo-resumen-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0.9rem; border-radius: 8px; margin-bottom: 0.5rem;
+  background: var(--fondo-sidebar); border: 1px solid var(--borde);
+}
+.metodo-resumen-info    { display: flex; flex-direction: column; gap: 0.1rem; }
+.metodo-resumen-label   { font-weight: 600; font-size: 0.88rem; color: var(--texto-principal); }
+.metodo-resumen-cuenta  { font-size: 0.76rem; color: var(--texto-muted); }
+.metodo-resumen-montos  { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+.metodo-resumen-orig    { font-size: 0.95rem; font-weight: 700; color: var(--texto-principal); }
+.metodo-resumen-usd     { font-size: 0.78rem; color: #16A34A; }
+.metodo-resumen-cant    { font-size: 0.75rem; color: var(--texto-muted); }
+
+.vendedor-resumen-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0.9rem; border-radius: 8px; margin-bottom: 0.5rem;
+  background: var(--fondo-sidebar); border: 1px solid var(--borde);
+}
+.vendedor-resumen-nombre { font-weight: 600; font-size: 0.88rem; color: var(--texto-principal); }
+.vendedor-resumen-stats  { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+.vendedor-resumen-ventas { font-size: 0.78rem; color: var(--texto-muted); }
+.vendedor-resumen-usd    { font-size: 0.95rem; font-weight: 700; }
 </style>
