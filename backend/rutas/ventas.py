@@ -373,6 +373,7 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         precio_esperado_usd = p_base if tipo_precio == "base" else p_ref
 
         # El frontend puede enviar precio_unitario para descuento manual
+        precio_libre        = bool(item.get("precio_libre", False))
         precio_unitario_usd = float(item.get("precio_unitario", 0) or 0)
         if precio_unitario_usd <= 0:
             precio_unitario_usd = precio_esperado_usd
@@ -410,6 +411,7 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             "precio_referencial_snap":p_ref,
             "precio_unitario":        precio_unitario_usd,
             "subtotal":               subtotal_linea,
+            "precio_libre":           precio_libre,
         })
 
     # ── Descuento global ─────────────────────────────────────────────────────
@@ -541,6 +543,7 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             precio_referencial_snap = d["precio_referencial_snap"],
             precio_unitario       = d["precio_unitario"],
             subtotal              = d["subtotal"],
+            precio_libre          = d["precio_libre"],
         ))
         if d["variante"]:
             d["variante"].stock = float(d["variante"].stock or 0) - d["cantidad"]

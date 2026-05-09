@@ -184,6 +184,11 @@ def inicializar_datos():
              "ALTER TABLE detalle_devolucion_cliente ADD COLUMN IF NOT EXISTS variante_id INTEGER"],
         )
 
+        migrar(
+            ["ALTER TABLE detalle_ventas ADD COLUMN precio_libre BOOLEAN DEFAULT 0"],
+            ["ALTER TABLE detalle_ventas ADD COLUMN IF NOT EXISTS precio_libre BOOLEAN DEFAULT FALSE"],
+        )
+
         # ── catalogo_proveedor: rif_proveedor como clave de cruce ───────────
         migrar(
             ["ALTER TABLE catalogo_proveedor ADD COLUMN rif_proveedor TEXT"],

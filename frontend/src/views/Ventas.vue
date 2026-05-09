@@ -250,7 +250,31 @@
                     <span v-if="item.variante_codigo" class="cod-tag-v">{{ item.variante_codigo }}</span>
                     <span v-else-if="item.codigo && !item.variante_id" class="cod-tag-v">{{ item.codigo }}</span>
                   </span>
-                  <span class="item-ref">Ref: ${{ Number(item.precio_unitario).toFixed(2) }}</span>
+                  <!-- Precio con edición libre -->
+                  <div class="item-precio-wrap">
+                    <template v-if="!item.editandoPrecio">
+                      <span class="item-ref" :class="item.precio_libre ? 'precio-libre-activo' : ''">
+                        ${{ Number(item.precio_unitario).toFixed(2) }}
+                        <span v-if="item.precio_libre" class="precio-libre-badge" title="Precio libre">✏️</span>
+                      </span>
+                      <button class="btn-editar-precio" @click="iniciarEdicionPrecio(item)" title="Editar precio">✏️</button>
+                    </template>
+                    <template v-else>
+                      <div class="precio-edit-wrap">
+                        <span class="moneda-edit">$</span>
+                        <input class="input-precio-libre" type="number" min="0" step="0.01"
+                          v-model.number="item.precioEditandoTemp"
+                          @keydown.enter="confirmarPrecioLibre(item)"
+                          @keydown.escape="cancelarEdicionPrecio(item)"
+                          :ref="'inputPrecio_' + i" />
+                        <button class="btn-ok-precio" @click="confirmarPrecioLibre(item)" title="Confirmar">✓</button>
+                        <button class="btn-cancel-precio" @click="cancelarEdicionPrecio(item)" title="Cancelar">✕</button>
+                      </div>
+                      <span v-if="item.precio_original !== item.precio_unitario" class="precio-orig-hint">
+                        Orig: ${{ Number(item.precio_original).toFixed(2) }}
+                      </span>
+                    </template>
+                  </div>
                 </div>
                 <span class="item-sub">{{ formatMonto(subtotalLinea(item), monedaVenta) }}</span>
                 <button class="btn-quitar" @click="quitar(i)">✕</button>
@@ -1283,6 +1307,9 @@ export default {
         cantidad:               1,
         precio_original:        precio,
         precio_unitario:        precio,
+        precio_libre:           false,
+        editandoPrecio:         false,
+        precioEditandoTemp:     0,
       })
     },
 
@@ -1323,6 +1350,29 @@ export default {
       else this.quitar(i)
     },
     quitar(i) { this.carrito.splice(i, 1) },
+    iniciarEdicionPrecio(item) {
+      item.precioEditandoTemp = Number(item.precio_unitario)
+      item.editandoPrecio = true
+      this.$nextTick(() => {
+        const idx = this.carrito.indexOf(item)
+        const ref = this.$refs['inputPrecio_' + idx]
+        if (ref) {
+          const el = Array.isArray(ref) ? ref[0] : ref
+          if (el) el.focus()
+        }
+      })
+    },
+    confirmarPrecioLibre(item) {
+      const nuevo = Number(item.precioEditandoTemp)
+      if (isNaN(nuevo) || nuevo < 0) { item.editandoPrecio = false; return }
+      item.precio_unitario = nuevo
+      item.precio_libre    = nuevo !== item.precio_original
+      item.editandoPrecio  = false
+    },
+    cancelarEdicionPrecio(item) {
+      item.precioEditandoTemp = item.precio_unitario
+      item.editandoPrecio     = false
+    },
     normalizarPrecio(item) {
       const v = Number(item.precio_unitario || 0)
       item.precio_unitario = v >= 0 ? v : 0
@@ -1577,6 +1627,7 @@ export default {
             variante_id:     item.variante_id ? Number(item.variante_id) : null,
             cantidad:        Number(item.cantidad),
             precio_unitario: Number(item.precio_unitario),
+            precio_libre:    item.precio_libre || false,
           })),
           pagos: this.pagos.map(p => ({
             metodo:            p.metodo,
@@ -2569,4 +2620,18 @@ export default {
 }
 .btn-cancelar-dem { background: none; border: 1px solid var(--borde); border-radius: 6px; padding: 0.45rem 1rem; cursor: pointer; color: var(--texto-sec); font-size: 0.85rem; }
 .btn-enviar-dem { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+
+/* Precio libre en carrito */
+.item-precio-wrap   { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.btn-editar-precio  { background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0.1rem 0.2rem; opacity: 0.4; border-radius: 3px; line-height: 1; transition: opacity 0.15s; }
+.btn-editar-precio:hover { opacity: 1; background: #FFCC0033; }
+.precio-libre-activo { color: #D97706; font-weight: 700; }
+.precio-libre-badge  { font-size: 0.7rem; margin-left: 0.15rem; }
+.precio-edit-wrap   { display: flex; align-items: center; gap: 0.2rem; }
+.moneda-edit        { font-size: 0.8rem; color: var(--texto-sec); }
+.input-precio-libre { width: 72px; padding: 0.2rem 0.3rem; font-size: 0.82rem; border: 1px solid #FFCC00; border-radius: 4px; background: #FFFDF0; text-align: right; }
+.input-precio-libre:focus { outline: none; border-color: #D97706; }
+.btn-ok-precio      { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+.btn-cancel-precio  { background: #DC2626; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
+.precio-orig-hint   { font-size: 0.72rem; color: var(--texto-muted); text-decoration: line-through; display: block; width: 100%; margin-top: 0.1rem; }
 </style>

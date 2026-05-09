@@ -195,6 +195,7 @@ class DetalleVenta(Base):
     precio_referencial_snap = Column(Float)  # precio_base*factor al momento
     precio_unitario       = Column(Float)    # precio efectivamente cobrado (USD)
     subtotal              = Column(Float)    # en moneda_venta
+    precio_libre          = Column(Boolean, default=False)
 
 
 class Usuario(Base):
