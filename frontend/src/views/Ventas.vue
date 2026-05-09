@@ -254,14 +254,17 @@
                   <div class="item-precio-wrap">
                     <template v-if="!item.editandoPrecio">
                       <span class="item-ref" :class="item.precio_libre ? 'precio-libre-activo' : ''">
-                        ${{ Number(item.precio_unitario).toFixed(2) }}
+                        {{ monedaVenta === 'Bs'
+                           ? 'Bs. ' + (Number(item.precio_unitario) * (tasaBcv || 1)).toFixed(2)
+                           : '$' + Number(item.precio_unitario).toFixed(2)
+                        }}
                         <span v-if="item.precio_libre" class="precio-libre-badge" title="Precio libre">✏️</span>
                       </span>
                       <button class="btn-editar-precio" @click="iniciarEdicionPrecio(item)" title="Editar precio">✏️</button>
                     </template>
                     <template v-else>
                       <div class="precio-edit-wrap">
-                        <span class="moneda-edit">$</span>
+                        <span class="moneda-edit">{{ monedaVenta === 'Bs' ? 'Bs.' : '$' }}</span>
                         <input class="input-precio-libre" type="number" min="0" step="0.01"
                           v-model.number="item.precioEditandoTemp"
                           @keydown.enter="confirmarPrecioLibre(item)"
@@ -271,7 +274,10 @@
                         <button class="btn-cancel-precio" @click="cancelarEdicionPrecio(item)" title="Cancelar">✕</button>
                       </div>
                       <span v-if="item.precio_original !== item.precio_unitario" class="precio-orig-hint">
-                        Orig: ${{ Number(item.precio_original).toFixed(2) }}
+                        Orig: {{ monedaVenta === 'Bs'
+                          ? 'Bs. ' + (Number(item.precio_original) * (tasaBcv || 1)).toFixed(2)
+                          : '$' + Number(item.precio_original).toFixed(2)
+                        }}
                       </span>
                     </template>
                   </div>
@@ -1351,7 +1357,12 @@ export default {
     },
     quitar(i) { this.carrito.splice(i, 1) },
     iniciarEdicionPrecio(item) {
-      item.precioEditandoTemp = Number(item.precio_unitario)
+      if (this.monedaVenta === 'Bs') {
+        const tasa = this.tasaBcv || 1
+        item.precioEditandoTemp = Math.round(Number(item.precio_unitario) * tasa * 100) / 100
+      } else {
+        item.precioEditandoTemp = Number(item.precio_unitario)
+      }
       item.editandoPrecio = true
       this.$nextTick(() => {
         const idx = this.carrito.indexOf(item)
@@ -1364,9 +1375,20 @@ export default {
     },
     confirmarPrecioLibre(item) {
       const nuevo = Number(item.precioEditandoTemp)
-      if (isNaN(nuevo) || nuevo < 0) { item.editandoPrecio = false; return }
-      item.precio_unitario = nuevo
-      item.precio_libre    = nuevo !== item.precio_original
+      if (isNaN(nuevo) || nuevo < 0) {
+        item.editandoPrecio = false
+        return
+      }
+      let precioUSD
+      if (this.monedaVenta === 'Bs') {
+        const tasa = this.tasaBcv || 1
+        precioUSD = tasa > 0 ? nuevo / tasa : nuevo
+      } else {
+        precioUSD = nuevo
+      }
+      precioUSD = Math.round(precioUSD * 10000) / 10000
+      item.precio_unitario = precioUSD
+      item.precio_libre    = Math.abs(precioUSD - item.precio_original) > 0.0001
       item.editandoPrecio  = false
     },
     cancelarEdicionPrecio(item) {
