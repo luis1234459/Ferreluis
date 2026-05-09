@@ -60,6 +60,40 @@
             <div class="kpi-card"><p class="kpi-label">Equiv. USD total</p><p class="kpi-valor txt-verde">${{ datos.total_usd_equiv.toFixed(2) }}</p></div>
           </div>
 
+          <p class="sub-titulo" style="margin-bottom:0.75rem">Productos vendidos</p>
+          <div class="tabla-container" style="margin-bottom:1.75rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hora</th><th>Venta</th><th>Producto</th><th>Cant.</th>
+                  <th>Precio unit.</th><th>Subtotal</th><th>USD</th><th>Vendedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(l, i) in datos.lineas_productos" :key="i"
+                    :class="l.precio_libre ? 'fila-precio-libre' : ''">
+                  <td class="txt-muted" style="white-space:nowrap">{{ l.hora }}</td>
+                  <td class="txt-muted">#{{ l.venta_id }}</td>
+                  <td style="font-weight:600">
+                    {{ l.producto }}
+                    <span v-if="l.precio_libre" class="badge-precio-libre" title="Precio libre aplicado">✏️</span>
+                  </td>
+                  <td>{{ l.cantidad }}</td>
+                  <td>{{ l.moneda === 'USD' ? '$' : 'Bs.' }} {{ l.precio_unitario.toFixed(2) }}</td>
+                  <td>
+                    {{ l.moneda === 'USD' ? '$' : 'Bs.' }} {{ l.subtotal_venta.toFixed(2) }}
+                    <small v-if="l.tasa_bcv" class="txt-muted">@{{ l.tasa_bcv }}</small>
+                  </td>
+                  <td class="txt-verde">${{ l.subtotal_usd.toFixed(2) }}</td>
+                  <td class="txt-muted">{{ l.vendedor }}</td>
+                </tr>
+                <tr v-if="!datos.lineas_productos || datos.lineas_productos.length === 0">
+                  <td colspan="8" class="sin-datos">Sin ventas en el período</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <div class="resumen-dos-col">
             <!-- Cobros por método + cuenta -->
             <div>
@@ -768,4 +802,7 @@ export default {
 .vendedor-resumen-stats  { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
 .vendedor-resumen-ventas { font-size: 0.78rem; color: var(--texto-muted); }
 .vendedor-resumen-usd    { font-size: 0.95rem; font-weight: 700; }
+
+.fila-precio-libre td  { background: #FFFDF0; }
+.badge-precio-libre    { font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7; cursor: default; }
 </style>

@@ -399,6 +399,47 @@ def ventas_resumen_dia(
         por_vendedor[k]["subtotal_usd"]   = round(por_vendedor[k]["subtotal_usd"],   2)
         por_vendedor[k]["subtotal_venta"] = round(por_vendedor[k]["subtotal_venta"], 2)
 
+    productos_map = {p.id: p for p in db.query(Producto).all()}
+    variantes_map = {v.id: v for v in db.query(VarianteProducto).all()}
+
+    lineas_productos = []
+    for v in sorted(ventas, key=lambda x: x.fecha or x.id):
+        tasa = float(v.tasa_bcv or 1) if v.tasa_bcv else 1.0
+        for d in detalles_por_venta.get(v.id, []):
+            prod   = productos_map.get(d.producto_id)
+            nombre = prod.nombre if prod else f"Producto {d.producto_id}"
+            if d.variante_id:
+                var = variantes_map.get(d.variante_id)
+                if var:
+                    sufijo = f" ({var.clase}"
+                    if var.color: sufijo += f"/{var.color}"
+                    sufijo += ")"
+                    nombre += sufijo
+            cantidad       = int(d.cantidad or 0)
+            precio_usd     = float(d.precio_unitario or 0)
+            subtotal_usd   = round(precio_usd * cantidad, 2)
+            if v.moneda_venta == "USD":
+                precio_display   = precio_usd
+                subtotal_display = subtotal_usd
+                moneda_display   = "USD"
+            else:
+                precio_display   = round(precio_usd * tasa, 2)
+                subtotal_display = round(subtotal_usd * tasa, 2)
+                moneda_display   = "Bs"
+            lineas_productos.append({
+                "hora":            v.fecha.strftime('%H:%M') if v.fecha else '—',
+                "venta_id":        v.id,
+                "producto":        nombre,
+                "cantidad":        cantidad,
+                "moneda":          moneda_display,
+                "precio_unitario": precio_display,
+                "subtotal_venta":  subtotal_display,
+                "subtotal_usd":    subtotal_usd,
+                "tasa_bcv":        round(tasa, 2) if moneda_display == "Bs" else None,
+                "precio_libre":    False,
+                "vendedor":        v.usuario or "—",
+            })
+
     return {
         "cantidad_ventas":   len(ventas),
         "total_usd":         round(total_usd,      2),
@@ -406,6 +447,7 @@ def ventas_resumen_dia(
         "total_usd_equiv":   round(total_usd_equiv, 2),
         "por_metodo_cuenta": sorted(por_metodo.values(),   key=lambda x: x["monto_usd"],   reverse=True),
         "por_vendedor":      sorted(por_vendedor.values(), key=lambda x: x["subtotal_usd"], reverse=True),
+        "lineas_productos":  lineas_productos,
     }
 
 
