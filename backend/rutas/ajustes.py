@@ -72,10 +72,12 @@ def _tasas(db: Session):
     return bcv, binance
 
 
-def _filtrar_productos(db: Session, filtro_tipo: str, filtro_id: Optional[int]):
+def _filtrar_productos(db: Session, filtro_tipo: str, filtro_id: Optional[int] = None, categoria_id: Optional[int] = None):
     q = db.query(Producto)
     if filtro_tipo == "departamento" and filtro_id:
         q = q.filter(Producto.departamento_id == filtro_id)
+        if categoria_id:
+            q = q.filter(Producto.categoria_id == categoria_id)
     elif filtro_tipo == "proveedor" and filtro_id:
         q = q.filter(Producto.proveedor_id == filtro_id)
     elif filtro_tipo == "pareto":
@@ -118,12 +120,13 @@ def _guardar_historial(db, usuario, tipo, descripcion, cambios):
 
 @router.get("/productos")
 def listar_productos_ajuste(
-    filtro_tipo: str           = "todos",
-    filtro_id:   Optional[int] = None,
-    db: Session  = Depends(get_db),
-    _: None      = Depends(require_admin),
+    filtro_tipo:  str           = "todos",
+    filtro_id:    Optional[int] = None,
+    categoria_id: Optional[int] = None,
+    db: Session   = Depends(get_db),
+    _: None       = Depends(require_admin),
 ):
-    productos     = _filtrar_productos(db, filtro_tipo, filtro_id)
+    productos     = _filtrar_productos(db, filtro_tipo, filtro_id, categoria_id)
     bcv, binance  = _tasas(db)
 
     deptos_map = {d.id: d for d in db.query(Departamento).all()}

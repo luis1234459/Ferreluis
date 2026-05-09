@@ -131,16 +131,26 @@
 
           <!-- Filtros -->
           <div class="filtros-bar">
-            <select v-model="filtroStockTipo" @change="filtroStockId = ''; productosStock = []">
+            <select v-model="filtroStockTipo"
+              @change="filtroStockId = ''; filtroStockCategoria = ''; categoriasStock = []; productosStock = []">
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
               <option value="proveedor">Por proveedor</option>
               <option value="pareto">Solo productos clave</option>
             </select>
             <select v-if="filtroStockTipo === 'departamento' || filtroStockTipo === 'proveedor'"
-              v-model="filtroStockId">
+              v-model="filtroStockId"
+              @change="cargarCategoriasStock()">
               <option value="">— Seleccionar —</option>
               <option v-for="op in opcionesFiltroStock" :key="op.id" :value="op.id">{{ op.nombre }}</option>
+            </select>
+            <select
+              v-if="filtroStockTipo === 'departamento' && filtroStockId && categoriasStock.length > 0"
+              v-model="filtroStockCategoria"
+              @change="productosStock = []"
+            >
+              <option value="">Todas las categorías</option>
+              <option v-for="c in categoriasStock" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
             <button class="btn-cargar" @click="cargarProductosStock" :disabled="cargandoStock">
               {{ cargandoStock ? 'Cargando...' : 'Cargar productos' }}
@@ -210,6 +220,12 @@
 
           <div v-if="productosStock.length > 0" class="acciones-footer">
             <span v-if="msgStock" class="msg-ok">{{ msgStock }}</span>
+            <button
+              class="btn-hoja-conteo"
+              @click="generarHojaConteo"
+              :disabled="productosStock.length === 0"
+              title="Imprimir hoja de conteo físico"
+            >🖨 Hoja de conteo</button>
             <button class="btn-guardar-lote" @click="guardarCambiosStock" :disabled="guardandoStock">
               {{ guardandoStock ? 'Guardando...' : 'Guardar todos los cambios' }}
             </button>
@@ -471,8 +487,10 @@ export default {
       msgPrecio:        '',
 
       // ── Tab Stock ────────────────────────────────────────────────────────
-      filtroStockTipo: 'todos',
-      filtroStockId:   '',
+      filtroStockTipo:      'todos',
+      filtroStockId:        '',
+      filtroStockCategoria: '',
+      categoriasStock:      [],
       productosStock:  [],
       cargandoStock:   false,
       globalStockTipo:     'agregar',
@@ -649,7 +667,8 @@ export default {
       this.msgStock      = ''
       try {
         const params = { filtro_tipo: this.filtroStockTipo }
-        if (this.filtroStockId) params.filtro_id = this.filtroStockId
+        if (this.filtroStockId)        params.filtro_id    = this.filtroStockId
+        if (this.filtroStockCategoria) params.categoria_id = this.filtroStockCategoria
         const res = await axios.get('/ajustes/productos', { params, headers: this._headers() })
         this.productosStock = res.data.map(p => ({
           ...p,
@@ -661,6 +680,22 @@ export default {
       } finally {
         this.cargandoStock = false
       }
+    },
+    async cargarCategoriasStock() {
+      if (!this.filtroStockId || this.filtroStockTipo !== 'departamento') {
+        this.categoriasStock      = []
+        this.filtroStockCategoria = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/categorias', {
+          params: { departamento_id: this.filtroStockId }
+        })
+        this.categoriasStock = res.data
+      } catch {
+        this.categoriasStock = []
+      }
+      this.filtroStockCategoria = ''
     },
     stockResultante(p) {
       const c = parseInt(p._cantidad) || 0
@@ -698,6 +733,152 @@ export default {
       } finally {
         this.guardandoStock = false
       }
+    },
+
+    generarHojaConteo() {
+      const fecha = new Date().toLocaleDateString('es-VE', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      })
+      const hora = new Date().toLocaleTimeString('es-VE', {
+        hour: '2-digit', minute: '2-digit'
+      })
+
+      let tituloFiltro = 'Todos los productos'
+      if (this.filtroStockTipo === 'departamento' && this.filtroStockId) {
+        const dept = this.departamentos.find(d => d.id == this.filtroStockId)
+        tituloFiltro = dept ? `Departamento: ${dept.nombre}` : 'Por departamento'
+        if (this.filtroStockCategoria) {
+          const cat = this.categoriasStock.find(c => c.id == this.filtroStockCategoria)
+          if (cat) tituloFiltro += ` › ${cat.nombre}`
+        }
+      } else if (this.filtroStockTipo === 'proveedor' && this.filtroStockId) {
+        const prov = this.proveedores.find(p => p.id == this.filtroStockId)
+        tituloFiltro = prov ? `Proveedor: ${prov.nombre}` : 'Por proveedor'
+      } else if (this.filtroStockTipo === 'pareto') {
+        tituloFiltro = 'Productos clave (Pareto)'
+      }
+
+      const filas = this.productosStock.map((p, i) => `
+        <tr>
+          <td class="col-num">${i + 1}</td>
+          <td class="col-nombre">${p.nombre}</td>
+          <td class="col-stock">${p.stock}</td>
+          <td class="col-contado"></td>
+          <td class="col-dif"></td>
+          <td class="col-obs"></td>
+        </tr>
+      `).join('')
+
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Hoja de Conteo — Ferreutil</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1A1A1A; }
+    .header { padding: 12px 16px 8px; border-bottom: 2px solid #1A1A1A; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .empresa { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+    .doc-titulo { font-size: 13px; font-weight: 700; color: #555; margin-top: 2px; }
+    .header-meta { text-align: right; font-size: 10px; color: #666; line-height: 1.6; }
+    .filtro-badge {
+      display: inline-block; margin-top: 6px;
+      background: #FFCC00; color: #1A1A1A;
+      padding: 2px 10px; border-radius: 3px;
+      font-size: 10px; font-weight: 700;
+    }
+    .instruccion {
+      padding: 6px 16px; font-size: 10px; color: #666;
+      border-bottom: 1px solid #ddd; background: #FAFAF7;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #1A1A1A; color: #FFCC00; }
+    thead th {
+      padding: 6px 8px; text-align: left;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    tbody tr { border-bottom: 1px solid #E5E5E5; }
+    tbody tr:nth-child(even) { background: #FAFAF7; }
+    tbody td { padding: 7px 8px; vertical-align: middle; }
+    .col-num     { width: 32px;  text-align: center; color: #999; font-size: 10px; }
+    .col-nombre  { width: auto;  font-weight: 600; }
+    .col-stock   { width: 70px;  text-align: center; font-weight: 700; }
+    .col-contado { width: 80px;  text-align: center; border-left: 2px dashed #FFCC00; }
+    .col-dif     { width: 70px;  text-align: center; }
+    .col-obs     { width: 130px; }
+    .footer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 6px 16px; border-top: 1px solid #ddd;
+      display: flex; justify-content: space-between;
+      font-size: 9px; color: #999; background: white;
+    }
+    .firma-box {
+      margin: 20px 16px 60px;
+      display: flex; gap: 40px;
+    }
+    .firma-linea {
+      flex: 1; border-top: 1px solid #1A1A1A;
+      padding-top: 4px; font-size: 10px; color: #666;
+      text-align: center;
+    }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="empresa">FERREUTIL</div>
+        <div class="doc-titulo">Hoja de Conteo Físico de Inventario</div>
+        <div class="filtro-badge">${tituloFiltro}</div>
+      </div>
+      <div class="header-meta">
+        <div>Fecha: <strong>${fecha}</strong></div>
+        <div>Hora: <strong>${hora}</strong></div>
+        <div>Total productos: <strong>${this.productosStock.length}</strong></div>
+        <div>Responsable: ______________________</div>
+      </div>
+    </div>
+  </div>
+  <div class="instruccion">
+    📋 Instrucciones: Cuente físicamente cada producto y anote la cantidad en la columna "Contado".
+    Calcule la diferencia y anote observaciones si aplica. Entregue esta hoja al administrador.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-num">#</th>
+        <th class="col-nombre">Producto</th>
+        <th class="col-stock">Stock sistema</th>
+        <th class="col-contado">Contado ✍</th>
+        <th class="col-dif">Diferencia</th>
+        <th class="col-obs">Observaciones</th>
+      </tr>
+    </thead>
+    <tbody>${filas}</tbody>
+  </table>
+  <div class="firma-box">
+    <div class="firma-linea">Realizado por</div>
+    <div class="firma-linea">Revisado por</div>
+    <div class="firma-linea">Aprobado por</div>
+  </div>
+  <div class="footer">
+    <span>FERREUTIL — Hoja de Conteo Físico</span>
+    <span>${tituloFiltro} · ${fecha} ${hora}</span>
+    <span>Sistema Ferreutil v2</span>
+  </div>
+</body>
+</html>`
+
+      const ventana = window.open('', '_blank', 'width=900,height=700')
+      ventana.document.write(html)
+      ventana.document.close()
+      ventana.focus()
+      setTimeout(() => ventana.print(), 600)
     },
 
     // ── Tab Comisiones ─────────────────────────────────────────────────────
@@ -950,4 +1131,14 @@ export default {
 .fila-compra    { background: #F0FDF4; }
 .fila-ajuste    { background: #FFFBEB; }
 .fila-devolucion{ background: #F5F3FF; }
+
+/* ── Hoja de conteo ── */
+.btn-hoja-conteo {
+  background: #1A1A1A; color: #FFCC00; border: none;
+  padding: 0.55rem 1.1rem; border-radius: 6px;
+  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-hoja-conteo:hover:not(:disabled) { background: #333; }
+.btn-hoja-conteo:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
