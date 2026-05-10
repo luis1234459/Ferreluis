@@ -46,30 +46,84 @@
             </div>
             <p class="deuda-info">Saldo pendiente: <strong class="txt-rojo">${{ proveedorPago.saldo_pendiente.toFixed(2) }}</strong></p>
             <div class="form-grid">
+              <!-- Selector moneda -->
+              <div class="field field-wide">
+                <label>Moneda del pago</label>
+                <div class="moneda-toggle">
+                  <button
+                    :class="['btn-moneda', formPago.moneda === 'USD' ? 'activo' : '']"
+                    @click="formPago.moneda = 'USD'; formPago.cuenta_id = ''; formPago.tasa_cambio = ''"
+                    type="button"
+                  >💵 USD</button>
+                  <button
+                    :class="['btn-moneda', formPago.moneda === 'Bs' ? 'activo' : '']"
+                    @click="formPago.moneda = 'Bs'; formPago.cuenta_id = ''"
+                    type="button"
+                  >🇻🇪 Bolívares</button>
+                </div>
+              </div>
+
+              <!-- Tasa manual (solo Bs) -->
+              <div class="field" v-if="formPago.moneda === 'Bs'">
+                <label>Tasa de cambio del día del pago (Bs por $1)</label>
+                <input
+                  v-model.number="formPago.tasa_cambio"
+                  type="number" min="0" step="0.01"
+                  placeholder="Ej: 92.50"
+                />
+                <span class="field-hint">
+                  Ingresa la tasa BCV o acordada del día que se realizó el pago
+                </span>
+              </div>
+
+              <!-- Cuenta bancaria -->
               <div class="field">
                 <label>Cuenta bancaria origen</label>
                 <select v-model="formPago.cuenta_id">
-                  <option value="">— Seleccionar cuenta USD —</option>
-                  <option v-for="c in cuentasUSD" :key="c.id" :value="c.id">
-                    {{ c.nombre }} (${{ c.saldo.toFixed(2) }})
+                  <option value="">— Seleccionar cuenta {{ formPago.moneda }} —</option>
+                  <option v-for="c in cuentasDisponibles" :key="c.id" :value="c.id">
+                    {{ c.nombre }}
+                    ({{ c.moneda === 'USD' ? '$' : 'Bs.' }}{{ c.saldo.toFixed(2) }})
                   </option>
                 </select>
+                <span v-if="cuentasDisponibles.length === 0" class="aviso-sin-cuentas">
+                  ⚠ No hay cuentas en {{ formPago.moneda }} disponibles
+                </span>
               </div>
+
+              <!-- Monto -->
               <div class="field">
-                <label>Monto a pagar</label>
-                <input v-model.number="formPago.monto" type="number" min="0" step="0.01"
-                  :placeholder="'Máx. $' + proveedorPago.saldo_pendiente.toFixed(2)" />
+                <label>Monto a pagar ({{ formPago.moneda }})</label>
+                <input
+                  v-model.number="formPago.monto"
+                  type="number" min="0" step="0.01"
+                  :placeholder="formPago.moneda === 'USD'
+                    ? 'Máx. $' + proveedorPago.saldo_pendiente.toFixed(2)
+                    : 'Monto en Bs'"
+                />
+                <span v-if="formPago.moneda === 'Bs' && montoUSDEquivalente" class="equiv-usd">
+                  ≈ ${{ montoUSDEquivalente }} USD
+                  <span
+                    v-if="parseFloat(montoUSDEquivalente) > proveedorPago.saldo_pendiente"
+                    class="aviso-exceso"
+                  > ⚠ Excede la deuda</span>
+                </span>
               </div>
+
+              <!-- Referencia -->
               <div class="field">
                 <label>Referencia bancaria</label>
                 <input v-model="formPago.referencia" placeholder="Nro. operación" />
               </div>
+
+              <!-- Orden de compra -->
               <div class="field">
                 <label>Orden de compra (opcional)</label>
                 <select v-model="formPago.orden_compra_id">
                   <option value="">— Sin asociar —</option>
                   <option v-for="o in ordenesProveedor" :key="o.id" :value="o.id">
-                    {{ o.numero }} (${{ o.total.toFixed ? o.total.toFixed(2) : o.total }})
+                    {{ o.numero }}
+                    (${{ o.total.toFixed ? o.total.toFixed(2) : o.total }})
                   </option>
                 </select>
               </div>
@@ -113,7 +167,15 @@
               <tbody>
                 <tr v-for="p in historial.pagos" :key="p.id">
                   <td>{{ formatFecha(p.fecha) }}</td>
-                  <td class="txt-verde">${{ p.monto.toFixed(2) }}</td>
+                  <td class="txt-verde">
+                    {{ p.moneda === 'Bs' ? 'Bs.' : '$' }}{{ p.monto.toFixed(2) }}
+                    <span v-if="p.moneda === 'Bs' && p.monto_convertido" class="equiv-hist">
+                      ≈ ${{ Number(p.monto_convertido).toFixed(2) }}
+                    </span>
+                    <span v-if="p.moneda === 'Bs' && p.tasa_cambio" class="tasa-hist">
+                      @{{ p.tasa_cambio }}
+                    </span>
+                  </td>
                   <td>{{ p.referencia || '—' }}</td>
                 </tr>
                 <tr v-if="historial.pagos.length === 0">
@@ -145,7 +207,14 @@ export default {
       historial:        null,
       pagando:          false,
       errorPago:        '',
-      formPago: { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '' },
+      formPago: {
+        cuenta_id:       '',
+        monto:           '',
+        referencia:      '',
+        orden_compra_id: '',
+        moneda:          'USD',
+        tasa_cambio:     '',
+      },
     }
   },
   computed: {
@@ -159,6 +228,16 @@ export default {
       }
     },
     cuentasUSD() { return this.cuentas.filter(c => c.moneda === 'USD') },
+    cuentasBs() { return this.cuentas.filter(c => c.moneda === 'Bs') },
+    cuentasDisponibles() {
+      return this.formPago.moneda === 'USD' ? this.cuentasUSD : this.cuentasBs
+    },
+    montoUSDEquivalente() {
+      if (this.formPago.moneda === 'USD') return this.formPago.monto
+      const tasa = parseFloat(this.formPago.tasa_cambio)
+      if (!tasa || tasa <= 0 || !this.formPago.monto) return null
+      return (parseFloat(this.formPago.monto) / tasa).toFixed(2)
+    },
   },
   async mounted() {
     await Promise.all([this.cargar(), this.cargarCuentas()])
@@ -175,27 +254,41 @@ export default {
     async abrirPago(p) {
       this.proveedorPago    = p
       this.errorPago        = ''
-      this.formPago         = { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '' }
+      this.formPago         = { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '', moneda: 'USD', tasa_cambio: '' }
       const res             = await axios.get(`/bancos/proveedores/${p.proveedor_id}/estado/`)
       this.ordenesProveedor = res.data.ordenes.filter(o => ['recibida_parcial','cerrada'].includes(o.estado))
     },
-    cerrarPago() { this.proveedorPago = null },
+    cerrarPago() {
+      this.proveedorPago = null
+      this.formPago = { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '', moneda: 'USD', tasa_cambio: '' }
+    },
     async confirmarPago() {
       if (!this.formPago.cuenta_id) { this.errorPago = 'Selecciona la cuenta bancaria'; return }
       if (!this.formPago.monto || this.formPago.monto <= 0) { this.errorPago = 'Ingresa un monto válido'; return }
+      if (this.formPago.moneda === 'Bs' && !this.formPago.tasa_cambio) {
+        this.errorPago = 'Ingresa la tasa de cambio para pagos en Bs'; return
+      }
       this.pagando = true; this.errorPago = ''
       try {
-        await axios.post(`/bancos/proveedores/${this.proveedorPago.proveedor_id}/pago/`, {
-          ...this.formPago,
-          moneda:        'USD',
-          orden_compra_id: this.formPago.orden_compra_id || null,
-          registrado_por:  this.usuario.usuario || 'admin',
-        })
+        await axios.post(
+          `/bancos/proveedores/${this.proveedorPago.proveedor_id}/pago/`,
+          {
+            cuenta_id:       this.formPago.cuenta_id,
+            monto:           this.formPago.monto,
+            moneda:          this.formPago.moneda,
+            tasa_cambio:     this.formPago.moneda === 'Bs' ? this.formPago.tasa_cambio : null,
+            referencia:      this.formPago.referencia,
+            orden_compra_id: this.formPago.orden_compra_id || null,
+            registrado_por:  this.usuario.usuario || 'admin',
+          }
+        )
         await Promise.all([this.cargar(), this.cargarCuentas()])
         this.cerrarPago()
       } catch (e) {
         this.errorPago = e?.response?.data?.detail || 'Error al registrar el pago'
-      } finally { this.pagando = false }
+      } finally {
+        this.pagando = false
+      }
     },
     async verHistorial(proveedorId) {
       const res = await axios.get(`/bancos/proveedores/${proveedorId}/estado/`)
@@ -226,4 +319,18 @@ export default {
 .badge-aprobada { background: #16A34A1A; color: #16A34A; }
 .badge-cerrada  { background: #8888881A; color: #555555; }
 .badge-recibida_parcial { background: #FFCC0033; color: #996600; }
+
+.moneda-toggle { display: flex; gap: 0.5rem; }
+.btn-moneda {
+  flex: 1; padding: 0.5rem; border-radius: 6px; cursor: pointer;
+  border: 2px solid var(--borde); background: white;
+  font-weight: 600; font-size: 0.85rem; transition: all 0.15s;
+}
+.btn-moneda.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.field-hint { font-size: 0.72rem; color: var(--texto-muted); display: block; margin-top: 0.25rem; }
+.equiv-usd { display: block; margin-top: 0.3rem; font-size: 0.82rem; color: #16A34A; font-weight: 600; }
+.aviso-exceso { color: #DC2626; font-size: 0.78rem; }
+.aviso-sin-cuentas { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: #DC2626; font-weight: 600; }
+.equiv-hist { font-size: 0.75rem; color: #16A34A; margin-left: 0.3rem; }
+.tasa-hist { font-size: 0.72rem; color: var(--texto-muted); margin-left: 0.3rem; }
 </style>

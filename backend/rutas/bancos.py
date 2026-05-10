@@ -326,12 +326,17 @@ def resumen_bancario(db: Session = Depends(get_db), _: None = Depends(require_ad
     ordenes_recibidas = db.query(OrdenCompra).filter(
         OrdenCompra.estado.in_(["recibida_parcial", "cerrada"])
     ).all()
-    pagado_a_proveedores = db.query(func.sum(MovimientoBancario.monto)).filter(
+    pagos_todos = db.query(MovimientoBancario).filter(
         MovimientoBancario.tipo == "pago_proveedor",
         MovimientoBancario.estado == "registrado",
-    ).scalar() or 0.0
+    ).all()
+    pagado_a_proveedores = sum(
+        float(m.monto_convertido or 0) if m.moneda == "Bs"
+        else float(m.monto or 0)
+        for m in pagos_todos
+    )
     total_compras = sum(float(o.total or 0) for o in ordenes_recibidas)
-    deuda_proveedores = round(total_compras - float(pagado_a_proveedores), 2)
+    deuda_proveedores = round(total_compras - pagado_a_proveedores, 2)
 
     return {
         "total_usd":        round(total_usd, 2),
@@ -357,11 +362,16 @@ def deuda_proveedores(db: Session = Depends(get_db)):
         total_comprado = sum(float(o.total or 0) for o in ordenes)
         if total_comprado == 0:
             continue
-        pagado = db.query(func.sum(MovimientoBancario.monto)).filter(
+        pagos_prov = db.query(MovimientoBancario).filter(
             MovimientoBancario.proveedor_id == p.id,
             MovimientoBancario.tipo == "pago_proveedor",
             MovimientoBancario.estado == "registrado",
-        ).scalar() or 0.0
+        ).all()
+        pagado = sum(
+            float(m.monto_convertido or 0) if m.moneda == "Bs"
+            else float(m.monto or 0)
+            for m in pagos_prov
+        )
         saldo = round(total_comprado - float(pagado), 2)
         resultado.append({
             "proveedor_id":    p.id,
@@ -382,11 +392,17 @@ def pagar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(get_db
     if monto <= 0:
         raise HTTPException(status_code=400, detail="Monto inválido")
 
+    tasa = float(datos.get("tasa_cambio", 0) or 0)
+    moneda = datos.get("moneda", "USD")
+    monto_convertido = round(monto / tasa, 2) if moneda == "Bs" and tasa > 0 else None
+
     m = MovimientoBancario(
         tipo              = "pago_proveedor",
         cuenta_origen_id  = datos.get("cuenta_id"),
         monto             = monto,
-        moneda            = datos.get("moneda", "USD"),
+        moneda            = moneda,
+        tasa_cambio       = tasa if tasa > 0 else None,
+        monto_convertido  = monto_convertido,
         referencia        = datos.get("referencia"),
         concepto          = f"Pago a proveedor: {proveedor.nombre}",
         beneficiario      = proveedor.nombre,
@@ -413,7 +429,11 @@ def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
         MovimientoBancario.estado == "registrado",
     ).order_by(MovimientoBancario.fecha.desc()).all()
     total_comprado = sum(float(o.total or 0) for o in ordenes if o.estado in ("recibida_parcial", "cerrada"))
-    total_pagado   = sum(float(m.monto or 0) for m in pagos)
+    total_pagado   = sum(
+        float(m.monto_convertido or 0) if m.moneda == "Bs"
+        else float(m.monto or 0)
+        for m in pagos
+    )
     return {
         "proveedor":       p.nombre,
         "total_comprado":  round(total_comprado, 2),
