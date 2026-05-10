@@ -691,3 +691,17 @@ def productos_frecuentes(n: int = 10, db: Session = Depends(get_db)):
         if p:
             resultado.append({"id": p.id, "nombre": p.nombre, "codigo": p.codigo or ""})
     return resultado
+
+
+@router.patch("/{venta_id}/estado", dependencies=[Depends(require_admin)])
+def cambiar_estado_venta(venta_id: int, datos: dict, db: Session = Depends(get_db)):
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    estados_validos = {"pagado", "anulada", "pendiente"}
+    nuevo_estado = datos.get("estado")
+    if nuevo_estado not in estados_validos:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    venta.estado = nuevo_estado
+    db.commit()
+    return {"id": venta_id, "estado": venta.estado}
