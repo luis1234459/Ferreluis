@@ -23,11 +23,19 @@
         <template v-else>
           <!-- Tasa BCV bar -->
           <div class="tasa-bar">
-            <span class="tasa-item">BCV: <strong>{{ d.tasa_bcv ? d.tasa_bcv.toFixed(2) : '—' }} Bs/$</strong></span>
-            <span class="tasa-sep">|</span>
-            <span class="tasa-item">Binance: <strong>{{ d.tasa_binance ? d.tasa_binance.toFixed(2) : '—' }} Bs/$</strong></span>
-            <span class="tasa-sep">|</span>
-            <span class="tasa-item">Factor: <strong>{{ d.factor ? d.factor.toFixed(4) : '—' }}</strong></span>
+            <span class="tasa-item">
+              BCV: <strong>{{ d.tasa_bcv ? d.tasa_bcv.toFixed(2) : '—' }} Bs/$</strong>
+            </span>
+            <template v-if="mostrarBinance">
+              <span class="tasa-sep">|</span>
+              <span class="tasa-item">
+                Binance: <strong>{{ d.tasa_binance ? d.tasa_binance.toFixed(2) : '—' }} Bs/$</strong>
+              </span>
+              <span class="tasa-sep">|</span>
+              <span class="tasa-item">
+                Factor: <strong>{{ d.factor ? d.factor.toFixed(4) : '—' }}</strong>
+              </span>
+            </template>
           </div>
 
           <!-- Alertas -->
@@ -38,6 +46,9 @@
                 :class="'alerta-' + a.tipo">{{ a.mensaje }}</li>
             </ul>
           </div>
+
+          <!-- ══ DASHBOARD ADMIN ══ -->
+          <template v-if="esAdmin">
 
           <!-- KPIs ventas (6) -->
           <div class="seccion-label">Ventas hoy</div>
@@ -152,8 +163,8 @@
             </div>
           </div>
 
-          <!-- Facturas de proveedores (solo admin) -->
-          <div v-if="esAdmin && d.facturas_pendientes && d.facturas_pendientes.length > 0"
+          <!-- Facturas de proveedores -->
+          <div v-if="d.facturas_pendientes && d.facturas_pendientes.length > 0"
             class="seccion-facturas" style="margin-top:1.5rem">
             <h2 class="panel-titulo">Facturas de proveedores pendientes</h2>
             <div class="tabla-container">
@@ -186,6 +197,118 @@
             </div>
           </div>
 
+          </template>
+          <!-- fin DASHBOARD ADMIN -->
+
+          <!-- ══ DASHBOARD VENDEDOR ══ -->
+          <template v-if="esVendedor">
+
+            <!-- KPIs del vendedor -->
+            <div class="seccion-label">Mis ventas hoy</div>
+            <div class="kpis-grid-3">
+              <div class="kpi-card">
+                <p class="kpi-label">Transacciones</p>
+                <p class="kpi-valor">{{ d.ventas_hoy }}</p>
+              </div>
+              <div class="kpi-card">
+                <p class="kpi-label">Total USD</p>
+                <p class="kpi-valor txt-verde">${{ fmt(d.total_hoy_usd) }}</p>
+              </div>
+              <div class="kpi-card">
+                <p class="kpi-label">Unidades vendidas</p>
+                <p class="kpi-valor">{{ d.unidades_vendidas_hoy }}</p>
+              </div>
+            </div>
+
+            <!-- Dos columnas: compras recibidas + precios actualizados -->
+            <div class="dos-col" style="margin-top:1.5rem">
+
+              <!-- Últimas compras recibidas -->
+              <div class="col-panel">
+                <h2 class="panel-titulo">📦 Últimas compras recibidas</h2>
+                <div class="tabla-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Depto.</th>
+                        <th>Categoría</th>
+                        <th>Precio $</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(c, i) in d.ultimas_compras" :key="i">
+                        <td style="font-weight:600">{{ c.producto }}</td>
+                        <td class="txt-muted">{{ c.departamento }}</td>
+                        <td class="txt-muted">{{ c.categoria }}</td>
+                        <td class="txt-verde">${{ fmt(c.precio_usd) }}</td>
+                      </tr>
+                      <tr v-if="!d.ultimas_compras || d.ultimas_compras.length === 0">
+                        <td colspan="4" class="sin-datos">Sin compras recientes</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Productos con precio actualizado -->
+              <div class="col-panel">
+                <h2 class="panel-titulo">📈 Precios actualizados</h2>
+                <div class="tabla-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Depto.</th>
+                        <th>Precio actual $</th>
+                        <th>Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(p, i) in d.productos_precio_subio" :key="i">
+                        <td style="font-weight:600">{{ p.producto }}</td>
+                        <td class="txt-muted">{{ p.departamento }}</td>
+                        <td class="txt-amarillo">${{ fmt(p.precio_actual) }}</td>
+                        <td class="txt-muted">{{ fmtFecha(p.fecha) }}</td>
+                      </tr>
+                      <tr v-if="!d.productos_precio_subio || d.productos_precio_subio.length === 0">
+                        <td colspan="4" class="sin-datos">Sin cambios de precio recientes</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Últimas ventas del día (vendedor) -->
+            <div class="col-panel" style="margin-top:1rem">
+              <h2 class="panel-titulo">Últimas ventas del día</h2>
+              <div class="tabla-container">
+                <table>
+                  <thead>
+                    <tr><th>#</th><th>Total</th><th>Estado</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="v in d.ultimas_ventas" :key="v.id">
+                      <td class="txt-muted">#{{ v.id }}</td>
+                      <td :class="v.moneda_venta === 'USD' ? 'txt-verde' : ''">
+                        {{ v.moneda_venta === 'USD' ? '$' : 'Bs.' }}{{ fmt(v.total) }}
+                      </td>
+                      <td>
+                        <span :class="'badge badge-' + v.estado">{{ v.estado }}</span>
+                      </td>
+                    </tr>
+                    <tr v-if="!d.ultimas_ventas || d.ultimas_ventas.length === 0">
+                      <td colspan="3" class="sin-datos">Sin ventas hoy</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </template>
+          <!-- fin DASHBOARD VENDEDOR -->
+
         </template>
       </div>
     </main>
@@ -202,6 +325,7 @@ export default {
   data() {
     return {
       usuario:      JSON.parse(localStorage.getItem('usuario') || '{}'),
+      tipoPrecio:   localStorage.getItem('tipoPrecio') || 'referencial',
       cargando:     true,
       marcandoPago: null,
       d: {
@@ -211,12 +335,15 @@ export default {
         valor_inventario_usd: 0, comision_total_hoy: 0, comisiones_pendientes_pago: 0,
         tasa_bcv: 0, tasa_binance: 0, factor: 1,
         alertas: [], ultimas_ventas: [], productos_alerta: [], facturas_pendientes: [],
+        ultimas_compras: [], productos_precio_subio: [],
       },
       _timer: null,
     }
   },
   computed: {
     esAdmin() { return this.usuario.rol === 'admin' },
+    esVendedor() { return this.usuario.rol !== 'admin' },
+    mostrarBinance() { return this.esAdmin || this.tipoPrecio === 'base' },
     tienePermiso() {
       return (modulo) => {
         if (this.usuario.rol === 'admin') return true
@@ -260,6 +387,10 @@ export default {
       }
     },
     fmt(n) { return n != null ? Number(n).toFixed(2) : '0.00' },
+    fmtFecha(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
+    },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },
 }
@@ -337,4 +468,7 @@ export default {
 .btn-pagar-factura:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .txt-amarillo { color: #996600; }
+
+.kpis-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
+@media (max-width: 700px) { .kpis-grid-3 { grid-template-columns: 1fr 1fr; } }
 </style>

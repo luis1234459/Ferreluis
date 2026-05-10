@@ -150,6 +150,80 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             "alerta":            alerta,
         })
 
+    # ── Últimas compras recibidas ─────────────────────────────────────────────
+    recepciones = db.query(models.RecepcionCompra).order_by(
+        models.RecepcionCompra.id.desc()
+    ).limit(10).all()
+
+    ultimas_compras = []
+    for rec in recepciones:
+        orden = db.query(models.OrdenCompra).filter(
+            models.OrdenCompra.id == rec.orden_id
+        ).first()
+        if not orden:
+            continue
+        prov = db.query(models.Proveedor).filter(
+            models.Proveedor.id == orden.proveedor_id
+        ).first()
+        detalles = db.query(models.DetalleRecepcion).filter(
+            models.DetalleRecepcion.recepcion_id == rec.id
+        ).all()
+        for det in detalles[:5]:
+            prod = db.query(models.Producto).filter(
+                models.Producto.id == det.producto_id
+            ).first() if det.producto_id else None
+            if not prod:
+                continue
+            dept = db.query(models.Departamento).filter(
+                models.Departamento.id == prod.departamento_id
+            ).first() if prod.departamento_id else None
+            ultimas_compras.append({
+                "producto":     prod.nombre,
+                "precio_usd":   round(float(det.precio_unitario_real_usd or 0), 2),
+                "cantidad":     int(det.cantidad_recibida or 0),
+                "departamento": dept.nombre if dept else "—",
+                "categoria":    prod.categoria or "—",
+                "proveedor":    prov.nombre if prov else "—",
+                "fecha":        rec.fecha_recepcion.isoformat() if rec.fecha_recepcion else None,
+            })
+        if len(ultimas_compras) >= 15:
+            break
+
+    # ── Productos con precio actualizado ──────────────────────────────────────
+    hace_7_dias = datetime.now() - timedelta(days=7)
+
+    detalles_actualizados = db.query(models.DetalleRecepcion).join(
+        models.RecepcionCompra,
+        models.DetalleRecepcion.recepcion_id == models.RecepcionCompra.id,
+    ).filter(
+        models.DetalleRecepcion.actualizo_costo == True,
+        models.RecepcionCompra.fecha_recepcion >= hace_7_dias,
+    ).order_by(models.RecepcionCompra.fecha_recepcion.desc()).limit(20).all()
+
+    productos_precio_subio = []
+    seen_ids: set = set()
+    for det in detalles_actualizados:
+        if det.producto_id in seen_ids:
+            continue
+        seen_ids.add(det.producto_id)
+        prod = db.query(models.Producto).filter(
+            models.Producto.id == det.producto_id
+        ).first()
+        if not prod:
+            continue
+        dept = db.query(models.Departamento).filter(
+            models.Departamento.id == prod.departamento_id
+        ).first() if prod.departamento_id else None
+        rec_p = db.query(models.RecepcionCompra).filter(
+            models.RecepcionCompra.id == det.recepcion_id
+        ).first()
+        productos_precio_subio.append({
+            "producto":      prod.nombre,
+            "precio_actual": round(float(prod.costo_usd or 0), 2),
+            "departamento":  dept.nombre if dept else "—",
+            "fecha":         rec_p.fecha_recepcion.isoformat() if rec_p and rec_p.fecha_recepcion else None,
+        })
+
     return {
         "ventas_hoy":                 ventas_hoy_count,
         "total_hoy_usd":              round(total_hoy_usd, 2),
@@ -170,4 +244,6 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         "ultimas_ventas":             ultimas_ventas,
         "productos_alerta":           productos_alerta,
         "facturas_pendientes":        facturas_pendientes,
+        "ultimas_compras":            ultimas_compras[:15],
+        "productos_precio_subio":     productos_precio_subio[:10],
     }
