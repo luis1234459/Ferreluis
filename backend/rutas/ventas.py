@@ -693,7 +693,7 @@ def productos_frecuentes(n: int = 10, db: Session = Depends(get_db)):
     return resultado
 
 
-@router.patch("/{venta_id}/estado", dependencies=[Depends(require_admin)])
+@router.patch("/ventas/{venta_id}/estado", dependencies=[Depends(require_admin)])
 def cambiar_estado_venta(venta_id: int, datos: dict, db: Session = Depends(get_db)):
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
