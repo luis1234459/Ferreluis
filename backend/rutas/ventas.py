@@ -35,6 +35,7 @@ from models import (
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
+from rutas.usuarios import require_admin
 
 router = APIRouter()
 
