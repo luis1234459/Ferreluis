@@ -47,7 +47,7 @@ const GRUPOS = [
     items: [
       { ruta: '/inventario',          label: 'Inventario',     permiso: 'inventario' },
       { ruta: '/inventario/importar', label: 'Importar Excel', soloAdmin: true },
-      { ruta: '/ajustes',             label: 'Ajustes',        soloAdmin: true },
+      { ruta: '/ajustes',             label: 'Ajustes',        soloAdminOGestionador: true },
     ],
   },
   {
@@ -194,9 +194,10 @@ export default {
       return Array.isArray(p) ? p.includes(modulo) : true
     },
     itemVisible(item) {
-      if (item.soloAdmin) return this.esAdmin
-      if (item.siempre)   return true
-      if (item.permiso)   return this.tienePermiso(item.permiso)
+      if (item.soloAdmin)              return this.esAdmin
+      if (item.soloAdminOGestionador)  return this.esAdmin || this.usuario.rol === 'gestionador'
+      if (item.siempre)                return true
+      if (item.permiso)                return this.tienePermiso(item.permiso)
       return true
     },
     itemsVisibles(grupo) {

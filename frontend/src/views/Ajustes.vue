@@ -19,15 +19,15 @@
             @click="tabActivo = 'stock'">
             Stock
           </button>
-          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'comisiones' }"
+          <button v-if="esAdmin" class="tab-btn" :class="{ 'tab-activo': tabActivo === 'comisiones' }"
             @click="tabActivo = 'comisiones'">
             Comisiones
           </button>
-          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'historial' }"
+          <button v-if="esAdmin" class="tab-btn" :class="{ 'tab-activo': tabActivo === 'historial' }"
             @click="cambiarTabHistorial">
             Historial
           </button>
-          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'trazabilidad' }"
+          <button v-if="esAdmin" class="tab-btn" :class="{ 'tab-activo': tabActivo === 'trazabilidad' }"
             @click="tabActivo = 'trazabilidad'">
             Trazabilidad
           </button>
@@ -807,6 +807,9 @@ export default {
   async mounted() {
     await Promise.all([this.cargarDepartamentos(), this.cargarProveedores()])
     await this.cargarHistorial()
+    if (!this.esAdmin && this.tabActivo === 'precios') {
+      this.tabActivo = 'stock'
+    }
   },
 
   methods: {

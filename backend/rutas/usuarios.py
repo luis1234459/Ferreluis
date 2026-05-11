@@ -59,6 +59,17 @@ def require_admin(
     return user
 
 
+def require_admin_o_gestionador(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    x_usuario_rol: Optional[str] = Header(None),
+    x_usuario_id:  Optional[str] = Header(None),
+) -> dict:
+    user = get_current_user(credentials, x_usuario_rol, x_usuario_id)
+    if user.get("rol") not in ("admin", "gestionador"):
+        raise HTTPException(status_code=403, detail="Acceso denegado. Se requiere rol admin o gestionador.")
+    return user
+
+
 # ── Password helpers ──────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:

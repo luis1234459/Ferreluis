@@ -12,7 +12,7 @@ from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
     Departamento, Proveedor, TasaCambio,
 )
-from rutas.usuarios import require_admin
+from rutas.usuarios import require_admin, require_admin_o_gestionador
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/ajustes", tags=["ajustes"])
@@ -124,7 +124,7 @@ def listar_productos_ajuste(
     filtro_id:    Optional[int] = None,
     categoria_id: Optional[int] = None,
     db: Session   = Depends(get_db),
-    _: None       = Depends(require_admin),
+    _: None       = Depends(require_admin_o_gestionador),
 ):
     productos     = _filtrar_productos(db, filtro_tipo, filtro_id, categoria_id)
     bcv, binance  = _tasas(db)
@@ -164,7 +164,7 @@ def listar_productos_ajuste(
 def ajuste_stock_lote(
     datos: AjusteStockLote,
     db:    Session           = Depends(get_db),
-    _:     None              = Depends(require_admin),
+    _:     None              = Depends(require_admin_o_gestionador),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     cambios = []
@@ -201,7 +201,7 @@ def ajuste_stock_lote(
 def ajuste_precio_lote(
     datos: AjustePrecioLote,
     db:    Session           = Depends(get_db),
-    _:     None              = Depends(require_admin),
+    _:     None              = Depends(require_admin_o_gestionador),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     cambios = []
@@ -303,7 +303,7 @@ class MoverProductosLote(BaseModel):
 def mover_departamento_lote(
     datos: MoverProductosLote,
     db:    Session = Depends(get_db),
-    _:     None    = Depends(require_admin),
+    _:     None    = Depends(require_admin_o_gestionador),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
@@ -348,7 +348,7 @@ class EditarNombreItem(BaseModel):
 def editar_nombre_producto(
     datos: EditarNombreItem,
     db:    Session = Depends(get_db),
-    _:     None    = Depends(require_admin),
+    _:     None    = Depends(require_admin_o_gestionador),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
@@ -383,7 +383,7 @@ class CrearProductoSchema(BaseModel):
 def crear_producto_ajuste(
     datos: CrearProductoSchema,
     db:    Session = Depends(get_db),
-    _:     None    = Depends(require_admin),
+    _:     None    = Depends(require_admin_o_gestionador),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
