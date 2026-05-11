@@ -191,7 +191,7 @@
                 @click="agregar(p); $refs.inputBuscador.focus()"
               >
                 <div class="pi-nombre">
-                  <span class="pi-nombre-texto">
+                  <span class="pi-nombre-texto" :title="p.nombre">
                     {{ p.nombre }}
                     <span v-if="p.codigo_proveedor" class="cod-tag-prov" :title="`Cód. proveedor: ${p.codigo_proveedor}`">{{ p.codigo_proveedor }}</span>
                     <span v-else-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
@@ -243,7 +243,7 @@
                 <span class="item-qty">{{ item.cantidad }}</span>
                 <button class="btn-cnt" @click="sumar(i)">+</button>
                 <div class="item-info">
-                  <span class="item-nombre">
+                  <span class="item-nombre" :title="item.nombre">
                     {{ item.nombre }}
                     <span v-if="item.variante_label" class="variante-tag">{{ item.variante_label }}</span>
                     <span v-if="item._esPaquete" class="tag-paquete">{{ item._nombrePaquete }}</span>
@@ -2063,6 +2063,21 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: default;
+}
+
+.prod-item:hover .pi-nombre-texto,
+.prod-item-resaltado .pi-nombre-texto {
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+}
+.prod-item:hover .pi-nombre,
+.prod-item-resaltado .pi-nombre {
+  overflow: visible;
+}
+.prod-item:hover {
+  z-index: 10;
 }
 .pi-vcods {
   display: flex;
