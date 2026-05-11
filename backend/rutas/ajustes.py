@@ -291,6 +291,127 @@ def ajuste_comisiones_lote(
     return {"ok": True, "productos_afectados": len(cambios)}
 
 
+# ── Gestión: mover departamento masivo ───────────────────────────────────────
+
+class MoverProductosLote(BaseModel):
+    producto_ids:    List[int]
+    departamento_id: int
+    categoria_id:    Optional[int] = None
+
+
+@router.post("/productos/mover-departamento")
+def mover_departamento_lote(
+    datos: MoverProductosLote,
+    db:    Session = Depends(get_db),
+    _:     None    = Depends(require_admin),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    from fastapi import HTTPException
+    deptos_map  = {d.id: d for d in db.query(Departamento).all()}
+    depto_nuevo = deptos_map.get(datos.departamento_id)
+    if not depto_nuevo:
+        raise HTTPException(404, "Departamento no encontrado")
+
+    cambios = []
+    for pid in datos.producto_ids:
+        p = db.query(Producto).filter(Producto.id == pid).first()
+        if not p:
+            continue
+        depto_ant = deptos_map.get(p.departamento_id)
+        cambios.append({
+            "producto_id":        p.id,
+            "nombre":             p.nombre,
+            "depto_anterior":     depto_ant.nombre if depto_ant else "—",
+            "depto_nuevo":        depto_nuevo.nombre,
+            "categoria_anterior": p.categoria_id,
+            "categoria_nueva":    datos.categoria_id,
+        })
+        p.departamento_id = datos.departamento_id
+        p.categoria_id    = datos.categoria_id
+    db.commit()
+    _guardar_historial(
+        db, x_usuario_nombre, "gestion",
+        f"Movimiento masivo → {depto_nuevo.nombre} — {len(cambios)} productos",
+        cambios,
+    )
+    return {"ok": True, "productos_afectados": len(cambios)}
+
+
+# ── Gestión: editar nombre ────────────────────────────────────────────────────
+
+class EditarNombreItem(BaseModel):
+    producto_id: int
+    nombre:      str
+
+
+@router.post("/productos/editar-nombre")
+def editar_nombre_producto(
+    datos: EditarNombreItem,
+    db:    Session = Depends(get_db),
+    _:     None    = Depends(require_admin),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    from fastapi import HTTPException
+    p = db.query(Producto).filter(Producto.id == datos.producto_id).first()
+    if not p:
+        raise HTTPException(404, "Producto no encontrado")
+    nombre_anterior = p.nombre
+    p.nombre = datos.nombre.strip()
+    db.commit()
+    _guardar_historial(
+        db, x_usuario_nombre, "gestion",
+        f"Nombre editado: '{nombre_anterior}' → '{p.nombre}'",
+        [{"producto_id": p.id, "nombre_anterior": nombre_anterior,
+          "nombre_nuevo": p.nombre}],
+    )
+    return {"ok": True, "id": p.id, "nombre": p.nombre}
+
+
+# ── Gestión: crear producto ───────────────────────────────────────────────────
+
+class CrearProductoSchema(BaseModel):
+    nombre:          str
+    departamento_id: Optional[int] = None
+    categoria_id:    Optional[int] = None
+    proveedor_id:    Optional[int] = None
+    costo_usd:       float = 0.0
+    margen:          float = 0.30
+    stock:           int   = 0
+
+
+@router.post("/productos/crear")
+def crear_producto_ajuste(
+    datos: CrearProductoSchema,
+    db:    Session = Depends(get_db),
+    _:     None    = Depends(require_admin),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    from fastapi import HTTPException
+    if not datos.nombre.strip():
+        raise HTTPException(400, "El nombre es obligatorio")
+    nuevo = Producto(
+        nombre          = datos.nombre.strip(),
+        departamento_id = datos.departamento_id,
+        categoria_id    = datos.categoria_id,
+        proveedor_id    = datos.proveedor_id,
+        costo_usd       = datos.costo_usd,
+        margen          = datos.margen,
+        stock           = datos.stock,
+        activo          = True,
+    )
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    _guardar_historial(
+        db, x_usuario_nombre, "gestion",
+        f"Producto creado: '{nuevo.nombre}'",
+        [{"producto_id": nuevo.id, "nombre": nuevo.nombre,
+          "departamento_id": nuevo.departamento_id,
+          "stock_inicial": nuevo.stock}],
+    )
+    return {"ok": True, "id": nuevo.id, "nombre": nuevo.nombre}
+
+
 # ── Historial ────────────────────────────────────────────────────────────────
 
 @router.get("/historial")

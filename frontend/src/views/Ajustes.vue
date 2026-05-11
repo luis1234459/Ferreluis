@@ -31,6 +31,10 @@
             @click="tabActivo = 'trazabilidad'">
             Trazabilidad
           </button>
+          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'gestion' }"
+            @click="tabActivo = 'gestion'">
+            Gestión
+          </button>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -456,6 +460,225 @@
 
         </div>
 
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- Tab: Gestión                                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <div v-show="tabActivo === 'gestion'">
+
+          <!-- Acciones superiores -->
+          <div class="gestion-acciones">
+            <button class="btn-crear-prod" @click="modalCrearProd = true">
+              + Crear producto
+            </button>
+          </div>
+
+          <!-- Filtros para cargar productos -->
+          <div class="filtros-bar">
+            <select v-model="gestionFiltroTipo"
+              @change="gestionFiltroId = ''; gestionProductos = []">
+              <option value="todos">Todos los productos</option>
+              <option value="departamento">Por departamento</option>
+              <option value="proveedor">Por proveedor</option>
+            </select>
+            <select v-if="gestionFiltroTipo === 'departamento' ||
+                          gestionFiltroTipo === 'proveedor'"
+              v-model="gestionFiltroId">
+              <option value="">— Seleccionar —</option>
+              <option v-for="op in gestionFiltroTipo === 'departamento'
+                                  ? departamentos : proveedores"
+                :key="op.id" :value="op.id">{{ op.nombre }}</option>
+            </select>
+            <button class="btn-cargar" @click="cargarProductosGestion"
+              :disabled="gestionCargando">
+              {{ gestionCargando ? 'Cargando...' : 'Cargar productos' }}
+            </button>
+          </div>
+
+          <!-- Panel mover departamento -->
+          <div v-if="gestionProductos.length > 0" class="panel-global">
+            <p class="panel-titulo">
+              Mover seleccionados ({{ gestionSeleccion.length }}) a otro departamento
+            </p>
+            <div class="panel-controles">
+              <select v-model="gestionDeptDestino"
+                @change="cargarCategoriasDestino">
+                <option value="">— Departamento destino —</option>
+                <option v-for="d in departamentos" :key="d.id" :value="d.id">
+                  {{ d.nombre }}
+                </option>
+              </select>
+              <select v-if="gestionCategoriasDestino.length > 0"
+                v-model="gestionCatDestino">
+                <option value="">— Categoría (opcional) —</option>
+                <option v-for="c in gestionCategoriasDestino"
+                  :key="c.id" :value="c.id">{{ c.nombre }}</option>
+              </select>
+              <button class="btn-aplicar" @click="moverDepartamento"
+                :disabled="gestionMoviendo || !gestionSeleccion.length">
+                {{ gestionMoviendo ? 'Moviendo...' : 'Mover productos' }}
+              </button>
+            </div>
+            <span v-if="msgGestion"
+              :class="msgGestion.startsWith('✓') ? 'msg-ok' : 'msg-error'">
+              {{ msgGestion }}
+            </span>
+          </div>
+
+          <!-- Mensaje sin tabla cargada -->
+          <span v-if="msgGestion && gestionProductos.length === 0"
+            :class="msgGestion.startsWith('✓') ? 'msg-ok' : 'msg-error'"
+            style="display:block;margin-bottom:0.75rem">
+            {{ msgGestion }}
+          </span>
+
+          <!-- Tabla de productos -->
+          <div v-if="gestionProductos.length > 0" class="tabla-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox"
+                      :checked="gestionSeleccion.length === gestionProductos.length && gestionProductos.length > 0"
+                      @change="toggleGestionTodos" />
+                  </th>
+                  <th>Nombre</th>
+                  <th>Departamento</th>
+                  <th>Proveedor</th>
+                  <th>Stock</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in gestionProductos" :key="p.id"
+                  :class="{ 'fila-seleccionada': gestionSeleccion.includes(p.id) }">
+                  <td>
+                    <input type="checkbox"
+                      :checked="gestionSeleccion.includes(p.id)"
+                      @change="toggleGestionSeleccion(p.id)" />
+                  </td>
+                  <td style="font-weight:600">{{ p.nombre }}</td>
+                  <td class="txt-muted">{{ p.departamento_nombre }}</td>
+                  <td class="txt-muted">{{ p.proveedor_nombre }}</td>
+                  <td>{{ p.stock }}</td>
+                  <td>
+                    <button class="btn-editar-nombre" @click="abrirEditarNombre(p)">
+                      ✏️ Nombre
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="gestionProductos.length === 0 && !gestionCargando"
+               class="sin-datos-tab">
+            Selecciona un filtro y haz clic en "Cargar productos"
+          </div>
+
+          <!-- Modal crear producto -->
+          <div class="overlay" v-if="modalCrearProd"
+               @click.self="modalCrearProd = false">
+            <div class="modal">
+              <div class="modal-header">
+                <h2>Nuevo producto</h2>
+                <button class="btn-cerrar-modal"
+                  @click="modalCrearProd = false">✕</button>
+              </div>
+              <div class="form-grid">
+                <div class="field field-wide">
+                  <label>Nombre *</label>
+                  <input v-model="formCrearProd.nombre"
+                    placeholder="Nombre del producto" />
+                </div>
+                <div class="field">
+                  <label>Departamento</label>
+                  <select v-model="formCrearProd.departamento_id"
+                    @change="cargarCategoriasCrear">
+                    <option value="">— Sin departamento —</option>
+                    <option v-for="d in departamentos"
+                      :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Categoría</label>
+                  <select v-model="formCrearProd.categoria_id">
+                    <option value="">— Sin categoría —</option>
+                    <option v-for="c in categoriasCrear"
+                      :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Proveedor</label>
+                  <select v-model="formCrearProd.proveedor_id">
+                    <option value="">— Sin proveedor —</option>
+                    <option v-for="p in proveedores"
+                      :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Costo USD</label>
+                  <input v-model.number="formCrearProd.costo_usd"
+                    type="number" min="0" step="0.0001" />
+                </div>
+                <div class="field">
+                  <label>Margen %</label>
+                  <input v-model.number="formCrearProd.margen"
+                    type="number" min="0" step="0.1" />
+                </div>
+                <div class="field">
+                  <label>Stock inicial</label>
+                  <input v-model.number="formCrearProd.stock"
+                    type="number" min="0" step="1" />
+                </div>
+              </div>
+              <p class="msg-error" v-if="errorCrearProd">{{ errorCrearProd }}</p>
+              <div class="form-botones">
+                <button class="btn-cancelar"
+                  @click="modalCrearProd = false">Cancelar</button>
+                <button class="btn-guardar" @click="crearProducto"
+                  :disabled="creandoProd">
+                  {{ creandoProd ? 'Creando...' : 'Crear producto' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal editar nombre -->
+          <div class="overlay" v-if="modalEditarNombre"
+               @click.self="modalEditarNombre = false">
+            <div class="modal" style="max-width:460px">
+              <div class="modal-header">
+                <h2>Editar nombre</h2>
+                <button class="btn-cerrar-modal"
+                  @click="modalEditarNombre = false">✕</button>
+              </div>
+              <div class="form-grid">
+                <div class="field field-wide">
+                  <label>Nombre actual</label>
+                  <div style="color:var(--texto-muted);font-size:0.88rem;padding:0.4rem 0">
+                    {{ prodEditandoNombre?.nombre }}
+                  </div>
+                </div>
+                <div class="field field-wide">
+                  <label>Nuevo nombre *</label>
+                  <input v-model="nuevoNombreProd"
+                    placeholder="Nuevo nombre del producto"
+                    @keydown.enter="guardarNombreProducto" />
+                </div>
+              </div>
+              <div class="form-botones">
+                <button class="btn-cancelar"
+                  @click="modalEditarNombre = false">Cancelar</button>
+                <button class="btn-guardar" @click="guardarNombreProducto"
+                  :disabled="editandoNombre || !nuevoNombreProd.trim()">
+                  {{ editandoNombre ? 'Guardando...' : 'Guardar nombre' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /tab gestion -->
+
       </div><!-- /contenido-inner -->
     </main>
   </div>
@@ -527,6 +750,30 @@ export default {
       productosSearch:      [],
       categoriasTraz:       [],
       filtroTrazTipo:       '',
+
+      // ── Tab Gestión ──────────────────────────────────────────────────────
+      gestionFiltroTipo:        'todos',
+      gestionFiltroId:          '',
+      gestionProductos:         [],
+      gestionCargando:          false,
+      gestionSeleccion:         [],
+      gestionDeptDestino:       '',
+      gestionCatDestino:        '',
+      gestionCategoriasDestino: [],
+      gestionMoviendo:          false,
+      msgGestion:               '',
+      modalCrearProd:           false,
+      formCrearProd: {
+        nombre: '', departamento_id: '', categoria_id: '',
+        proveedor_id: '', costo_usd: 0, margen: 30, stock: 0,
+      },
+      creandoProd:              false,
+      errorCrearProd:           '',
+      categoriasCrear:          [],
+      modalEditarNombre:        false,
+      prodEditandoNombre:       null,
+      nuevoNombreProd:          '',
+      editandoNombre:           false,
     }
   },
 
@@ -1023,6 +1270,153 @@ export default {
       return { venta: 'Venta', compra: 'Compra', ajuste: 'Ajuste', devolucion: 'Devolución' }[t] || t
     },
 
+    // ── Gestión: cargar productos ──────────────────────────────────────────
+    async cargarProductosGestion() {
+      this.gestionCargando = true
+      this.gestionSeleccion = []
+      this.msgGestion = ''
+      try {
+        const params = { filtro_tipo: this.gestionFiltroTipo }
+        if (this.gestionFiltroId) params.filtro_id = this.gestionFiltroId
+        const res = await axios.get('/ajustes/productos',
+          { params, headers: this._headers() })
+        this.gestionProductos = res.data
+      } finally {
+        this.gestionCargando = false
+      }
+    },
+
+    toggleGestionSeleccion(id) {
+      const idx = this.gestionSeleccion.indexOf(id)
+      if (idx === -1) this.gestionSeleccion.push(id)
+      else this.gestionSeleccion.splice(idx, 1)
+    },
+
+    toggleGestionTodos() {
+      if (this.gestionSeleccion.length === this.gestionProductos.length) {
+        this.gestionSeleccion = []
+      } else {
+        this.gestionSeleccion = this.gestionProductos.map(p => p.id)
+      }
+    },
+
+    async cargarCategoriasDestino() {
+      if (!this.gestionDeptDestino) {
+        this.gestionCategoriasDestino = []
+        this.gestionCatDestino = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/categorias',
+          { params: { departamento_id: this.gestionDeptDestino } })
+        this.gestionCategoriasDestino = res.data
+        this.gestionCatDestino = ''
+      } catch {
+        this.gestionCategoriasDestino = []
+      }
+    },
+
+    async moverDepartamento() {
+      if (!this.gestionSeleccion.length) {
+        this.msgGestion = 'Selecciona al menos un producto'
+        return
+      }
+      if (!this.gestionDeptDestino) {
+        this.msgGestion = 'Selecciona el departamento destino'
+        return
+      }
+      this.gestionMoviendo = true
+      this.msgGestion = ''
+      try {
+        const res = await axios.post('/ajustes/productos/mover-departamento', {
+          producto_ids:    this.gestionSeleccion,
+          departamento_id: parseInt(this.gestionDeptDestino),
+          categoria_id:    this.gestionCatDestino
+                           ? parseInt(this.gestionCatDestino) : null,
+        }, { headers: this._headers() })
+        this.msgGestion =
+          `✓ ${res.data.productos_afectados} producto(s) movidos correctamente`
+        this.gestionSeleccion = []
+        this.gestionDeptDestino = ''
+        this.gestionCatDestino = ''
+        await this.cargarProductosGestion()
+      } catch (e) {
+        this.msgGestion = e?.response?.data?.detail || 'Error al mover productos'
+      } finally {
+        this.gestionMoviendo = false
+      }
+    },
+
+    // ── Gestión: crear producto ────────────────────────────────────────────
+    async cargarCategoriasCrear() {
+      if (!this.formCrearProd.departamento_id) {
+        this.categoriasCrear = []
+        this.formCrearProd.categoria_id = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/categorias',
+          { params: { departamento_id: this.formCrearProd.departamento_id } })
+        this.categoriasCrear = res.data
+      } catch { this.categoriasCrear = [] }
+    },
+
+    async crearProducto() {
+      if (!this.formCrearProd.nombre.trim()) {
+        this.errorCrearProd = 'El nombre es obligatorio'
+        return
+      }
+      this.creandoProd = true
+      this.errorCrearProd = ''
+      try {
+        await axios.post('/ajustes/productos/crear', {
+          nombre:          this.formCrearProd.nombre.trim(),
+          departamento_id: this.formCrearProd.departamento_id || null,
+          categoria_id:    this.formCrearProd.categoria_id    || null,
+          proveedor_id:    this.formCrearProd.proveedor_id    || null,
+          costo_usd:       Number(this.formCrearProd.costo_usd) || 0,
+          margen:          Number(this.formCrearProd.margen) / 100 || 0.30,
+          stock:           Number(this.formCrearProd.stock) || 0,
+        }, { headers: this._headers() })
+        this.modalCrearProd = false
+        this.formCrearProd = {
+          nombre: '', departamento_id: '', categoria_id: '',
+          proveedor_id: '', costo_usd: 0, margen: 30, stock: 0,
+        }
+        this.msgGestion = '✓ Producto creado correctamente'
+        await this.cargarProductosGestion()
+      } catch (e) {
+        this.errorCrearProd = e?.response?.data?.detail || 'Error al crear producto'
+      } finally {
+        this.creandoProd = false
+      }
+    },
+
+    // ── Gestión: editar nombre ─────────────────────────────────────────────
+    abrirEditarNombre(prod) {
+      this.prodEditandoNombre = prod
+      this.nuevoNombreProd    = prod.nombre
+      this.modalEditarNombre  = true
+    },
+
+    async guardarNombreProducto() {
+      if (!this.nuevoNombreProd.trim()) return
+      this.editandoNombre = true
+      try {
+        await axios.post('/ajustes/productos/editar-nombre', {
+          producto_id: this.prodEditandoNombre.id,
+          nombre:      this.nuevoNombreProd.trim(),
+        }, { headers: this._headers() })
+        this.prodEditandoNombre.nombre = this.nuevoNombreProd.trim()
+        this.modalEditarNombre = false
+        this.msgGestion = '✓ Nombre actualizado correctamente'
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al editar nombre')
+      } finally {
+        this.editandoNombre = false
+      }
+    },
+
     // ── Utilidades ─────────────────────────────────────────────────────────
     formatFecha(iso) {
       if (!iso) return '—'
@@ -1131,6 +1525,84 @@ export default {
 .fila-compra    { background: #F0FDF4; }
 .fila-ajuste    { background: #FFFBEB; }
 .fila-devolucion{ background: #F5F3FF; }
+
+/* ── Gestión ── */
+.gestion-acciones {
+  display: flex; gap: 0.75rem;
+  margin-bottom: 1rem; justify-content: flex-end;
+}
+.btn-crear-prod {
+  background: #1A1A1A; color: #FFCC00; border: none;
+  padding: 0.55rem 1.1rem; border-radius: 6px;
+  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-crear-prod:hover { background: #333; }
+.btn-editar-nombre {
+  background: #F1F5F9; border: 1px solid var(--borde);
+  border-radius: 5px; padding: 0.25rem 0.6rem;
+  font-size: 0.78rem; cursor: pointer; color: var(--texto-sec);
+  transition: all 0.12s;
+}
+.btn-editar-nombre:hover { background: #FFCC0033; border-color: #FFCC00; }
+.fila-seleccionada td { background: #FFCC0015 !important; }
+
+/* ── Modales de gestión ── */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 500; display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal {
+  background: #FAFAF7; border-radius: 14px;
+  width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.2);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--borde);
+  background: #FFFFFF; border-radius: 14px 14px 0 0;
+}
+.modal-header h2 { margin: 0; font-size: 1rem; font-weight: 700; color: #1A1A1A; }
+.btn-cerrar-modal {
+  background: transparent; border: none; font-size: 1.1rem;
+  cursor: pointer; color: var(--texto-muted); padding: 0.2rem 0.45rem;
+}
+.btn-cerrar-modal:hover { background: #F3F4F6; color: #1A1A1A; }
+.form-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0.75rem; padding: 1.25rem;
+}
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field-wide { grid-column: 1 / -1; }
+.field label { color: var(--texto-sec); font-size: 0.82rem; font-weight: 600; }
+.field input, .field select {
+  padding: 0.5rem 0.7rem; border: 1px solid #CCCCCC;
+  border-radius: 7px; background: #FFFFFF;
+  color: var(--texto-principal); font-size: 0.88rem;
+}
+.field input:focus, .field select:focus {
+  outline: none; border-color: #FFCC00;
+  box-shadow: 0 0 0 2px rgba(255,204,0,0.2);
+}
+.form-botones {
+  display: flex; justify-content: flex-end; gap: 0.6rem;
+  padding: 1rem 1.25rem; border-top: 1px solid var(--borde);
+}
+.btn-cancelar {
+  padding: 0.55rem 1.1rem; background: transparent;
+  border: 1px solid var(--borde); color: var(--texto-sec);
+  border-radius: 8px; cursor: pointer; font-size: 0.88rem;
+}
+.btn-cancelar:hover { border-color: #DC2626; color: #DC2626; }
+.btn-guardar {
+  padding: 0.55rem 1.2rem; background: #1A1A1A; color: #FFCC00;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-size: 0.9rem; font-weight: 700;
+}
+.btn-guardar:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-guardar:not(:disabled):hover { background: #333; }
+.msg-error { color: #DC2626; font-size: 0.85rem; margin: 0 1.25rem 0.5rem; }
 
 /* ── Hoja de conteo ── */
 .btn-hoja-conteo {
