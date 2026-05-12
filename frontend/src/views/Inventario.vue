@@ -422,6 +422,21 @@
                 <label>Descripción</label>
                 <input v-model="form.descripcion" placeholder="Descripción opcional" />
               </div>
+              <div class="field field-wide">
+                <label>URL de imagen (foto)</label>
+                <input
+                  v-model="form.foto_url"
+                  type="url"
+                  placeholder="https://ejemplo.com/imagen.jpg"
+                />
+                <img
+                  v-if="form.foto_url"
+                  :src="form.foto_url"
+                  style="max-height:80px; margin-top:0.5rem; border-radius:6px; border:1px solid var(--borde)"
+                  @error="form.foto_url = ''"
+                />
+                <small style="color:var(--texto-muted)">Pega la URL de la imagen del producto</small>
+              </div>
             </div>
 
             <!-- Opciones especiales -->
