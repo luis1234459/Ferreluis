@@ -201,6 +201,52 @@
                 </div>
               </div>
 
+              <!-- Modal actualizar nombre al vincular -->
+              <div v-if="modalActualizarNombre && lineaActualizarNombre"
+                   class="modal-overlay"
+                   @click.self="confirmarActualizarNombre(false)">
+                <div class="modal-box">
+                  <div class="modal-header">
+                    <h3>¿Actualizar nombre del producto?</h3>
+                    <button class="btn-cerrar-modal"
+                      @click="confirmarActualizarNombre(false)">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <p style="color:var(--texto-sec);font-size:0.88rem;margin:0 0 0.75rem">
+                      El nombre en la factura es diferente al registrado en inventario:
+                    </p>
+                    <div class="renombrar-comparacion">
+                      <div class="renombrar-fila">
+                        <span class="renombrar-etiqueta">En factura</span>
+                        <span class="renombrar-valor txt-amarillo">
+                          {{ lineaActualizarNombre.nombre_ia }}
+                        </span>
+                      </div>
+                      <div class="renombrar-fila">
+                        <span class="renombrar-etiqueta">En sistema</span>
+                        <span class="renombrar-valor">
+                          {{ lineaActualizarNombre.match?.nombre }}
+                        </span>
+                      </div>
+                    </div>
+                    <p style="color:var(--texto-sec);font-size:0.85rem;margin:0.75rem 0 0">
+                      ¿Deseas actualizar el nombre en inventario con el de la factura?
+                    </p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn-condicion"
+                      @click="confirmarActualizarNombre(false)">
+                      No, mantener "{{ lineaActualizarNombre.match?.nombre }}"
+                    </button>
+                    <button class="btn-confirmar"
+                      style="width:auto;padding:0.6rem 1.5rem"
+                      @click="confirmarActualizarNombre(true)">
+                      Sí, usar "{{ lineaActualizarNombre.nombre_ia }}"
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="field-group">
                 <label class="field-label">Nº Factura</label>
                 <input v-model="numeroFactura" class="input-field" placeholder="FAC-001" />
@@ -661,6 +707,9 @@ export default {
       departamentos:         [],
       panelDeptSeleccionado: null,
       panelCatSeleccionada:  null,
+      // Modal actualizar nombre al vincular
+      modalActualizarNombre:  false,
+      lineaActualizarNombre:  null,
     }
   },
 
@@ -982,6 +1031,15 @@ export default {
       linea._busqResultados = []
       linea._busqVisible    = false
 
+      // Si el nombre de la IA es distinto al nombre en inventario,
+      // preguntar si actualizar
+      const nombreIA = (linea.nombre_ia || '').trim()
+      const nombreSistema = (prod.nombre || '').trim()
+      if (nombreIA && nombreIA.toLowerCase() !== nombreSistema.toLowerCase()) {
+        this.lineaActualizarNombre = linea
+        this.modalActualizarNombre = true
+      }
+
       // Verificar genericidad en segundo plano
       axios.get(`/productos/${prod.id}`).then(res => {
         if (res.data.es_generico) {
@@ -1020,6 +1078,24 @@ export default {
       this.modalNuevoProd  = false
       this.lineaPendiente  = null
       this.nombreNuevoProd = ''
+    },
+    async confirmarActualizarNombre(actualizar) {
+      const linea = this.lineaActualizarNombre
+      if (actualizar && linea && linea.match) {
+        try {
+          await axios.post('/ajustes/productos/editar-nombre', {
+            producto_id: linea.match.id,
+            nombre:      linea.nombre_ia.trim(),
+          }, {
+            headers: { 'x-usuario-rol': 'admin', 'x-usuario-nombre': 'admin' }
+          })
+          linea.match.nombre = linea.nombre_ia.trim()
+        } catch (e) {
+          console.warn('No se pudo actualizar el nombre:', e)
+        }
+      }
+      this.modalActualizarNombre = false
+      this.lineaActualizarNombre = null
     },
 
     // ── Tabla ─────────────────────────────────────────────────────────
