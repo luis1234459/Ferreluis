@@ -242,6 +242,29 @@
           </div>
         </template>
 
+        <!-- ══ MODAL: Actualizar nombre en inventario ══════════════════ -->
+        <div v-if="modalActualizarNombreCat" class="modal-overlay" @click.self="confirmarActualizarNombreCat(false)">
+          <div class="modal-box">
+            <h3 class="modal-titulo">¿Actualizar nombre en inventario?</h3>
+            <p class="modal-desc">El nombre del catálogo es diferente al nombre actual en inventario.</p>
+            <div class="renombrar-comparacion">
+              <div>
+                <span class="comp-label">En catálogo (IA)</span>
+                <span class="comp-val">{{ lineaActualizarNombreCat?.nombre_final }}</span>
+              </div>
+              <div>
+                <span class="comp-label">En inventario</span>
+                <span class="comp-val">{{ prodActualizarNombreCat?.nombre }}</span>
+              </div>
+            </div>
+            <p class="modal-pregunta">¿Deseas actualizar el nombre del producto en inventario con el nombre del catálogo?</p>
+            <div class="modal-acciones">
+              <button class="btn-condicion btn-confirmar" @click="confirmarActualizarNombreCat(true)">Sí, actualizar</button>
+              <button class="btn-condicion" @click="confirmarActualizarNombreCat(false)">No, mantener</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -284,6 +307,11 @@ export default {
       importando:   false,
       errorImport:  '',
       resultado:    { creados: 0, vinculados: 0, errores: [] },
+
+      // Modal actualizar nombre
+      modalActualizarNombreCat: false,
+      lineaActualizarNombreCat: null,
+      prodActualizarNombreCat:  null,
     }
   },
 
@@ -419,9 +447,36 @@ export default {
       linea.producto_existente = prod
       linea._busqProd          = prod.nombre
       linea._busqAbierta       = false
+
+      const nombreCatalogo = (linea.nombre_final || '').trim()
+      const nombreSistema  = (prod.nombre || '').trim()
+      if (nombreCatalogo &&
+          nombreCatalogo.toLowerCase() !== nombreSistema.toLowerCase()) {
+        this.lineaActualizarNombreCat = linea
+        this.prodActualizarNombreCat  = prod
+        this.modalActualizarNombreCat = true
+      }
     },
     cerrarBusqLinea(linea) {
       setTimeout(() => { linea._busqAbierta = false }, 180)
+    },
+    async confirmarActualizarNombreCat(actualizar) {
+      if (actualizar && this.prodActualizarNombreCat && this.lineaActualizarNombreCat) {
+        try {
+          await axios.post('/ajustes/productos/editar-nombre', {
+            producto_id: this.prodActualizarNombreCat.id,
+            nombre:      this.lineaActualizarNombreCat.nombre_final.trim(),
+          }, {
+            headers: { 'x-usuario-rol': 'admin', 'x-usuario-nombre': 'admin' },
+          })
+          this.prodActualizarNombreCat.nombre = this.lineaActualizarNombreCat.nombre_final.trim()
+        } catch (e) {
+          alert(e?.response?.data?.detail || 'Error al actualizar nombre')
+        }
+      }
+      this.modalActualizarNombreCat = false
+      this.lineaActualizarNombreCat = null
+      this.prodActualizarNombreCat  = null
     },
 
     // ── Importar ───────────────────────────────────────────────────────
@@ -686,4 +741,32 @@ export default {
 .stock-hint { color: var(--texto-muted); font-size: 0.75rem; }
 .input-sm { padding: 0.3rem 0.5rem; font-size: 0.82rem; }
 .input-field { width: 100%; box-sizing: border-box; }
+
+/* ── Modal actualizar nombre ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 500;
+}
+.modal-box {
+  background: #fff; border-radius: 12px; padding: 1.75rem;
+  max-width: 440px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.modal-titulo { margin: 0 0 0.75rem; font-size: 1.05rem; }
+.modal-desc   { font-size: 0.85rem; color: var(--texto-sec); margin: 0 0 1rem; }
+.renombrar-comparacion {
+  background: #F8F9FA; border-radius: 8px; padding: 0.75rem 1rem;
+  margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem;
+}
+.comp-label { font-size: 0.72rem; font-weight: 700; color: var(--texto-muted); text-transform: uppercase; display: block; }
+.comp-val   { font-size: 0.88rem; color: var(--texto-principal); }
+.modal-pregunta { font-size: 0.85rem; margin: 0 0 1rem; }
+.modal-acciones { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.btn-condicion {
+  padding: 0.45rem 1rem; border-radius: 6px;
+  border: 1px solid var(--borde); background: #F3F4F6;
+  color: var(--texto-sec); cursor: pointer; font-size: 0.875rem; font-weight: 600;
+}
+.btn-condicion:hover { background: #E5E7EB; }
+.btn-confirmar { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-confirmar:hover { background: #333; }
 </style>
