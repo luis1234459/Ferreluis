@@ -188,6 +188,7 @@
                   <th>Ventas</th>
                   <th>Total USD</th>
                   <th>Estado</th>
+                  <th v-if="esAdmin"></th>
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +204,16 @@
                        : c.estado_revision === 'con_diferencias' ? '⚠ Diferencias'
                        : 'Pendiente' }}
                     </span>
+                  </td>
+                  <td v-if="esAdmin">
+                    <button
+                      v-if="c.estado_revision === 'pendiente'"
+                      class="btn-aprobar-cierre"
+                      @click="aprobarCierre(c.id)"
+                      :disabled="aprobando === c.id"
+                    >
+                      {{ aprobando === c.id ? '...' : '✓ Aprobar' }}
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -231,6 +242,7 @@ export default {
       exitoso: false,
       cierreId: null,
       error: '',
+      aprobando: null,
       observacion: '',
       contados: {
         efectivo_usd: '',
@@ -327,6 +339,21 @@ export default {
     formatHora(iso) {
       if (!iso) return '—'
       return new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
+    },
+    async aprobarCierre(id) {
+      if (!confirm('¿Aprobar este cierre?')) return
+      this.aprobando = id
+      try {
+        await axios.put(`/cierres/${id}/revisar`, {
+          estado_revision: 'aprobado',
+          revisado_por: this.usuario.usuario || 'admin',
+        })
+        await this.cargarHistorial()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al aprobar')
+      } finally {
+        this.aprobando = null
+      }
     },
     salir() {
       localStorage.removeItem('usuario')
@@ -428,4 +455,8 @@ export default {
 .badge-aprobado        { background:#DCFCE7; color:#16A34A; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
 .badge-con_diferencias { background:#FEF3C7; color:#92400E; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
 .badge-pendiente       { background:#F1F5F9; color:#64748B; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
+
+.btn-aprobar-cierre { background:#16A34A; color:white; border:none; padding:0.3rem 0.75rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:700; }
+.btn-aprobar-cierre:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-aprobar-cierre:hover:not(:disabled) { background:#15803D; }
 </style>
