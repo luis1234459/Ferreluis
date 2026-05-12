@@ -285,8 +285,10 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
         from models import METODOS_USD
         moneda = "USD" if p.metodo_pago in METODOS_USD else "Bs"
         if cid not in acumulado:
-            acumulado[cid] = {"monto": 0.0, "moneda": moneda, "metodo": p.metodo_pago}
+            acumulado[cid] = {"monto": 0.0, "moneda": moneda, "metodo": p.metodo_pago, "tasa": None}
         acumulado[cid]["monto"] = round(acumulado[cid]["monto"] + monto, 2)
+        if moneda == "Bs" and p.tasa_cambio:
+            acumulado[cid]["tasa"] = float(p.tasa_cambio)
 
     for cid, info in acumulado.items():
         if info["monto"] <= 0:
@@ -298,6 +300,7 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
             cuenta_destino_id = cid,
             monto             = info["monto"],
             moneda            = info["moneda"],
+            tasa_cambio       = info.get("tasa"),
             concepto          = f"Cierre de caja #{cierre.id} — {usuario_nombre} — {info['metodo']}",
             categoria         = "ventas",
             referencia        = f"cierre_{cierre.id}",

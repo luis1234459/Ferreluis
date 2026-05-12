@@ -187,6 +187,7 @@
                   <th>Usuario</th>
                   <th>Ventas</th>
                   <th>Total USD</th>
+                  <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -196,6 +197,13 @@
                   <td>{{ c.usuario }}</td>
                   <td>{{ c.cantidad_ventas }}</td>
                   <td>${{ (c.total_ventas_usd || 0).toFixed(2) }}</td>
+                  <td>
+                    <span :class="'badge badge-' + (c.estado_revision || 'pendiente')">
+                      {{ c.estado_revision === 'aprobado' ? '✓ Aprobado'
+                       : c.estado_revision === 'con_diferencias' ? '⚠ Diferencias'
+                       : 'Pendiente' }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -416,4 +424,8 @@ export default {
 .comision-fila.grande { font-size: 1rem; font-weight: 600; color: #FFFFFF; }
 .comision-monto-grande { color: #FFCC00; font-size: 1.75rem; font-weight: 800; line-height: 1; }
 .comision-monto { color: #16A34A; font-weight: 700; font-size: 1rem; }
+
+.badge-aprobado        { background:#DCFCE7; color:#16A34A; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
+.badge-con_diferencias { background:#FEF3C7; color:#92400E; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
+.badge-pendiente       { background:#F1F5F9; color:#64748B; font-size:0.75rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; }
 </style>
