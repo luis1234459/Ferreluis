@@ -23,6 +23,7 @@ _origins = [
     "http://127.0.0.1:5174",
     "https://ferreutil.up.railway.app",
     "https://aware-heart-production-aed1.up.railway.app",
+    "https://ferreutil-web-production.up.railway.app",
 ]
 
 if FRONTEND_URL and FRONTEND_URL not in _origins:
