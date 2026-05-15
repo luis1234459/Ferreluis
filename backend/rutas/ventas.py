@@ -88,19 +88,6 @@ def _calcular_precio_referencial(precio_base: float, factor: float) -> float:
     return round(precio_base * factor, 4)
 
 
-def _validar_autorizacion(db: Session, clave: str) -> bool:
-    obj = db.query(ClaveAutorizacion).filter(
-        ClaveAutorizacion.accion == "descuento"
-    ).first()
-    if not obj or not obj.clave:
-        # Fallback: check legacy Configuracion table
-        config = db.query(Configuracion).first()
-        if not config or not config.clave_autorizacion:
-            return False
-        return clave == config.clave_autorizacion
-    return clave == obj.clave
-
-
 def _registrar_excepcion(db: Session, venta_id: int, motivo: str,
                           usuario: str, **kwargs):
     try:
@@ -259,7 +246,6 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
     tipo_precio     = data.get("tipo_precio", "referencial")   # "base" | "referencial"
     descuento_input = float(data.get("descuento", 0) or 0)
     observacion     = data.get("observacion", "") or ""
-    autorizacion    = data.get("autorizacion_clave", "") or ""
     detalles_in     = data.get("detalles", [])
     pagos_in        = data.get("pagos", [])
     cliente_id      = data.get("cliente_id")
@@ -425,16 +411,6 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
 
     descuento = round(min(descuento_input, subtotal), decimales)
     total     = round(subtotal - descuento, decimales)
-
-    # ── Clave de autorización ────────────────────────────────────────────────
-    if motivos_autorizacion:
-        if not autorizacion:
-            raise HTTPException(status_code=400,
-                                detail="Se requiere clave de autorización para: "
-                                       + "; ".join(motivos_autorizacion))
-        if not _validar_autorizacion(db, autorizacion):
-            raise HTTPException(status_code=400,
-                                detail="Clave de autorización inválida")
 
     # ── Procesar pagos ───────────────────────────────────────────────────────
     pagos_procesados = []

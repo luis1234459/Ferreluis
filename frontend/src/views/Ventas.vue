@@ -688,15 +688,6 @@
             </div>
           </template>
 
-          <div v-if="requiereAutorizacion" class="autorizacion-box">
-            <p class="aut-titulo">Se requiere autorización</p>
-            <ul class="aut-motivos">
-              <li v-for="(m, i) in motivosAutorizacion" :key="i">{{ m }}</li>
-            </ul>
-            <input v-model="autorizacionClave" type="password"
-              placeholder="Clave de autorización" />
-          </div>
-
           <div class="field">
             <label>Observación</label>
             <input v-model="observacion" placeholder="Opcional..." />
@@ -959,7 +950,6 @@ export default {
       nuevaCuentaId:     null,
       nuevoEquivalente:  null,
 
-      autorizacionClave: '',
       observacion:       '',
 
       // Cliente
@@ -1096,21 +1086,6 @@ export default {
     pagoCompleto() {
       return this.saldoPendiente <= TOLERANCIA && this.pagos.length > 0
     },
-    motivosAutorizacion() {
-      const m = []
-      if (this.tipoPrecio === 'base')
-        m.push('Descuento divisa: precios en USD base')
-      for (const item of this.carrito) {
-        if (Number(item.cantidad) > Number(item.stock))
-          m.push(`Sin stock suficiente: ${item.nombre}`)
-        if (Number(item.precio_unitario) < Number(item.precio_original) - TOLERANCIA)
-          m.push(`Descuento en producto: ${item.nombre}`)
-      }
-      if (Number(this.descuentoGlobal || 0) > 0)
-        m.push('Descuento global de factura')
-      return m
-    },
-    requiereAutorizacion() { return this.motivosAutorizacion.length > 0 },
     nuevoMonedaPago()      { return METODOS_USD.includes(this.nuevoMetodo) ? 'USD' : 'Bs' },
     esAdmin()              { return this.usuario.rol === 'admin' },
     categoriasDeFiltro() {
@@ -1639,8 +1614,6 @@ export default {
     async cobrar(accion = 'solo') {
       this.error = ''
       if (!this.pagoCompleto)       { this.error = 'El cobro no cubre el total'; return }
-      if (this.requiereAutorizacion && !this.autorizacionClave)
-                                    { this.error = 'Ingresa la clave de autorización'; return }
       if (!this.tasaBcv)            { this.error = 'No hay tasa definida. Ve a Tasa BCV.'; return }
 
       // ── Pre-check garantías ─────────────────────────────────────────────────
@@ -1669,7 +1642,6 @@ export default {
           tipo_precio:        this.tipoPrecio,
           descuento:          Number(this.descuentoGlobal || 0),
           observacion:        this.observacion,
-          autorizacion_clave: this.autorizacionClave || '',
           cliente_id:         this.clienteSeleccionado ? this.clienteSeleccionado.id : null,
           detalles: this.carrito.map(item => ({
             producto_id:     Number(item.id),
@@ -1721,7 +1693,7 @@ export default {
 
 
         this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
-        this.autorizacionClave = ''; this.observacion = ''
+        this.observacion = ''
         this.clienteSeleccionado = null; this.nuevoMonto = ''
         this.garantiasPendientes = []; this.itemsGarantia = []
 
