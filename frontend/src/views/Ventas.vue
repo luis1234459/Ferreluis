@@ -152,11 +152,11 @@
 
             <!-- Panel de filtros colapsable -->
             <div v-if="filtrosAbiertos" class="filtros-panel">
-              <select v-model="filtroDepartamento" class="filtro-sel" @change="filtroCategoria = null; cargarProductos()">
+              <select v-model="filtroDepartamento" class="filtro-sel" @change="alCambiarDepartamento">
                 <option :value="null">Todos los dept.</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
               </select>
-              <select v-model="filtroCategoria" class="filtro-sel" @change="cargarProductos()">
+              <select v-model="filtroCategoria" class="filtro-sel" ref="selectCategoria" @change="cargarProductos()">
                 <option :value="null">Todas las cat.</option>
                 <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
@@ -179,6 +179,17 @@
                   >{{ p.nombre }}</button>
                 </div>
               </div>
+            </div>
+
+            <!-- Chips de departamento sugeridos -->
+            <div v-if="deptosSugeridos.length" class="deptos-chips">
+              <span class="chips-label">Ir a departamento:</span>
+              <button
+                v-for="d in deptosSugeridos"
+                :key="d.id"
+                class="chip-depto"
+                @click="irADepartamento(d)"
+              >{{ d.nombre }}</button>
             </div>
 
             <!-- Lista compacta de productos -->
@@ -1092,6 +1103,11 @@ export default {
       if (!this.filtroDepartamento) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
     },
+    deptosSugeridos() {
+      if (this.busqueda.length < 2) return []
+      const q = this.busqueda.toLowerCase()
+      return this.departamentos.filter(d => d.nombre.toLowerCase().includes(q)).slice(0, 4)
+    },
     tienePermiso() {
       return (modulo) => {
         if (this.usuario.rol === 'admin') return true
@@ -1920,6 +1936,26 @@ export default {
       this.filtroProveedor    = null
       this.cargarProductos()
     },
+    alCambiarDepartamento() {
+      this.filtroCategoria = null
+      this.cargarProductos()
+      if (this.filtroDepartamento) {
+        this.filtrosAbiertos = true
+        this.$nextTick(() => {
+          setTimeout(() => { this.$refs.selectCategoria?.focus() }, 100)
+        })
+      }
+    },
+    irADepartamento(depto) {
+      this.filtroDepartamento = depto.id
+      this.filtroCategoria    = null
+      this.busqueda           = ''
+      this.filtrosAbiertos    = true
+      this.cargarProductos()
+      this.$nextTick(() => {
+        setTimeout(() => { this.$refs.selectCategoria?.focus() }, 100)
+      })
+    },
 
     abrirModalDemanda(producto) {
       this.productoDemanda = producto
@@ -2502,6 +2538,10 @@ export default {
 .filtro-sel { flex: 1; min-width: 130px; padding: 0.4rem 0.55rem; background: #FFFFFF; border: 1px solid #CCCCCC; color: var(--texto-principal); border-radius: 6px; font-size: 0.82rem; }
 .btn-limpiar-filtros { padding: 0.35rem 0.75rem; background: transparent; border: 1px solid #DC2626; color: #DC2626; border-radius: 6px; cursor: pointer; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
 .btn-limpiar-filtros:hover { background: #DC26261A; }
+.deptos-chips { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 0; }
+.chips-label { font-size: 0.75rem; color: var(--texto-muted); font-weight: 600; white-space: nowrap; }
+.chip-depto { background: #FFCC0022; border: 1px solid #FFCC00; color: #1A1A1A; border-radius: 20px; padding: 0.25rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.chip-depto:hover { background: #FFCC00; }
 
 /* ── Acceso rápido ── */
 .acceso-rapido { margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
