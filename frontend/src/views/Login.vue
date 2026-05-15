@@ -1,5 +1,22 @@
 <template>
   <div class="login-container">
+
+    <!-- ══ Modal inicio de jornada ══════════════════════════════════ -->
+    <div v-if="modalVisible" class="jornada-overlay">
+      <div class="jornada-modal">
+        <p class="jornada-titulo">Inicio de jornada</p>
+        <p class="jornada-saludo">Buenos días, {{ usuarioNombre }}</p>
+        <p class="jornada-fecha">{{ fechaStr }}</p>
+        <p class="jornada-hora">{{ horaStr }}</p>
+        <div class="jornada-tasa-wrap">
+          <p class="jornada-tasa-label">Tasa BCV hoy</p>
+          <p class="jornada-tasa-valor">{{ tasa ? tasa.toFixed(2) : '—' }}</p>
+          <p class="jornada-tasa-unit">Bs / $1 USD</p>
+        </div>
+        <button class="jornada-btn" @click="confirmar">✓ Entendido, comenzar</button>
+      </div>
+    </div>
+
     <div class="login-box">
       <div class="login-header">
         <h1>Ferreutil</h1>
@@ -33,7 +50,14 @@ export default {
       email: '',
       password: '',
       error: '',
-      cargando: false
+      cargando: false,
+      // Modal inicio jornada
+      modalVisible:  false,
+      tasa:          null,
+      fechaStr:      '',
+      horaStr:       '',
+      usuarioNombre: '',
+      claveHoy:      '',
     }
   },
   methods: {
@@ -43,16 +67,45 @@ export default {
       try {
         const res = await axios.post('/usuarios/login', {
           email: this.email,
-          password: this.password
+          password: this.password,
         })
-        localStorage.setItem('usuario', JSON.stringify(res.data))
+        const usuario = res.data
+        localStorage.setItem('usuario', JSON.stringify(usuario))
+
+        try {
+          const tasaRes = await axios.get('/tasa/')
+          this.tasa = tasaRes.data.tasa
+
+          const fechaServidor = new Date(tasaRes.headers['date'])
+          const ymd     = fechaServidor.toISOString().slice(0, 10)
+          const userId  = usuario.id || usuario.usuario
+          const clave   = `inicio_dia_${userId}_${ymd}`
+
+          if (!localStorage.getItem(clave)) {
+            this.usuarioNombre = usuario.nombre || usuario.usuario || ''
+            const fmt = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+            const raw = fechaServidor.toLocaleDateString('es', fmt)
+            this.fechaStr = raw.charAt(0).toUpperCase() + raw.slice(1)
+            this.horaStr  = fechaServidor.toLocaleTimeString('en-US', {
+              hour: '2-digit', minute: '2-digit', hour12: true,
+            })
+            this.claveHoy    = clave
+            this.modalVisible = true
+            return
+          }
+        } catch { /* si falla la tasa, navegar sin modal */ }
+
         this.$router.push('/dashboard')
       } catch (e) {
         this.error = 'Correo o contraseña incorrectos'
       } finally {
         this.cargando = false
       }
-    }
+    },
+    confirmar() {
+      localStorage.setItem(this.claveHoy, '1')
+      this.$router.push('/dashboard')
+    },
   }
 }
 </script>
@@ -145,4 +198,89 @@ export default {
   margin-top: 0.75rem;
   font-size: 0.88rem;
 }
+
+/* ── Modal inicio jornada ── */
+.jornada-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.jornada-modal {
+  background: #1A1A1A;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  border: 1px solid #2D2D2D;
+}
+.jornada-titulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #FFCC00;
+  margin: 0 0 1.5rem;
+}
+.jornada-saludo {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0 0 0.4rem;
+}
+.jornada-fecha {
+  font-size: 0.9rem;
+  color: #FFFFFF;
+  margin: 0 0 0.15rem;
+}
+.jornada-hora {
+  font-size: 0.82rem;
+  color: #9CA3AF;
+  margin: 0 0 2rem;
+}
+.jornada-tasa-wrap {
+  background: #111111;
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  margin-bottom: 2rem;
+}
+.jornada-tasa-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6B7280;
+  margin: 0 0 0.35rem;
+}
+.jornada-tasa-valor {
+  font-size: 3.2rem;
+  font-weight: 800;
+  color: #FFCC00;
+  line-height: 1;
+  margin: 0 0 0.3rem;
+  letter-spacing: -0.02em;
+}
+.jornada-tasa-unit {
+  font-size: 0.75rem;
+  color: #6B7280;
+  margin: 0;
+}
+.jornada-btn {
+  width: 100%;
+  padding: 0.9rem;
+  background: #FFCC00;
+  color: #1A1A1A;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.jornada-btn:hover { opacity: 0.88; }
 </style>
