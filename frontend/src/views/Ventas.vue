@@ -181,15 +181,18 @@
               </div>
             </div>
 
-            <!-- Chips de departamento sugeridos -->
-            <div v-if="deptosSugeridos.length" class="deptos-chips">
-              <span class="chips-label">Ir a departamento:</span>
+            <!-- Chips de categoría sugeridos -->
+            <div v-if="categoriasSugeridas.length" class="deptos-chips">
+              <span class="chips-label">Categoría:</span>
               <button
-                v-for="d in deptosSugeridos"
-                :key="d.id"
+                v-for="c in categoriasSugeridas"
+                :key="c.id"
                 class="chip-depto"
-                @click="irADepartamento(d)"
-              >{{ d.nombre }}</button>
+                @click="irACategoria(c)"
+              >
+                {{ c.nombre }}
+                <small v-if="c.departamento_nombre" style="opacity:0.7;font-size:0.7rem;margin-left:4px">· {{ c.departamento_nombre }}</small>
+              </button>
             </div>
 
             <!-- Lista compacta de productos -->
@@ -1103,10 +1106,14 @@ export default {
       if (!this.filtroDepartamento) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
     },
-    deptosSugeridos() {
+    categoriasSugeridas() {
       if (this.busqueda.length < 2) return []
       const q = this.busqueda.toLowerCase()
-      return this.departamentos.filter(d => d.nombre.toLowerCase().includes(q)).slice(0, 4)
+      const deptoMap = Object.fromEntries(this.departamentos.map(d => [d.id, d.nombre]))
+      return this.categorias
+        .filter(c => c.nombre.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map(c => ({ ...c, departamento_nombre: deptoMap[c.departamento_id] || '' }))
     },
     tienePermiso() {
       return (modulo) => {
@@ -1946,15 +1953,12 @@ export default {
         })
       }
     },
-    irADepartamento(depto) {
-      this.filtroDepartamento = depto.id
-      this.filtroCategoria    = null
+    irACategoria(cat) {
+      this.filtroDepartamento = cat.departamento_id
+      this.filtroCategoria    = cat.id
       this.busqueda           = ''
       this.filtrosAbiertos    = true
       this.cargarProductos()
-      this.$nextTick(() => {
-        setTimeout(() => { const sel = this.$refs.selectCategoria; sel?.focus(); sel?.click() }, 100)
-      })
     },
 
     abrirModalDemanda(producto) {
