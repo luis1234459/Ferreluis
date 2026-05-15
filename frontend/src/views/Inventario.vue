@@ -765,7 +765,7 @@
                 <label>Producto *</label>
                 <select v-model="formOferta.producto_id">
                   <option value="">— Seleccionar —</option>
-                  <option v-for="p in productos" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                  <option v-for="p in productosSelector" :key="p.id" :value="p.id">{{ p.nombre }}</option>
                 </select>
               </div>
               <div class="field">
@@ -1087,7 +1087,8 @@ export default {
       tabActivo: 'productos',
 
       // Ofertas
-      ofertas: [],
+      ofertas:           [],
+      productosSelector: [],
 
       // Modal producto
       mostrarForm: false,
@@ -1222,7 +1223,7 @@ export default {
     },
 
     precioBaseProductoOferta() {
-      const p = this.productos.find(x => x.id === this.formOferta.producto_id)
+      const p = this.productosSelector.find(x => x.id === this.formOferta.producto_id)
       return p ? Number(p.precio_base_usd) : 0
     },
     precioEfectivoOferta() {
@@ -1302,22 +1303,21 @@ export default {
       this.tasaBinance = r.data.tasa_binance
       this.factor      = r.data.factor || 1
     },
-    async cargarProductos(limitOverride = null) {
-      const params = {
-        skip:  limitOverride ? 0 : (this.paginaActual - 1) * 100,
-        limit: limitOverride || 100,
-      }
+    async cargarProductos() {
+      const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       if (this.esAdmin && this.filtroStockCero)  params.stock_cero        = true
-      if (!limitOverride) {
-        if (this.busqueda)           params.busqueda        = this.busqueda
-        if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
-        if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
-      }
+      if (this.busqueda)           params.busqueda        = this.busqueda
+      if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
+      if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
       const res = await axios.get('/productos/', { params })
       this.productos      = res.data.productos
       this.totalProductos = res.data.total
       if (this.modoEdicion) this.sincronizarBorrador()
+    },
+    async cargarProductosSelector() {
+      const res = await axios.get('/productos/', { params: { skip: 0, limit: 2000 } })
+      this.productosSelector = res.data.productos || []
     },
     async cargarDepartamentos() {
       const res = await axios.get('/productos/departamentos')
@@ -1761,9 +1761,7 @@ export default {
 
     // ── CRUD Ofertas ──────────────────────────────────────────────────────────
     async abrirNuevaOferta() {
-      if (this.productos.length === 0) {
-        await this.cargarProductos(2000)
-      }
+      await this.cargarProductosSelector()
       this.editandoOfertaId = null
       this.errorOferta      = ''
       const hoy = new Date().toISOString().split('T')[0]
@@ -1774,7 +1772,8 @@ export default {
       }
       this.mostrarFormOferta = true
     },
-    editarOferta(o) {
+    async editarOferta(o) {
+      await this.cargarProductosSelector()
       this.editandoOfertaId = o.id
       this.errorOferta      = ''
       this.formOferta = {
