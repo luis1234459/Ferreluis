@@ -1942,7 +1942,7 @@ export default {
       if (this.filtroDepartamento) {
         this.filtrosAbiertos = true
         this.$nextTick(() => {
-          setTimeout(() => { this.$refs.selectCategoria?.focus() }, 100)
+          setTimeout(() => { const sel = this.$refs.selectCategoria; sel?.focus(); sel?.click() }, 100)
         })
       }
     },
@@ -1953,7 +1953,7 @@ export default {
       this.filtrosAbiertos    = true
       this.cargarProductos()
       this.$nextTick(() => {
-        setTimeout(() => { this.$refs.selectCategoria?.focus() }, 100)
+        setTimeout(() => { const sel = this.$refs.selectCategoria; sel?.focus(); sel?.click() }, 100)
       })
     },
 
