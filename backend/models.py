@@ -23,7 +23,7 @@ LABELS_METODO = {
     "credito":         "A crédito",
 }
 
-TOLERANCIA    = 0.01   # diferencia mínima aceptable por redondeo
+TOLERANCIA    = 1.0    # diferencia mínima aceptable por redondeo
 DECIMALES_USD = 2
 DECIMALES_BS  = 2
 
