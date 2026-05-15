@@ -1302,13 +1302,18 @@ export default {
       this.tasaBinance = r.data.tasa_binance
       this.factor      = r.data.factor || 1
     },
-    async cargarProductos() {
-      const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
+    async cargarProductos(limitOverride = null) {
+      const params = {
+        skip:  limitOverride ? 0 : (this.paginaActual - 1) * 100,
+        limit: limitOverride || 100,
+      }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       if (this.esAdmin && this.filtroStockCero)  params.stock_cero        = true
-      if (this.busqueda)           params.busqueda        = this.busqueda
-      if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
-      if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
+      if (!limitOverride) {
+        if (this.busqueda)           params.busqueda        = this.busqueda
+        if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
+        if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
+      }
       const res = await axios.get('/productos/', { params })
       this.productos      = res.data.productos
       this.totalProductos = res.data.total
@@ -1755,7 +1760,10 @@ export default {
     },
 
     // ── CRUD Ofertas ──────────────────────────────────────────────────────────
-    abrirNuevaOferta() {
+    async abrirNuevaOferta() {
+      if (this.productos.length === 0) {
+        await this.cargarProductos(2000)
+      }
       this.editandoOfertaId = null
       this.errorOferta      = ''
       const hoy = new Date().toISOString().split('T')[0]
