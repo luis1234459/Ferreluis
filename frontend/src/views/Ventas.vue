@@ -1170,8 +1170,15 @@ export default {
   },
   beforeUnmount() {
     clearInterval(this._timerHora)
+    window.removeEventListener('popstate', this._onPopState)
   },
   async mounted() {
+    history.pushState(null, '', window.location.href)
+    this._onPopState = () => {
+      history.pushState(null, '', window.location.href)
+    }
+    window.addEventListener('popstate', this._onPopState)
+
     await Promise.all([
       this.cargarProductos(),
       this.cargarTasa(),
@@ -1944,6 +1951,9 @@ export default {
 </script>
 
 <style scoped>
+/* Bloquear swipe-back horizontal del navegador */
+.contenido { overscroll-behavior-x: none; }
+
 /* ── Top bar ── */
 .top-meta { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
 .selector-group { display: flex; align-items: center; gap: 0.4rem; }
