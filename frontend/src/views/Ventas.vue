@@ -39,6 +39,10 @@
               </span>
             </template>
           </div>
+          <div class="fecha-hora-venta" v-if="fechaVenta">
+            <span class="fecha-venta">{{ fechaVenta }}</span>
+            <span class="hora-venta">{{ horaVenta }}</span>
+          </div>
         </div>
       </div>
 
@@ -1038,6 +1042,13 @@ export default {
         precio_competencia: null,
         observacion:        '',
       },
+
+      // Fecha y hora del servidor
+      fechaVenta:    '',
+      horaVenta:     '',
+      _servidorBase: null,
+      _clienteBase:  null,
+      _timerHora:    null,
     }
   },
   computed: {
@@ -1182,6 +1193,9 @@ export default {
       this._busquedaTimer = setTimeout(() => this.cargarProductos(), 400)
     },
   },
+  beforeUnmount() {
+    clearInterval(this._timerHora)
+  },
   async mounted() {
     await Promise.all([
       this.cargarProductos(),
@@ -1214,6 +1228,19 @@ export default {
       this.tasaBcv     = r.data.tasa
       this.tasaBinance = r.data.tasa_binance
       this.factor      = r.data.factor || 1
+      const fechaServidor  = new Date(r.headers['date'])
+      this._servidorBase   = fechaServidor
+      this._clienteBase    = Date.now()
+      const fmt = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+      const raw = fechaServidor.toLocaleDateString('es', fmt)
+      this.fechaVenta = raw.charAt(0).toUpperCase() + raw.slice(1)
+      this._actualizarHora()
+      clearInterval(this._timerHora)
+      this._timerHora = setInterval(() => this._actualizarHora(), 60000)
+    },
+    _actualizarHora() {
+      const ahora = new Date(this._servidorBase.getTime() + (Date.now() - this._clienteBase))
+      this.horaVenta = ahora.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     },
 
     precioBase(p) { return Number(p.precio_base_usd        ?? 0) },
@@ -1952,6 +1979,9 @@ export default {
 .tasa-oculta .tasa-valor { display: none; }
 .tasa-oculta:hover .tasa-letra { display: none; }
 .tasa-oculta:hover .tasa-valor { display: inline; }
+.fecha-hora-venta { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+.fecha-venta { font-size: 0.75rem; color: var(--texto-muted); }
+.hora-venta  { font-size: 0.92rem; font-weight: 700; color: var(--texto-principal); }
 .aviso-base { background: #F3E8FF; border: 1px solid #7b2cbf; color: #6b21a8; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
 
 /* ── Tabs nav ── */

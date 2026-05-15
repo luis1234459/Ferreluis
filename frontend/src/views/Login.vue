@@ -7,7 +7,6 @@
         <p class="jornada-titulo">Inicio de jornada</p>
         <p class="jornada-saludo">Buenos días, {{ usuarioNombre }}</p>
         <p class="jornada-fecha">{{ fechaStr }}</p>
-        <p class="jornada-hora">{{ horaStr }}</p>
         <div class="jornada-tasa-wrap">
           <p class="jornada-tasa-label">Tasa BCV hoy</p>
           <p class="jornada-tasa-valor">{{ tasa ? tasa.toFixed(2) : '—' }}</p>
@@ -55,7 +54,6 @@ export default {
       modalVisible:  false,
       tasa:          null,
       fechaStr:      '',
-      horaStr:       '',
       usuarioNombre: '',
       claveHoy:      '',
     }
@@ -86,9 +84,6 @@ export default {
             const fmt = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
             const raw = fechaServidor.toLocaleDateString('es', fmt)
             this.fechaStr = raw.charAt(0).toUpperCase() + raw.slice(1)
-            this.horaStr  = fechaServidor.toLocaleTimeString('en-US', {
-              hour: '2-digit', minute: '2-digit', hour12: true,
-            })
             this.claveHoy    = clave
             this.modalVisible = true
             return
@@ -236,11 +231,6 @@ export default {
 .jornada-fecha {
   font-size: 0.9rem;
   color: #FFFFFF;
-  margin: 0 0 0.15rem;
-}
-.jornada-hora {
-  font-size: 0.82rem;
-  color: #9CA3AF;
   margin: 0 0 2rem;
 }
 .jornada-tasa-wrap {
