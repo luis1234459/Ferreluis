@@ -1203,7 +1203,14 @@ export default {
       this.tasaBcv     = r.data.tasa
       this.tasaBinance = r.data.tasa_binance
       this.factor      = r.data.factor || 1
-      const fechaServidor  = new Date(r.headers['date'])
+      let fechaServidor
+      try {
+        const dateHeader = r.headers['date']
+        fechaServidor = dateHeader ? new Date(dateHeader) : new Date()
+      } catch {
+        fechaServidor = new Date()
+      }
+      if (isNaN(fechaServidor.getTime())) fechaServidor = new Date()
       this._servidorBase   = fechaServidor
       this._clienteBase    = Date.now()
       const fmt = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
