@@ -7,7 +7,7 @@ from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
-from rutas.usuarios import require_admin
+from rutas.usuarios import require_admin, require_admin_o_gestionador
 import io
 import re
 import pandas as pd
@@ -223,7 +223,7 @@ def departamentos_con_categorias(db: Session = Depends(get_db)):
 def crear_departamento(
     datos: DepartamentoSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_gestionador),
 ):
     nuevo = Departamento(**datos.dict())
     db.add(nuevo)
@@ -237,7 +237,7 @@ def actualizar_departamento(
     departamento_id: int,
     datos: DepartamentoSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_gestionador),
 ):
     dep = db.query(Departamento).filter(Departamento.id == departamento_id).first()
     if not dep:
@@ -298,7 +298,7 @@ def listar_categorias(
 def crear_categoria(
     datos: CategoriaSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_gestionador),
 ):
     nueva = Categoria(**datos.dict())
     db.add(nueva)
@@ -312,7 +312,7 @@ def actualizar_categoria(
     categoria_id: int,
     datos: CategoriaSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_gestionador),
 ):
     cat = db.query(Categoria).filter(Categoria.id == categoria_id).first()
     if not cat:
