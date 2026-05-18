@@ -12,6 +12,10 @@
           <p class="jornada-tasa-valor">{{ tasa ? tasa.toFixed(2) : '—' }}</p>
           <p class="jornada-tasa-unit">Bs / $1 USD</p>
         </div>
+        <div class="jornada-frase" v-if="frase.texto">
+          <p class="frase-texto">"{{ frase.texto }}"</p>
+          <p class="frase-fuente">— {{ frase.fuente }}</p>
+        </div>
         <button class="jornada-btn" @click="confirmar">✓ Entendido, comenzar</button>
       </div>
     </div>
@@ -42,6 +46,29 @@
 <script>
 import axios from 'axios'
 
+const FRASES = [
+  { texto: "Todo lo puedo en Cristo que me fortalece.", fuente: "Filipenses 4:13" },
+  { texto: "El Señor es mi pastor, nada me faltará.", fuente: "Salmos 23:1" },
+  { texto: "Encomienda al Señor tus obras y tus planes se cumplirán.", fuente: "Proverbios 16:3" },
+  { texto: "Jehová es mi luz y mi salvación; ¿a quién temeré?", fuente: "Salmos 27:1" },
+  { texto: "No temas, porque yo estoy contigo.", fuente: "Isaías 41:10" },
+  { texto: "El que comenzó en vosotros la buena obra la perfeccionará.", fuente: "Filipenses 1:6" },
+  { texto: "Fía en Jehová de todo tu corazón y no te apoyes en tu propia prudencia.", fuente: "Proverbios 3:5" },
+  { texto: "Todo tiene su tiempo, y todo lo que se quiere tiene su hora.", fuente: "Eclesiastés 3:1" },
+  { texto: "No os afanéis por nada; sino sean conocidas vuestras peticiones delante de Dios.", fuente: "Filipenses 4:6" },
+  { texto: "El hombre propone y Dios dispone.", fuente: "Proverbios 16:9" },
+  { texto: "Ocúpate de lo que está en tu poder y acepta el resto tal como viene.", fuente: "Epicteto" },
+  { texto: "No desperdicies lo que te queda de vida en pensamientos sobre otros.", fuente: "Marco Aurelio" },
+  { texto: "La felicidad de tu vida depende de la calidad de tus pensamientos.", fuente: "Marco Aurelio" },
+  { texto: "Comienza haciendo lo necesario, luego lo posible y de repente estarás haciendo lo imposible.", fuente: "Marco Aurelio" },
+  { texto: "No son las cosas las que nos perturban sino la opinión que tenemos de ellas.", fuente: "Epicteto" },
+  { texto: "Pierde el miedo a equivocarte. El mayor error es vivir con miedo al error.", fuente: "Séneca" },
+  { texto: "Aprovecha el día. Confía lo menos posible en el mañana.", fuente: "Horacio" },
+  { texto: "Nunca consideres el estudio como una obligación sino como una oportunidad.", fuente: "Einstein" },
+  { texto: "El éxito no es definitivo, el fracaso no es fatal: lo que cuenta es el valor de continuar.", fuente: "Churchill" },
+  { texto: "Haz cada día lo que otros no quieren hacer y mañana tendrás lo que otros no tienen.", fuente: "Anónimo" },
+]
+
 export default {
   name: 'Login',
   data() {
@@ -56,6 +83,7 @@ export default {
       fechaStr:      '',
       usuarioNombre: '',
       claveHoy:      '',
+      frase:         { texto: '', fuente: '' },
     }
   },
   methods: {
@@ -85,6 +113,8 @@ export default {
             const raw = fechaServidor.toLocaleDateString('es', fmt)
             this.fechaStr = raw.charAt(0).toUpperCase() + raw.slice(1)
             this.claveHoy    = clave
+            const diaDelAno = Math.floor((fechaServidor - new Date(fechaServidor.getFullYear(), 0, 0)) / 86400000)
+            this.frase = FRASES[diaDelAno % FRASES.length]
             this.modalVisible = true
             return
           }
@@ -259,6 +289,25 @@ export default {
   font-size: 0.75rem;
   color: #6B7280;
   margin: 0;
+}
+.jornada-frase {
+  margin: 1.25rem 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid #FFCC00;
+  background: rgba(255,204,0,0.08);
+  border-radius: 0 8px 8px 0;
+}
+.frase-texto {
+  font-size: 0.92rem;
+  color: #FFFFFF;
+  line-height: 1.6;
+  font-style: italic;
+  margin-bottom: 0.4rem;
+}
+.frase-fuente {
+  font-size: 0.78rem;
+  color: #FFCC00;
+  font-weight: 600;
 }
 .jornada-btn {
   width: 100%;

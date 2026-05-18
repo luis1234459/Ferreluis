@@ -42,6 +42,10 @@
           <div class="fecha-hora-venta" v-if="fechaVenta">
             <span class="fecha-venta">{{ fechaVenta }}</span>
             <span class="hora-venta">{{ horaVenta }}</span>
+            <div class="frase-dia" v-if="frase.texto">
+              <span class="frase-dia-texto">"{{ frase.texto }}"</span>
+              <span class="frase-dia-fuente">— {{ frase.fuente }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -916,6 +920,29 @@ import ModalGarantia from '../components/ModalGarantia.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
 
+const FRASES = [
+  { texto: "Todo lo puedo en Cristo que me fortalece.", fuente: "Filipenses 4:13" },
+  { texto: "El Señor es mi pastor, nada me faltará.", fuente: "Salmos 23:1" },
+  { texto: "Encomienda al Señor tus obras y tus planes se cumplirán.", fuente: "Proverbios 16:3" },
+  { texto: "Jehová es mi luz y mi salvación; ¿a quién temeré?", fuente: "Salmos 27:1" },
+  { texto: "No temas, porque yo estoy contigo.", fuente: "Isaías 41:10" },
+  { texto: "El que comenzó en vosotros la buena obra la perfeccionará.", fuente: "Filipenses 1:6" },
+  { texto: "Fía en Jehová de todo tu corazón y no te apoyes en tu propia prudencia.", fuente: "Proverbios 3:5" },
+  { texto: "Todo tiene su tiempo, y todo lo que se quiere tiene su hora.", fuente: "Eclesiastés 3:1" },
+  { texto: "No os afanéis por nada; sino sean conocidas vuestras peticiones delante de Dios.", fuente: "Filipenses 4:6" },
+  { texto: "El hombre propone y Dios dispone.", fuente: "Proverbios 16:9" },
+  { texto: "Ocúpate de lo que está en tu poder y acepta el resto tal como viene.", fuente: "Epicteto" },
+  { texto: "No desperdicies lo que te queda de vida en pensamientos sobre otros.", fuente: "Marco Aurelio" },
+  { texto: "La felicidad de tu vida depende de la calidad de tus pensamientos.", fuente: "Marco Aurelio" },
+  { texto: "Comienza haciendo lo necesario, luego lo posible y de repente estarás haciendo lo imposible.", fuente: "Marco Aurelio" },
+  { texto: "No son las cosas las que nos perturban sino la opinión que tenemos de ellas.", fuente: "Epicteto" },
+  { texto: "Pierde el miedo a equivocarte. El mayor error es vivir con miedo al error.", fuente: "Séneca" },
+  { texto: "Aprovecha el día. Confía lo menos posible en el mañana.", fuente: "Horacio" },
+  { texto: "Nunca consideres el estudio como una obligación sino como una oportunidad.", fuente: "Einstein" },
+  { texto: "El éxito no es definitivo, el fracaso no es fatal: lo que cuenta es el valor de continuar.", fuente: "Churchill" },
+  { texto: "Haz cada día lo que otros no quieren hacer y mañana tendrás lo que otros no tienen.", fuente: "Anónimo" },
+]
+
 const METODOS_USD = ['efectivo_usd', 'zelle', 'binance', 'credito']
 const LABELS = {
   efectivo_usd:     'Efectivo $',
@@ -1050,6 +1077,7 @@ export default {
       // Fecha y hora del servidor
       fechaVenta:    '',
       horaVenta:     '',
+      frase:         { texto: '', fuente: '' },
       _servidorBase: null,
       _clienteBase:  null,
       _timerHora:    null,
@@ -1246,6 +1274,8 @@ export default {
       const fmt = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
       const raw = fechaServidor.toLocaleDateString('es', fmt)
       this.fechaVenta = raw.charAt(0).toUpperCase() + raw.slice(1)
+      const diaDelAno = Math.floor((fechaServidor - new Date(fechaServidor.getFullYear(), 0, 0)) / 86400000)
+      this.frase = FRASES[diaDelAno % FRASES.length]
       this._actualizarHora()
       clearInterval(this._timerHora)
       this._timerHora = setInterval(() => this._actualizarHora(), 60000)
@@ -2011,6 +2041,8 @@ export default {
 .fecha-hora-venta { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 .fecha-venta { font-size: 0.75rem; color: var(--texto-muted); }
 .hora-venta  { font-size: 0.92rem; font-weight: 700; color: var(--texto-principal); }
+.frase-dia { font-size: 0.75rem; color: var(--texto-muted); font-style: italic; margin-top: 0.25rem; max-width: 500px; line-height: 1.4; text-align: right; }
+.frase-dia-fuente { color: #996600; font-weight: 600; font-style: normal; margin-left: 0.3rem; }
 .aviso-base { background: #F3E8FF; border: 1px solid #7b2cbf; color: #6b21a8; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
 
 /* ── Tabs nav ── */
