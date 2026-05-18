@@ -1724,6 +1724,7 @@ export default {
             cuenta_destino_id: p.cuenta_destino_id || null,
           })),
           garantias: this.garantiasPendientes,
+          tasa_bcv:  this.tasaBcv || null,
         }
 
         const res = await axios.post('/ventas/', payload)

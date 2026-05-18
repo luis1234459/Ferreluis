@@ -272,6 +272,9 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
 
     # ── Tasas de cambio ──────────────────────────────────────────────────────
     tasa_bcv, tasa_binance, factor = _obtener_tasas(db)
+    tasa_payload = data.get("tasa_bcv")
+    if tasa_payload and float(tasa_payload) > 0:
+        tasa_bcv = float(tasa_payload)
 
     # ── Validar métodos de pago ──────────────────────────────────────────────
     for i, p in enumerate(pagos_in):
