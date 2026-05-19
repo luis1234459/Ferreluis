@@ -314,7 +314,8 @@ class Proveedor(Base):
     credito_disponible = Column(Float,    default=0)
     codigo             = Column(String,   nullable=True, unique=True, index=True)
     pricing_policy     = Column(String,   default="MARKET_FACTOR")   # MARKET_FACTOR | BCV_DIRECT
-    ajuste_divisa_pct  = Column(Float,    default=0.0)               # deprecated — ya no se usa en pricing
+    ajuste_divisa_pct  = Column(Float,    default=0.0)
+    ajuste_tipo        = Column(String,   default="manual")           # sistema | manual
 
 
 class CatalogoProveedor(Base):

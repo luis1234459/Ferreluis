@@ -110,13 +110,36 @@
                 </div>
               </div>
 
-              <div class="field" v-if="form.pricing_policy === 'BCV_DIRECT'">
-                <label>Ajuste divisa % <span class="label-hint">(recargo USD para cobros en divisas)</span></label>
-                <div class="input-pct-wrap">
-                  <input v-model.number="form.ajuste_divisa_pct_display" type="number" min="0" max="100" step="0.5" placeholder="0" />
-                  <span class="pct-suffix">%</span>
+              <div class="field field-wide" v-if="form.pricing_policy === 'BCV_DIRECT'">
+                <label class="section-label">Tipo de ajuste divisa</label>
+                <div class="policy-toggle">
+                  <button
+                    :class="['policy-btn', form.ajuste_tipo === 'sistema' ? 'policy-active' : '']"
+                    @click="form.ajuste_tipo = 'sistema'; form.ajuste_divisa_pct_display = 0"
+                    type="button"
+                  >
+                    <span class="policy-icon">⚙️</span>
+                    <span class="policy-name">Factor del sistema</span>
+                    <span class="policy-desc">Usa Binance ÷ BCV automáticamente</span>
+                  </button>
+                  <button
+                    :class="['policy-btn', form.ajuste_tipo === 'manual' ? 'policy-active' : '']"
+                    @click="form.ajuste_tipo = 'manual'"
+                    type="button"
+                  >
+                    <span class="policy-icon">✏️</span>
+                    <span class="policy-name">Factor manual</span>
+                    <span class="policy-desc">Porcentaje fijo negociado</span>
+                  </button>
                 </div>
-                <span class="field-hint">Ej: 3 → precio divisa = precio_base × 1.03</span>
+                <div v-if="form.ajuste_tipo === 'manual'" style="margin-top:0.75rem">
+                  <label>Ajuste divisa % <span class="label-hint">(recargo USD para cobros en divisas)</span></label>
+                  <div class="input-pct-wrap">
+                    <input v-model.number="form.ajuste_divisa_pct_display" type="number" min="0" max="100" step="0.5" placeholder="0" />
+                    <span class="pct-suffix">%</span>
+                  </div>
+                  <span class="field-hint">Ej: 3 → precio divisa = precio_base × 1.03</span>
+                </div>
               </div>
             </div>
             <div class="form-botones">
@@ -200,7 +223,7 @@ export default {
       editandoId:          null,
       guardando:           false,
       error:               '',
-      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_divisa_pct_display: 0 },
+      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0 },
       proveedorCatalogo:   null,
       catalogoItems:       [],
       nuevoItem: { producto_id: '', nombre_producto: '', codigo_proveedor: '', precio_referencia_usd: '' },
@@ -231,7 +254,7 @@ export default {
     },
     abrirNuevo() {
       this.editandoId = null
-      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_divisa_pct_display: 0 }
+      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0 }
       this.mostrarForm = true
     },
     editar(p) {
@@ -244,7 +267,8 @@ export default {
         contacto:                p.contacto        || '',
         direccion:               p.direccion       || '',
         dias_credito:            p.dias_credito    || 0,
-        pricing_policy:          p.pricing_policy  || 'MARKET_FACTOR',
+        pricing_policy:            p.pricing_policy  || 'MARKET_FACTOR',
+        ajuste_tipo:               p.ajuste_tipo     || (p.ajuste_divisa_pct > 0 ? 'manual' : 'sistema'),
         ajuste_divisa_pct_display: Math.round((p.ajuste_divisa_pct || 0) * 100 * 10) / 10,
       }
       this.mostrarForm = true
@@ -256,7 +280,9 @@ export default {
       try {
         const payload = {
           ...this.form,
-          ajuste_divisa_pct: (this.form.ajuste_divisa_pct_display || 0) / 100,
+          ajuste_divisa_pct: this.form.ajuste_tipo === 'manual'
+            ? (this.form.ajuste_divisa_pct_display || 0) / 100
+            : null,
         }
         delete payload.ajuste_divisa_pct_display
         if (this.editandoId) {

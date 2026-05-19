@@ -159,7 +159,9 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
         if policy in ("MARKET_FACTOR", "BCV_DIRECT"):
             p.pricing_policy = policy
     if "ajuste_divisa_pct" in datos:
-        p.ajuste_divisa_pct = float(datos["ajuste_divisa_pct"] or 0)
+        p.ajuste_divisa_pct = float(datos["ajuste_divisa_pct"] or 0) if datos["ajuste_divisa_pct"] is not None else 0.0
+    if "ajuste_tipo" in datos:
+        p.ajuste_tipo = datos["ajuste_tipo"] or "manual"
     db.commit()
     db.refresh(p)
     return p

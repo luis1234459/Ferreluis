@@ -9,11 +9,13 @@ _VALID_POLICIES      = {POLICY_MARKET_FACTOR, POLICY_BCV_DIRECT}
 
 
 def calcular_precios(
-    costo_usd:    float,
-    margen:       float,
-    tasa_bcv:     float,
-    tasa_binance: float,
-    policy:       str = POLICY_MARKET_FACTOR,
+    costo_usd:         float,
+    margen:            float,
+    tasa_bcv:          float,
+    tasa_binance:      float,
+    policy:            str   = POLICY_MARKET_FACTOR,
+    ajuste_tipo:       str   = "manual",
+    ajuste_divisa_pct: float = 0.0,
 ) -> dict:
     """
     MARKET_FACTOR (proveedor normal):
@@ -29,19 +31,25 @@ def calcular_precios(
     factor_normal    = round(tasa_binance / tasa_bcv,    6) if tasa_bcv     > 0 else 1.0
     factor_invertido = round(tasa_bcv    / tasa_binance, 6) if tasa_binance > 0 else 1.0
 
+    precio_base = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
+
     if policy == POLICY_BCV_DIRECT:
-        precio_ref  = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
-        precio_base = round(precio_ref * factor_invertido, 4)
-        precio_bs   = round(precio_ref * float(tasa_bcv), 2)
+        if ajuste_tipo == "sistema" or ajuste_divisa_pct is None:
+            precio_ref = round(precio_base * factor_normal, 4)
+        else:
+            precio_ref = round(precio_base * (1 + float(ajuste_divisa_pct or 0)), 4)
+        precio_bs = round(precio_ref * float(tasa_bcv), 2)
     else:  # MARKET_FACTOR
-        precio_base = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
-        precio_ref  = round(precio_base * factor_normal, 4)
-        precio_bs   = round(precio_base * float(tasa_binance), 2)
+        precio_ref = round(precio_base * factor_normal, 4)
+        precio_bs  = round(precio_base * float(tasa_binance), 2)
+
+    precio_divisa_usd = round(precio_base * (1 + float(ajuste_divisa_pct or 0)), 4)
 
     return {
         "precio_base_usd":        precio_base,
         "precio_referencial_usd": precio_ref,
         "precio_bs":              precio_bs,
+        "precio_divisa_usd":      precio_divisa_usd,
         "factor":                 factor_normal,
         "pricing_policy":         policy,
     }

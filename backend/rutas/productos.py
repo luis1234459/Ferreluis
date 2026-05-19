@@ -107,35 +107,46 @@ class OfertaSchema(BaseModel):
 # ============================================================================
 
 def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float,
-                         policy: str = "MARKET_FACTOR") -> dict:
+                         policy: str = "MARKET_FACTOR",
+                         ajuste_tipo: str = "manual",
+                         ajuste_divisa_pct: float = 0.0) -> dict:
     return calcular_precios(
-        costo_usd    = float(p.costo_usd or 0),
-        margen       = float(p.margen or 0),
-        tasa_bcv     = tasa_bcv,
-        tasa_binance = tasa_binance,
-        policy       = policy,
+        costo_usd         = float(p.costo_usd or 0),
+        margen            = float(p.margen or 0),
+        tasa_bcv          = tasa_bcv,
+        tasa_binance      = tasa_binance,
+        policy            = policy,
+        ajuste_tipo       = ajuste_tipo,
+        ajuste_divisa_pct = ajuste_divisa_pct,
     )
 
 
-def _resolver_policy(producto: Producto, db: Session) -> str:
+def _resolver_policy(producto: Producto, db: Session) -> tuple:
+    """Retorna (policy, ajuste_tipo, ajuste_divisa_pct)."""
     if producto.pricing_policy_override:
-        return producto.pricing_policy_override
+        return producto.pricing_policy_override, "manual", 0.0
     if producto.proveedor_id:
         prov = db.query(Proveedor).filter(
             Proveedor.id == producto.proveedor_id
         ).first()
         if prov and prov.pricing_policy:
-            return prov.pricing_policy
-    return "MARKET_FACTOR"
+            return (
+                prov.pricing_policy,
+                getattr(prov, 'ajuste_tipo', 'manual') or 'manual',
+                float(prov.ajuste_divisa_pct or 0.0),
+            )
+    return "MARKET_FACTOR", "manual", 0.0
 
 
 def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 variantes: list = None, plantilla: PlantillaGarantia = None,
                 tiene_catalogo: bool = False,
                 policy: str = "MARKET_FACTOR",
+                ajuste_tipo: str = "manual",
+                ajuste_divisa_pct: float = 0.0,
                 codigo_proveedor: str = "") -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
-    d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy))
+    d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_tipo, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
     d["codigo_proveedor"]  = codigo_proveedor  # código del proveedor vinculado (inamovible tras 1ª compra)
     vs = variantes or []
@@ -425,7 +436,8 @@ def listar_ofertas(db: Session = Depends(get_db)):
         prod = db.query(Producto).filter(Producto.id == o.producto_id).first()
         d["nombre_producto"] = prod.nombre if prod else "—"
         if prod and o.tipo_precio == "porcentaje":
-            precio_base = _precios_computados(prod, bcv, binance, _resolver_policy(prod, db))["precio_base_usd"]
+            _pol, _at, _ap = _resolver_policy(prod, db)
+            precio_base = _precios_computados(prod, bcv, binance, _pol, _at, _ap)["precio_base_usd"]
             d["precio_efectivo_usd"] = round(precio_base * (1 - o.valor / 100), 4)
         elif o.tipo_precio == "directo":
             d["precio_efectivo_usd"] = o.valor
@@ -565,24 +577,29 @@ def listar_productos(
                 catalogo_codigo_map[c.producto_id] = c.codigo_proveedor or ""
     prov_ids = {p.proveedor_id for p in lista if p.proveedor_id}
     prov_policy_map: dict = {}
+    prov_ajuste_map: dict = {}
     if prov_ids:
         for prov in db.query(Proveedor).filter(Proveedor.id.in_(prov_ids)).all():
             prov_policy_map[prov.id] = (
                 prov.pricing_policy or "MARKET_FACTOR",
                 float(prov.ajuste_divisa_pct or 0.0),
             )
+            prov_ajuste_map[prov.id] = getattr(prov, 'ajuste_tipo', 'manual') or 'manual'
     productos = []
     for p in lista:
-        policy, _ = resolver_policy(
+        policy, ajuste_divisa_pct = resolver_policy(
             pricing_policy_override=p.pricing_policy_override,
             proveedor_id=p.proveedor_id,
             prov_policy_map=prov_policy_map,
         )
+        ajuste_tipo = "manual" if p.pricing_policy_override else prov_ajuste_map.get(p.proveedor_id, "manual")
         productos.append(
             _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
                         plantillas_map.get(p.plantilla_garantia_id),
                         tiene_catalogo=(p.id in catalogo_ids),
                         policy=policy,
+                        ajuste_tipo=ajuste_tipo,
+                        ajuste_divisa_pct=ajuste_divisa_pct,
                         codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
         )
     return {"total": total, "productos": productos}
@@ -706,8 +723,8 @@ def buscar_por_codigo(codigo: str, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
-    policy = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.post("/")
@@ -728,8 +745,8 @@ def crear_producto(
     db.commit()
     db.refresh(nuevo)
     bcv, binance = _tasas_actuales(db)
-    policy = _resolver_policy(nuevo, db)
-    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(nuevo, db)
+    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.post("/generar-codigos-masivo")
@@ -825,11 +842,11 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         CatalogoProveedor.producto_id == p.id,
         CatalogoProveedor.codigo_proveedor != None,
     ).first()
-    policy = _resolver_policy(p, db)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
     return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db),
                        tiene_catalogo=(cat is not None),
                        codigo_proveedor=cat.codigo_proveedor if cat else "",
-                       policy=policy)
+                       policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.put("/edicion-masiva")
@@ -873,8 +890,8 @@ def actualizar_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    policy = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.patch("/{producto_id}/genericidad")
@@ -947,8 +964,8 @@ def actualizar_codigo_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    policy = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.put("/{producto_id}/estado")
@@ -965,8 +982,8 @@ def cambiar_estado_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    policy = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
 
 
 @router.delete("/{producto_id}")
@@ -1013,6 +1030,7 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
     prov_policy_map: dict = {}
+    ajuste_tipo_prov = "manual"
     if p.proveedor_id:
         prov = db.query(Proveedor).filter(Proveedor.id == p.proveedor_id).first()
         if prov:
@@ -1020,11 +1038,13 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
                 prov.pricing_policy or "MARKET_FACTOR",
                 float(prov.ajuste_divisa_pct or 0.0),
             )
-    policy, _ = resolver_policy(
+            ajuste_tipo_prov = getattr(prov, 'ajuste_tipo', 'manual') or 'manual'
+    policy, ajuste_divisa_pct = resolver_policy(
         pricing_policy_override=p.pricing_policy_override,
         proveedor_id=p.proveedor_id,
         prov_policy_map=prov_policy_map,
     )
+    ajuste_tipo = "manual" if p.pricing_policy_override else ajuste_tipo_prov
     variantes = db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).all()
@@ -1034,11 +1054,13 @@ def listar_variantes(producto_id: int, db: Session = Depends(get_db)):
         d["costo_efectivo"]  = float(v.costo_usd if v.costo_usd is not None else (p.costo_usd or 0))
         d["margen_efectivo"] = float(v.margen     if v.margen    is not None else (p.margen    or 0))
         precios = calcular_precios(
-            costo_usd    = d["costo_efectivo"],
-            margen       = d["margen_efectivo"],
-            tasa_bcv     = bcv,
-            tasa_binance = binance,
-            policy       = policy,
+            costo_usd         = d["costo_efectivo"],
+            margen            = d["margen_efectivo"],
+            tasa_bcv          = bcv,
+            tasa_binance      = binance,
+            policy            = policy,
+            ajuste_tipo       = ajuste_tipo,
+            ajuste_divisa_pct = ajuste_divisa_pct,
         )
         d["precio_base_usd"]        = precios["precio_base_usd"]
         d["precio_referencial_usd"] = precios["precio_referencial_usd"]
