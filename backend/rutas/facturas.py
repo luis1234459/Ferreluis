@@ -102,7 +102,7 @@ async def escanear_factura(archivo: UploadFile = File(...)):
 
     mensaje = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[{
             "role": "user",
             "content": [
@@ -143,9 +143,16 @@ async def escanear_factura(archivo: UploadFile = File(...)):
     )
 
     texto = mensaje.content[0].text.strip()
-    if texto.startswith("```"):
-        lineas = texto.splitlines()
-        texto = "\n".join(lineas[1:-1] if lineas[-1].strip() == "```" else lineas[1:])
+    if "```" in texto:
+        import re
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', texto)
+        if match:
+            texto = match.group(1).strip()
+    if not texto.startswith('{'):
+        import re
+        match = re.search(r'\{[\s\S]*\}', texto)
+        if match:
+            texto = match.group(0)
 
     try:
         return json.loads(texto)
