@@ -1592,11 +1592,7 @@ export default {
         this.error = 'No se puede calcular el equivalente. Verifica la tasa.'; return
       }
 
-      const esEfectivo = ['efectivo_usd', 'efectivo_bs'].includes(this.nuevoMetodo)
-      if (!esEfectivo && equivalente > this.saldoPendiente + TOLERANCIA) {
-        this.error = `El pago (${this.formatMonto(equivalente, this.monedaVenta)}) excede el saldo (${this.formatMonto(this.saldoPendiente, this.monedaVenta)}). Solo efectivo puede tener exceso.`
-        return
-      }
+
 
       const cuentas = this.cuentasDelMetodo
       if (cuentas.length > 1 && !this.nuevaCuentaId) {

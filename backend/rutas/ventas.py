@@ -428,17 +428,6 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         equivalente = _calcular_equivalente(monto, moneda_pago, moneda_venta, tasa_bcv)
 
         pendiente_actual = round(total - total_abonado, decimales)
-        if equivalente > pendiente_actual + TOLERANCIA:
-            if metodo not in METODOS_EFECTIVO:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Pago #{i+1} ({metodo}): equivalente "
-                        f"({equivalente:.2f} {moneda_venta}) excede saldo "
-                        f"({pendiente_actual:.2f} {moneda_venta}). "
-                        "Solo efectivo puede tener exceso."
-                    )
-                )
 
         total_abonado = round(total_abonado + equivalente, decimales)
         pagos_procesados.append({
