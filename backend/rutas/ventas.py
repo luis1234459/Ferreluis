@@ -31,7 +31,7 @@ from models import (
     Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
-    GarantiaVenta, PlantillaGarantia,
+    GarantiaVenta, PlantillaGarantia, Proveedor,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
@@ -347,6 +347,13 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=404,
                                     detail=f"Variante no encontrada: ID {variante_id}")
 
+        # Resolver pricing_policy: override producto → proveedor → MARKET_FACTOR
+        raw_policy = producto.pricing_policy_override
+        if not raw_policy and producto.proveedor_id:
+            prov = db.query(Proveedor).filter(Proveedor.id == producto.proveedor_id).first()
+            raw_policy = prov.pricing_policy if prov else None
+        policy = raw_policy or "MARKET_FACTOR"
+
         # Precios base del sistema
         if variante:
             if variante.precio_override_usd is not None:
@@ -357,7 +364,11 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
                 p_base = round(costo * (1 + margen), 4)
         else:
             p_base = _calcular_precio_base(producto)
-        p_ref  = _calcular_precio_referencial(p_base, factor)
+
+        if policy == "BCV_DIRECT":
+            p_ref = p_base                                    # sin factor
+        else:
+            p_ref = _calcular_precio_referencial(p_base, factor)  # × (binance/bcv)
 
         # Precio esperado según tier seleccionado
         precio_esperado_usd = p_base if tipo_precio == "base" else p_ref
