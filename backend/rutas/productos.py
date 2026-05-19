@@ -117,6 +117,18 @@ def _precios_computados(p: Producto, tasa_bcv: float, tasa_binance: float,
     )
 
 
+def _resolver_policy(producto: Producto, db: Session) -> str:
+    if producto.pricing_policy_override:
+        return producto.pricing_policy_override
+    if producto.proveedor_id:
+        prov = db.query(Proveedor).filter(
+            Proveedor.id == producto.proveedor_id
+        ).first()
+        if prov and prov.pricing_policy:
+            return prov.pricing_policy
+    return "MARKET_FACTOR"
+
+
 def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 variantes: list = None, plantilla: PlantillaGarantia = None,
                 tiene_catalogo: bool = False,
@@ -413,7 +425,7 @@ def listar_ofertas(db: Session = Depends(get_db)):
         prod = db.query(Producto).filter(Producto.id == o.producto_id).first()
         d["nombre_producto"] = prod.nombre if prod else "—"
         if prod and o.tipo_precio == "porcentaje":
-            precio_base = _precios_computados(prod, bcv, binance)["precio_base_usd"]
+            precio_base = _precios_computados(prod, bcv, binance, _resolver_policy(prod, db))["precio_base_usd"]
             d["precio_efectivo_usd"] = round(precio_base * (1 - o.valor / 100), 4)
         elif o.tipo_precio == "directo":
             d["precio_efectivo_usd"] = o.valor
@@ -694,7 +706,8 @@ def buscar_por_codigo(codigo: str, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
+    policy = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
 
 
 @router.post("/")
@@ -715,7 +728,8 @@ def crear_producto(
     db.commit()
     db.refresh(nuevo)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db))
+    policy = _resolver_policy(nuevo, db)
+    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy)
 
 
 @router.post("/generar-codigos-masivo")
@@ -811,9 +825,11 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         CatalogoProveedor.producto_id == p.id,
         CatalogoProveedor.codigo_proveedor != None,
     ).first()
+    policy = _resolver_policy(p, db)
     return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db),
                        tiene_catalogo=(cat is not None),
-                       codigo_proveedor=cat.codigo_proveedor if cat else "")
+                       codigo_proveedor=cat.codigo_proveedor if cat else "",
+                       policy=policy)
 
 
 @router.put("/edicion-masiva")
@@ -857,7 +873,8 @@ def actualizar_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
+    policy = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
 
 
 @router.patch("/{producto_id}/genericidad")
@@ -930,7 +947,8 @@ def actualizar_codigo_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
+    policy = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
 
 
 @router.put("/{producto_id}/estado")
@@ -947,7 +965,8 @@ def cambiar_estado_producto(
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db))
+    policy = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy)
 
 
 @router.delete("/{producto_id}")
