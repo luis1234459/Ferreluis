@@ -1175,7 +1175,13 @@ export default {
       return Math.round(this.exceso / tasa * 100) / 100
     },
     cuentasEfectivo() {
-      return this.cuentas || []
+      const todas = Object.values(this.cuentasPorMetodo).flat()
+      const vistas = new Set()
+      return todas.filter(c => {
+        if (vistas.has(c.id)) return false
+        vistas.add(c.id)
+        return true
+      })
     },
     nuevoMonedaPago()      { return METODOS_USD.includes(this.nuevoMetodo) ? 'USD' : 'Bs' },
     esAdmin()              { return this.usuario.rol === 'admin' },
