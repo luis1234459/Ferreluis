@@ -467,6 +467,10 @@
 
           <!-- Acciones superiores -->
           <div class="gestion-acciones">
+            <button class="btn-crear-dept"
+              @click="modalDeptCat = true; errorDeptCat = ''">
+              + Departamento / Categoría
+            </button>
             <button class="btn-crear-prod" @click="modalCrearProd = true">
               + Crear producto
             </button>
@@ -643,6 +647,68 @@
             </div>
           </div>
 
+          <!-- Modal crear departamento / categoría -->
+          <div class="overlay" v-if="modalDeptCat"
+               @click.self="modalDeptCat = false">
+            <div class="modal" style="max-width:420px">
+              <div class="modal-header">
+                <h2>Nuevo departamento o categoría</h2>
+                <button class="btn-cerrar-modal"
+                  @click="modalDeptCat = false">✕</button>
+              </div>
+
+              <div class="tab-mini">
+                <button
+                  :class="['tab-mini-btn', tabDeptCat === 'departamento' ? 'active' : '']"
+                  @click="tabDeptCat = 'departamento'; errorDeptCat = ''">
+                  Departamento
+                </button>
+                <button
+                  :class="['tab-mini-btn', tabDeptCat === 'categoria' ? 'active' : '']"
+                  @click="tabDeptCat = 'categoria'; errorDeptCat = ''">
+                  Categoría
+                </button>
+              </div>
+
+              <div class="form-grid" style="padding:1rem 1.5rem">
+                <div v-if="tabDeptCat === 'departamento'" class="field field-wide">
+                  <label>Nombre del departamento *</label>
+                  <input v-model="formNuevoDepto.nombre"
+                    placeholder="ej: Plomería"
+                    @keydown.enter="crearDepartamento" />
+                </div>
+                <div v-if="tabDeptCat === 'categoria'">
+                  <div class="field field-wide" style="margin-bottom:0.75rem">
+                    <label>Departamento *</label>
+                    <select v-model="formNuevaCat.departamento_id">
+                      <option :value="null">— Seleccionar —</option>
+                      <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                    </select>
+                  </div>
+                  <div class="field field-wide">
+                    <label>Nombre de la categoría *</label>
+                    <input v-model="formNuevaCat.nombre"
+                      placeholder="ej: Herrajes y Sifones"
+                      @keydown.enter="crearCategoria" />
+                  </div>
+                </div>
+              </div>
+
+              <p class="msg-error" v-if="errorDeptCat"
+                style="padding:0 1.5rem">{{ errorDeptCat }}</p>
+
+              <div class="form-botones">
+                <button class="btn-cancelar"
+                  @click="modalDeptCat = false">Cancelar</button>
+                <button class="btn-guardar"
+                  @click="tabDeptCat === 'departamento' ? crearDepartamento() : crearCategoria()"
+                  :disabled="creandoDeptCat">
+                  {{ creandoDeptCat ? 'Creando...' : 'Crear' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Modal editar nombre -->
           <div class="overlay" v-if="modalEditarNombre"
                @click.self="modalEditarNombre = false">
@@ -774,6 +840,14 @@ export default {
       prodEditandoNombre:       null,
       nuevoNombreProd:          '',
       editandoNombre:           false,
+
+      // Modal departamento / categoría
+      modalDeptCat:   false,
+      tabDeptCat:     'departamento',
+      formNuevoDepto: { nombre: '' },
+      formNuevaCat:   { nombre: '', departamento_id: null },
+      creandoDeptCat: false,
+      errorDeptCat:   '',
     }
   },
 
@@ -1395,6 +1469,50 @@ export default {
       }
     },
 
+    // ── Gestión: crear departamento / categoría ───────────────────────────
+    async crearDepartamento() {
+      if (!this.formNuevoDepto.nombre.trim()) {
+        this.errorDeptCat = 'El nombre es obligatorio'; return
+      }
+      this.creandoDeptCat = true
+      this.errorDeptCat = ''
+      try {
+        await axios.post('/productos/departamentos', {
+          nombre: this.formNuevoDepto.nombre.trim(),
+          activo: true,
+        }, { headers: this._headers() })
+        this.formNuevoDepto.nombre = ''
+        this.msgGestion = '✓ Departamento creado correctamente'
+        this.modalDeptCat = false
+        await this.cargarDepartamentos()
+      } catch (e) {
+        this.errorDeptCat = e?.response?.data?.detail || 'Error al crear'
+      } finally { this.creandoDeptCat = false }
+    },
+
+    async crearCategoria() {
+      if (!this.formNuevaCat.nombre.trim()) {
+        this.errorDeptCat = 'El nombre es obligatorio'; return
+      }
+      if (!this.formNuevaCat.departamento_id) {
+        this.errorDeptCat = 'Selecciona un departamento'; return
+      }
+      this.creandoDeptCat = true
+      this.errorDeptCat = ''
+      try {
+        await axios.post('/productos/categorias', {
+          nombre:          this.formNuevaCat.nombre.trim(),
+          departamento_id: this.formNuevaCat.departamento_id,
+        }, { headers: this._headers() })
+        this.formNuevaCat = { nombre: '', departamento_id: null }
+        this.msgGestion = '✓ Categoría creada correctamente'
+        this.modalDeptCat = false
+        await this.cargarDepartamentos()
+      } catch (e) {
+        this.errorDeptCat = e?.response?.data?.detail || 'Error al crear'
+      } finally { this.creandoDeptCat = false }
+    },
+
     // ── Gestión: editar nombre ─────────────────────────────────────────────
     abrirEditarNombre(prod) {
       this.prodEditandoNombre = prod
@@ -1541,6 +1659,11 @@ export default {
   transition: background 0.15s;
 }
 .btn-crear-prod:hover { background: #333; }
+.btn-crear-dept { background: #FAFAF7; color: #1A1A1A; border: 1px solid var(--borde); padding: 0.55rem 1.1rem; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+.btn-crear-dept:hover { border-color: #FFCC00; background: #FFFDF0; }
+.tab-mini { display: flex; border-bottom: 1px solid var(--borde); padding: 0 1.5rem; }
+.tab-mini-btn { padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; border: none; background: none; color: var(--texto-sec); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab-mini-btn.active { color: #1A1A1A; border-bottom-color: #FFCC00; }
 .btn-editar-nombre {
   background: #F1F5F9; border: 1px solid var(--borde);
   border-radius: 5px; padding: 0.25rem 0.6rem;
