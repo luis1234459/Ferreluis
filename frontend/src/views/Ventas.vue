@@ -706,6 +706,39 @@
             </div>
           </template>
 
+          <!-- Configuración de vuelto -->
+          <div class="vuelto-config" v-if="exceso > 0">
+            <div class="vuelto-titulo">
+              💵 Configurar vuelto:
+              <strong>{{ monedaVenta === 'USD' ? '$' : 'Bs.' }}{{ exceso.toFixed(2) }}</strong>
+            </div>
+            <div class="vuelto-row">
+              <div class="field-mini">
+                <label>Moneda del vuelto</label>
+                <select v-model="vueltoMoneda">
+                  <option value="USD">USD $</option>
+                  <option value="Bs">Bolívares Bs</option>
+                </select>
+              </div>
+              <div class="field-mini" v-if="vueltoMoneda !== monedaVenta">
+                <label>Tasa negociada</label>
+                <input v-model.number="vueltoTasa" type="number" min="0" step="0.01" placeholder="ej: 690.00" />
+              </div>
+              <div class="field-mini">
+                <label>Cuenta que entrega vuelto</label>
+                <select v-model="vueltoCuenta">
+                  <option :value="null">— Seleccionar —</option>
+                  <option v-for="c in cuentasEfectivo" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="vuelto-resultado" v-if="vueltoFinal > 0">
+              Entregar:
+              <strong>{{ vueltoMoneda === 'USD' ? '$' : 'Bs.' }}{{ vueltoFinal.toFixed(2) }}</strong>
+              <span v-if="vueltoMoneda !== monedaVenta" class="vuelto-tasa-tag">@ {{ vueltoTasa }} Bs/$</span>
+            </div>
+          </div>
+
           <div class="field">
             <label>Observación</label>
             <input v-model="observacion" placeholder="Opcional..." />
@@ -1081,6 +1114,11 @@ export default {
       _servidorBase: null,
       _clienteBase:  null,
       _timerHora:    null,
+
+      // Vuelto
+      vueltoCuenta:  null,
+      vueltoMoneda:  'Bs',
+      vueltoTasa:    '',
     }
   },
   computed: {
@@ -1127,6 +1165,20 @@ export default {
     },
     pagoCompleto() {
       return this.saldoPendiente <= TOLERANCIA && this.pagos.length > 0
+    },
+    vueltoFinal() {
+      if (!this.exceso) return 0
+      if (this.monedaVenta === this.vueltoMoneda) return this.exceso
+      const tasa = parseFloat(this.vueltoTasa) || 0
+      if (!tasa) return 0
+      if (this.vueltoMoneda === 'Bs') return Math.round(this.exceso * tasa * 100) / 100
+      return Math.round(this.exceso / tasa * 100) / 100
+    },
+    cuentasEfectivo() {
+      return this.cuentas.filter(c =>
+        c.nombre.toLowerCase().includes('caja') ||
+        c.nombre.toLowerCase().includes('efectivo')
+      )
     },
     nuevoMonedaPago()      { return METODOS_USD.includes(this.nuevoMetodo) ? 'USD' : 'Bs' },
     esAdmin()              { return this.usuario.rol === 'admin' },
@@ -1725,6 +1777,13 @@ export default {
           })),
           garantias: this.garantiasPendientes,
           tasa_bcv:  this.tasaBcv || null,
+          vuelto: this.exceso > 0 ? {
+            monto_exceso:   this.exceso,
+            moneda_vuelto:  this.vueltoMoneda,
+            monto_vuelto:   this.vueltoFinal,
+            tasa_negociada: parseFloat(this.vueltoTasa) || null,
+            cuenta_id:      this.vueltoCuenta,
+          } : null,
         }
 
         const res = await axios.post('/ventas/', payload)
@@ -2397,6 +2456,14 @@ export default {
 .btn-rm-pago { background: var(--danger); color: white; border: none; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
 
 .resumen-cobro { background: var(--borde-suave); border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; border: 1px solid var(--borde); }
+.vuelto-config { background: #FFFDF0; border: 1px solid #FFCC00; border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.75rem; }
+.vuelto-titulo { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--texto-principal); }
+.vuelto-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.field-mini { display: flex; flex-direction: column; gap: 0.25rem; min-width: 140px; flex: 1; }
+.field-mini label { font-size: 0.72rem; font-weight: 600; color: var(--texto-sec); }
+.vuelto-resultado { margin-top: 0.5rem; font-size: 0.9rem; color: var(--texto-principal); }
+.vuelto-resultado strong { color: #16A34A; font-size: 1.1rem; }
+.vuelto-tasa-tag { font-size: 0.75rem; color: #996600; background: #FFCC0033; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.4rem; }
 .resumen-fila { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--texto-sec); font-size: 0.9rem; }
 .txt-verde   { color: #16A34A; font-weight: 600; }
 .txt-rojo    { color: #DC2626; font-weight: 600; }

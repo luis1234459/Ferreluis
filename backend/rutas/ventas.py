@@ -599,6 +599,33 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             _registrar_excepcion(db, venta.id, "descuento_total", usuario)
     db.commit()
 
+    # ── Vuelto: registrar egreso bancario si aplica ──────────────────────────
+    vuelto_data = data.get("vuelto")
+    if vuelto_data and float(vuelto_data.get("monto_vuelto") or 0) > 0:
+        try:
+            from models import MovimientoBancario, CuentaBancaria
+            mov = MovimientoBancario(
+                tipo             = "retiro",
+                monto            = round(float(vuelto_data["monto_vuelto"]), 2),
+                moneda           = vuelto_data["moneda_vuelto"],
+                cuenta_origen_id = vuelto_data.get("cuenta_id"),
+                concepto         = f"Vuelto venta #{venta.id} — tasa {vuelto_data.get('tasa_negociada', 'N/A')}",
+                registrado_por   = usuario,
+                referencia       = f"VUELTO-{venta.id}",
+            )
+            db.add(mov)
+            if vuelto_data.get("cuenta_id"):
+                cuenta_obj = db.query(CuentaBancaria).filter(
+                    CuentaBancaria.id == vuelto_data["cuenta_id"]
+                ).first()
+                if cuenta_obj:
+                    cuenta_obj.saldo = round(
+                        float(cuenta_obj.saldo or 0) - float(vuelto_data["monto_vuelto"]), 2
+                    )
+            db.commit()
+        except Exception:
+            db.rollback()
+
     # ── Comisiones de vendedor (no interrumpe la venta si falla) ─────────────
     try:
         from rutas.vendedores import calcular_porcentaje_comision
