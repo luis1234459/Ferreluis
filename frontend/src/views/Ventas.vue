@@ -1175,10 +1175,7 @@ export default {
       return Math.round(this.exceso / tasa * 100) / 100
     },
     cuentasEfectivo() {
-      return this.cuentas.filter(c =>
-        c.nombre.toLowerCase().includes('caja') ||
-        c.nombre.toLowerCase().includes('efectivo')
-      )
+      return this.cuentas || []
     },
     nuevoMonedaPago()      { return METODOS_USD.includes(this.nuevoMetodo) ? 'USD' : 'Bs' },
     esAdmin()              { return this.usuario.rol === 'admin' },
