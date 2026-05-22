@@ -150,6 +150,20 @@ def inicializar_datos():
             ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS pricing_policy_override TEXT"],
         )
 
+        # ── productos: auditoría de inventario ───────────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN auditado BOOLEAN DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN fecha_auditoria DATETIME",
+             "ALTER TABLE productos ADD COLUMN auditoria_pendiente BOOLEAN DEFAULT 0",
+             "ALTER TABLE productos ADD COLUMN conteo_pendiente INTEGER",
+             "ALTER TABLE productos ADD COLUMN diferencia_pendiente INTEGER"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS auditado BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS fecha_auditoria TIMESTAMP",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS auditoria_pendiente BOOLEAN DEFAULT FALSE",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS conteo_pendiente INTEGER",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS diferencia_pendiente INTEGER"],
+        )
+
         # ── productos: unidades de medida y paquete ──────────────────────────
         migrar(
             ["ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidad'",

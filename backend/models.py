@@ -84,6 +84,13 @@ class Producto(Base):
     precio_paquete_base_usd   = Column(Float,   nullable=True)     # precio base del paquete (manual)
     precio_paquete_ref_usd    = Column(Float,   nullable=True)     # precio referencial del paquete (manual)
 
+    # Auditoría de inventario
+    auditado             = Column(Boolean,  default=False)
+    fecha_auditoria      = Column(DateTime, nullable=True)
+    auditoria_pendiente  = Column(Boolean,  default=False)
+    conteo_pendiente     = Column(Integer,  nullable=True)
+    diferencia_pendiente = Column(Integer,  nullable=True)
+
     # Precios calculados (NO se guardan, se computan al vuelo):
     #   MARKET_FACTOR: precio_referencial = precio_base * (binance/BCV); precio_bs = base * binance
     #   BCV_DIRECT:    precio_referencial = precio_base;                  precio_bs = base * BCV

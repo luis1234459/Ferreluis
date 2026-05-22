@@ -59,6 +59,15 @@ class AjusteComisionLote(BaseModel):
     items: List[AjusteComisionItem]
 
 
+class ConteoFisicoItem(BaseModel):
+    producto_id:      int
+    cantidad_contada: int
+
+
+class ConteoFisicoLote(BaseModel):
+    items: List[ConteoFisicoItem]
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -410,6 +419,114 @@ def crear_producto_ajuste(
           "stock_inicial": nuevo.stock}],
     )
     return {"ok": True, "id": nuevo.id, "nombre": nuevo.nombre}
+
+
+# ── Conteo físico / Auditoría de inventario ──────────────────────────────────
+
+@router.post("/conteo/registrar")
+def registrar_conteo(
+    datos: ConteoFisicoLote,
+    db:    Session           = Depends(get_db),
+    _:     None              = Depends(require_admin_o_gestionador),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    cambios = []
+    for item in datos.items:
+        p = db.query(Producto).filter(Producto.id == item.producto_id).first()
+        if not p:
+            continue
+        stock_actual = int(p.stock or 0)
+        diferencia   = item.cantidad_contada - stock_actual
+
+        if diferencia >= 0:
+            p.stock                = item.cantidad_contada
+            p.auditado             = True
+            p.fecha_auditoria      = datetime.utcnow()
+            p.auditoria_pendiente  = False
+            p.conteo_pendiente     = None
+            p.diferencia_pendiente = None
+            cambios.append({
+                "producto_id":    p.id,
+                "nombre":         p.nombre,
+                "stock_anterior": stock_actual,
+                "stock_nuevo":    p.stock,
+                "diferencia":     diferencia,
+                "estado":         "auditado",
+            })
+        else:
+            p.auditoria_pendiente  = True
+            p.conteo_pendiente     = item.cantidad_contada
+            p.diferencia_pendiente = diferencia
+            p.auditado             = False
+            cambios.append({
+                "producto_id":   p.id,
+                "nombre":        p.nombre,
+                "stock_sistema": stock_actual,
+                "conteo":        item.cantidad_contada,
+                "diferencia":    diferencia,
+                "estado":        "pendiente",
+            })
+
+    db.commit()
+    _guardar_historial(
+        db, x_usuario_nombre, "auditoria",
+        f"Conteo físico — {len(cambios)} productos", cambios,
+    )
+    return {"ok": True, "cambios": cambios}
+
+
+@router.get("/conteo/pendientes")
+def listar_pendientes(
+    db: Session = Depends(get_db),
+    _:  None    = Depends(require_admin_o_gestionador),
+):
+    pendientes = db.query(Producto).filter(
+        Producto.auditoria_pendiente == True
+    ).all()
+    return [
+        {
+            "id":                p.id,
+            "nombre":            p.nombre,
+            "stock":             p.stock,
+            "conteo_pendiente":  p.conteo_pendiente,
+            "diferencia_pendiente": p.diferencia_pendiente,
+            "departamento":      p.departamento_id,
+        }
+        for p in pendientes
+    ]
+
+
+@router.post("/conteo/autorizar/{producto_id}")
+def autorizar_faltante(
+    producto_id: int,
+    db: Session  = Depends(get_db),
+    _:  None     = Depends(require_admin),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    from fastapi import HTTPException
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(404, "Producto no encontrado")
+    if not p.auditoria_pendiente:
+        raise HTTPException(400, "No hay auditoría pendiente")
+
+    stock_antes  = int(p.stock or 0)
+    diferencia   = int(p.diferencia_pendiente or 0)
+    p.stock      = max(0, stock_antes + diferencia)
+    p.auditado             = True
+    p.fecha_auditoria      = datetime.utcnow()
+    p.auditoria_pendiente  = False
+    p.conteo_pendiente     = None
+    p.diferencia_pendiente = None
+    db.commit()
+
+    _guardar_historial(
+        db, x_usuario_nombre, "auditoria",
+        f"Faltante autorizado: '{p.nombre}' — diferencia {diferencia}",
+        [{"producto_id": p.id, "nombre": p.nombre,
+          "stock_anterior": stock_antes, "stock_nuevo": p.stock}],
+    )
+    return {"ok": True, "stock_nuevo": p.stock}
 
 
 # ── Historial ────────────────────────────────────────────────────────────────

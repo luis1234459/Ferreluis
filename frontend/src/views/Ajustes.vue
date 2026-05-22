@@ -35,6 +35,10 @@
             @click="tabActivo = 'gestion'">
             Gestión
           </button>
+          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'conteo' }"
+            @click="tabActivo = 'conteo'; cargarPendientes()">
+            Conteo
+          </button>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -745,6 +749,118 @@
 
         </div><!-- /tab gestion -->
 
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- Tab: Conteo                                                         -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <div v-show="tabActivo === 'conteo'">
+
+          <!-- Sub-tabs nav -->
+          <div class="subtab-nav">
+            <button class="subtab-btn" :class="{ 'subtab-activo': tabConteo === 'registrar' }"
+              @click="tabConteo = 'registrar'">
+              Registrar conteo
+            </button>
+            <button class="subtab-btn" :class="{ 'subtab-activo': tabConteo === 'pendientes' }"
+              @click="tabConteo = 'pendientes'">
+              Faltantes pendientes
+              <span v-if="conteoPendientes.length" class="badge-alerta">{{ conteoPendientes.length }}</span>
+            </button>
+          </div>
+
+          <!-- Sub-tab: Registrar conteo -->
+          <div v-show="tabConteo === 'registrar'">
+            <div class="filtros-bar">
+              <select v-model="conteoFiltroTipo" @change="conteoFiltroId = ''; conteoProductos = []">
+                <option value="todos">Todos los productos</option>
+                <option value="departamento">Por departamento</option>
+                <option value="proveedor">Por proveedor</option>
+                <option value="pareto">Solo productos clave</option>
+              </select>
+              <select v-if="conteoFiltroTipo === 'departamento' || conteoFiltroTipo === 'proveedor'"
+                v-model="conteoFiltroId">
+                <option value="">— Seleccionar —</option>
+                <option v-for="op in (conteoFiltroTipo === 'departamento' ? departamentos : proveedores)"
+                  :key="op.id" :value="op.id">{{ op.nombre }}</option>
+              </select>
+              <button class="btn-cargar" @click="cargarProductosConteo" :disabled="conteoCargando">
+                {{ conteoCargando ? 'Cargando...' : 'Cargar productos' }}
+              </button>
+            </div>
+
+            <div v-if="conteoProductos.length">
+              <table class="tabla-ajuste">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Stock sistema</th>
+                    <th>Conteo físico</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in conteoProductos" :key="p.id"
+                    :class="{ 'fila-auditada': p.auditado && !p.auditoria_pendiente, 'fila-faltante': p.auditoria_pendiente }">
+                    <td>{{ p.nombre }}</td>
+                    <td>{{ p.stock }}</td>
+                    <td>
+                      <input class="input-conteo" type="number" min="0" v-model.number="p._contado"
+                        :placeholder="p.auditado ? 'Re-contar' : 'Ingresar'" />
+                    </td>
+                    <td>
+                      <span v-if="p.auditoria_pendiente" class="badge-pendiente">Faltante pendiente</span>
+                      <span v-else-if="p.auditado" class="badge-auditado">Auditado</span>
+                      <span v-else class="badge-sin-auditar">Sin auditar</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="conteo-footer">
+                <span v-if="msgConteo" :class="msgConteo.startsWith('Error') ? 'txt-danger' : 'msg-ok'">{{ msgConteo }}</span>
+                <button class="btn-guardar-lote" @click="registrarConteo" :disabled="conteoGuardando">
+                  {{ conteoGuardando ? 'Guardando...' : 'Registrar conteo' }}
+                </button>
+              </div>
+            </div>
+            <p v-else class="sin-datos-tab">Carga los productos para comenzar el conteo físico.</p>
+          </div>
+
+          <!-- Sub-tab: Faltantes pendientes -->
+          <div v-show="tabConteo === 'pendientes'">
+            <p v-if="pendientesCargando" class="sin-datos-tab">Cargando...</p>
+            <div v-else-if="conteoPendientes.length">
+              <table class="tabla-ajuste">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Stock sistema</th>
+                    <th>Conteo</th>
+                    <th>Diferencia</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in conteoPendientes" :key="p.id" class="fila-faltante">
+                    <td>{{ p.nombre }}</td>
+                    <td>{{ p.stock }}</td>
+                    <td>{{ p.conteo_pendiente }}</td>
+                    <td class="txt-danger">{{ p.diferencia_pendiente }}</td>
+                    <td>
+                      <button v-if="esAdmin" class="btn-autorizar"
+                        :disabled="autorizando === p.id"
+                        @click="autorizarFaltante(p.id)">
+                        {{ autorizando === p.id ? '...' : 'Autorizar' }}
+                      </button>
+                      <span v-else class="txt-muted">Solo admin</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else class="sin-datos-tab">No hay faltantes pendientes de autorización.</p>
+          </div>
+
+        </div><!-- /tab conteo -->
+
       </div><!-- /contenido-inner -->
     </main>
   </div>
@@ -848,6 +964,19 @@ export default {
       formNuevaCat:   { nombre: '', departamento_id: null },
       creandoDeptCat: false,
       errorDeptCat:   '',
+
+      // ── Tab Conteo ───────────────────────────────────────────────────────
+      conteoProductos:    [],
+      conteoCargando:     false,
+      conteoFiltroTipo:   'todos',
+      conteoFiltroId:     '',
+      conteoSeleccion:    [],
+      conteoGuardando:    false,
+      msgConteo:          '',
+      conteoPendientes:   [],
+      pendientesCargando: false,
+      tabConteo:          'registrar',
+      autorizando:        null,
     }
   },
 
@@ -1546,6 +1675,63 @@ export default {
         hour: '2-digit', minute: '2-digit',
       })
     },
+    // ── Tab Conteo ─────────────────────────────────────────────────────────
+    async cargarProductosConteo() {
+      this.conteoCargando = true
+      this.msgConteo      = ''
+      try {
+        const params = { filtro_tipo: this.conteoFiltroTipo }
+        if (this.conteoFiltroId) params.filtro_id = this.conteoFiltroId
+        const res = await axios.get('/ajustes/productos', { params, headers: this._headers() })
+        this.conteoProductos = res.data.map(p => ({ ...p, _contado: '' }))
+        this.conteoSeleccion = []
+      } catch {
+        this.msgConteo = 'Error al cargar productos.'
+      } finally {
+        this.conteoCargando = false
+      }
+    },
+    async registrarConteo() {
+      const items = this.conteoProductos
+        .filter(p => p._contado !== '' && p._contado !== null && p._contado !== undefined)
+        .map(p => ({ producto_id: p.id, cantidad_contada: parseInt(p._contado) }))
+      if (!items.length) { this.msgConteo = 'No hay conteos ingresados.'; return }
+      this.conteoGuardando = true
+      this.msgConteo       = ''
+      try {
+        await axios.post('/ajustes/conteo/registrar', { items }, { headers: this._headers() })
+        this.msgConteo = `Conteo registrado para ${items.length} producto(s).`
+        await this.cargarProductosConteo()
+        await this.cargarPendientes()
+      } catch (e) {
+        this.msgConteo = e.response?.data?.detail || 'Error al registrar conteo.'
+      } finally {
+        this.conteoGuardando = false
+      }
+    },
+    async cargarPendientes() {
+      this.pendientesCargando = true
+      try {
+        const res = await axios.get('/ajustes/conteo/pendientes', { headers: this._headers() })
+        this.conteoPendientes = res.data
+      } catch {
+        this.conteoPendientes = []
+      } finally {
+        this.pendientesCargando = false
+      }
+    },
+    async autorizarFaltante(productoId) {
+      this.autorizando = productoId
+      try {
+        await axios.post(`/ajustes/conteo/autorizar/${productoId}`, {}, { headers: this._headers() })
+        await this.cargarPendientes()
+      } catch (e) {
+        alert(e.response?.data?.detail || 'Error al autorizar.')
+      } finally {
+        this.autorizando = null
+      }
+    },
+
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -1739,4 +1925,21 @@ export default {
 }
 .btn-hoja-conteo:hover:not(:disabled) { background: #333; }
 .btn-hoja-conteo:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Conteo ── */
+.subtab-nav { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--borde); }
+.subtab-btn { padding: 0.5rem 1.1rem; background: transparent; color: var(--texto-sec); border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; font-size: 0.88rem; font-weight: 600; }
+.subtab-btn:hover { color: var(--texto-principal); }
+.subtab-activo { color: #1A1A1A !important; border-bottom-color: #FFCC00 !important; }
+.badge-alerta { background: #DC2626; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 10px; margin-left: 4px; }
+.input-conteo { width: 80px; padding: 0.3rem 0.5rem; border: 1px solid var(--borde); border-radius: 5px; font-size: 0.88rem; text-align: right; }
+.fila-faltante td { background: #FEF2F2 !important; }
+.fila-auditada td { background: #F0FDF4 !important; }
+.badge-auditado { background: #DCFCE7; color: #15803D; font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.badge-pendiente { background: #FEE2E2; color: #DC2626; font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.badge-sin-auditar { background: #F3F4F6; color: #6B7280; font-size: 0.75rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 10px; }
+.conteo-footer { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 1rem; }
+.btn-autorizar { background: #DC2626; color: #fff; border: none; padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.btn-autorizar:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-autorizar:not(:disabled):hover { background: #B91C1C; }
 </style>
