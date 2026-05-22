@@ -143,6 +143,66 @@
               </div>
             </div>
           </div>
+
+          <!-- Facturas del día -->
+          <div class="facturas-dia" v-if="facturas.length">
+            <h3 class="seccion-titulo">
+              Facturas del día
+              <span class="badge-count">{{ facturas.length }}</span>
+            </h3>
+
+            <div v-for="f in facturas" :key="f.venta_id"
+              :class="['factura-row', f.estado === 'anulada' ? 'factura-anulada' : '']">
+
+              <!-- Cabecera -->
+              <div class="factura-header"
+                @click="facturaExpandida = facturaExpandida === f.venta_id ? null : f.venta_id">
+                <span class="factura-id">#{{ f.venta_id }}</span>
+                <span class="factura-hora">{{ f.hora }}</span>
+                <span class="factura-usuario">{{ f.usuario }}</span>
+                <span class="factura-cliente">{{ f.cliente || 'Consumidor Final' }}</span>
+                <span class="factura-metodos">
+                  <span v-for="(m, i) in f.metodos_pago" :key="i" class="metodo-tag">
+                    {{ labelMetodo(m.metodo) }}
+                    <span v-if="m.cuenta" class="cuenta-tag">→ {{ m.cuenta }}</span>
+                    <span class="monto-tag">${{ m.monto.toFixed(2) }}</span>
+                  </span>
+                </span>
+                <span :class="['factura-total', f.estado === 'anulada' ? 'txt-danger' : 'txt-verde']">
+                  {{ f.moneda === 'USD' ? '$' : 'Bs.' }}{{ f.total_usd.toFixed(2) }}
+                </span>
+                <span v-if="f.estado === 'anulada'" class="badge-anulada">ANULADA</span>
+                <span class="factura-toggle">{{ facturaExpandida === f.venta_id ? '▲' : '▼' }}</span>
+              </div>
+
+              <!-- Detalle expandible -->
+              <div v-if="facturaExpandida === f.venta_id" class="factura-detalle">
+                <table class="tabla-detalle">
+                  <thead>
+                    <tr>
+                      <th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(p, i) in f.productos" :key="i">
+                      <td>{{ p.nombre }}</td>
+                      <td style="text-align:center">{{ p.cantidad }}</td>
+                      <td>{{ f.moneda === 'USD' ? '$' : 'Bs.' }}{{ p.precio_unitario.toFixed(2) }}</td>
+                      <td>{{ f.moneda === 'USD' ? '$' : 'Bs.' }}{{ p.subtotal.toFixed(2) }}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3" style="text-align:right;font-weight:700">Total:</td>
+                      <td style="font-weight:700;color:#16A34A">
+                        {{ f.moneda === 'USD' ? '$' : 'Bs.' }}{{ f.total_usd.toFixed(2) }}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
         </template>
 
         <!-- Ventas → Por período -->
@@ -593,8 +653,10 @@ export default {
       usuario:  JSON.parse(localStorage.getItem('usuario') || '{}'),
       tabMain:  'ventas',
       tabSub:   'resumen_dia',
-      datos:    null,
-      cargando: false,
+      datos:            null,
+      cargando:         false,
+      facturas:         [],
+      facturaExpandida: null,
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -665,7 +727,8 @@ export default {
           if (this.fechaHasta) params.hasta = this.fechaHasta
         }
         const res  = await axios.get(url, { params })
-        this.datos = res.data
+        this.datos    = res.data
+        this.facturas = res.data.facturas || []
       } catch (e) {
         console.error('Error cargando reporte', e)
         this.datos = null
@@ -839,4 +902,29 @@ export default {
 
 .fila-precio-libre td  { background: #FFFDF0; }
 .badge-precio-libre    { font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7; cursor: default; }
+
+/* ── Facturas del día ── */
+.facturas-dia { margin-top: 2rem; }
+.seccion-titulo { font-size: 0.95rem; font-weight: 700; color: var(--texto-principal); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.badge-count { background: #1A1A1A; color: #FFCC00; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 10px; }
+.factura-row { border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+.factura-anulada { border-color: #DC2626; opacity: 0.75; background: #FEF2F2; }
+.factura-header { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; cursor: pointer; background: #FAFAF7; flex-wrap: wrap; }
+.factura-header:hover { background: #F0F0E8; }
+.factura-id { font-weight: 700; color: #996600; font-size: 0.85rem; min-width: 50px; }
+.factura-hora { font-size: 0.82rem; color: var(--texto-muted); min-width: 45px; }
+.factura-usuario { font-size: 0.82rem; font-weight: 600; min-width: 80px; }
+.factura-cliente { flex: 1; font-size: 0.85rem; color: var(--texto-sec); }
+.factura-metodos { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.factura-total { font-weight: 700; font-size: 0.95rem; min-width: 80px; text-align: right; }
+.badge-anulada { background: #DC2626; color: white; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; }
+.factura-toggle { font-size: 0.75rem; color: var(--texto-muted); }
+.factura-detalle { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
+.tabla-detalle { width: 100%; border-collapse: collapse; }
+.tabla-detalle th { font-size: 0.75rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--borde); }
+.tabla-detalle td { font-size: 0.83rem; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
+.tabla-detalle tfoot td { border-bottom: none; padding-top: 0.5rem; }
+.metodo-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; background: #F1F5F9; border-radius: 4px; padding: 0.15rem 0.5rem; margin: 0.1rem; }
+.cuenta-tag { color: #15803D; font-weight: 600; }
+.monto-tag { color: #1A1A1A; font-weight: 700; }
 </style>

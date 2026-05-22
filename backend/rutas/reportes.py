@@ -440,6 +440,91 @@ def ventas_resumen_dia(
                 "vendedor":        v.usuario or "—",
             })
 
+    # ── Facturas agrupadas por venta ─────────────────────────────────────────
+    # Incluir anuladas también (filtro solo excluye anuladas del resumen)
+    todas_ventas = db.query(Venta)
+    if desde: todas_ventas = todas_ventas.filter(Venta.fecha >= desde)
+    if hasta: todas_ventas = todas_ventas.filter(Venta.fecha <= hasta)
+    todas_ventas = todas_ventas.all()
+    todos_ids = {v.id for v in todas_ventas}
+
+    pagos_todos = db.query(PagoVenta).filter(PagoVenta.venta_id.in_(todos_ids)).all()
+    pagos_por_venta: dict = {}
+    for p in pagos_todos:
+        pagos_por_venta.setdefault(p.venta_id, []).append(p)
+
+    detalles_todos = db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(todos_ids)).all()
+    detalles_todos_por_venta: dict = {}
+    for d in detalles_todos:
+        detalles_todos_por_venta.setdefault(d.venta_id, []).append(d)
+
+    vinculos = db.query(VentaCliente).filter(VentaCliente.venta_id.in_(todos_ids)).all()
+    cliente_ids = {vc.cliente_id for vc in vinculos}
+    clientes_map = {c.id: c for c in db.query(Cliente).filter(Cliente.id.in_(cliente_ids)).all()}
+    cliente_por_venta = {vc.venta_id: clientes_map.get(vc.cliente_id) for vc in vinculos}
+
+    facturas = []
+    for v in sorted(todas_ventas, key=lambda x: x.fecha or x.id, reverse=True):
+        tasa = float(v.tasa_bcv or 1) if v.tasa_bcv else 1.0
+        cliente = cliente_por_venta.get(v.id)
+        cliente_nombre = cliente.nombre if cliente and not getattr(cliente, 'es_cliente_generico', False) else None
+
+        metodos_pago = []
+        for p in pagos_por_venta.get(v.id, []):
+            cuenta = cuentas_map.get(p.cuenta_destino_id)
+            monto = float(p.monto_original or 0)
+            monto_usd = monto if p.moneda_pago == "USD" else (monto / tasa if tasa > 0 else 0.0)
+            metodos_pago.append({
+                "metodo": p.metodo_pago,
+                "cuenta": cuenta.nombre if cuenta else None,
+                "monto":  round(monto_usd, 2),
+            })
+
+        productos_factura = []
+        for d in detalles_todos_por_venta.get(v.id, []):
+            prod   = productos_map.get(d.producto_id)
+            nombre = prod.nombre if prod else f"Producto {d.producto_id}"
+            if d.variante_id:
+                var = variantes_map.get(d.variante_id)
+                if var:
+                    sufijo = f" ({var.clase}"
+                    if var.color: sufijo += f"/{var.color}"
+                    sufijo += ")"
+                    nombre += sufijo
+            precio_usd = float(d.precio_unitario or 0)
+            cantidad   = int(d.cantidad or 0)
+            if v.moneda_venta == "USD":
+                precio_display = precio_usd
+                subtotal       = round(precio_usd * cantidad, 2)
+            else:
+                precio_display = round(precio_usd * tasa, 2)
+                subtotal       = round(precio_usd * cantidad * tasa, 2)
+            productos_factura.append({
+                "nombre":          nombre,
+                "cantidad":        cantidad,
+                "precio_unitario": precio_display,
+                "subtotal":        subtotal,
+                "moneda":          v.moneda_venta or "USD",
+            })
+
+        total_venta = float(v.total or 0)
+        if v.moneda_venta != "USD":
+            total_venta = round(total_venta / tasa, 2) if tasa > 0 else 0.0
+        else:
+            total_venta = round(total_venta, 2)
+
+        facturas.append({
+            "venta_id":    v.id,
+            "hora":        v.fecha.strftime('%H:%M') if v.fecha else '—',
+            "usuario":     v.usuario or '—',
+            "cliente":     cliente_nombre,
+            "total_usd":   total_venta,
+            "moneda":      v.moneda_venta or "USD",
+            "estado":      v.estado or "pagado",
+            "metodos_pago": metodos_pago,
+            "productos":   productos_factura,
+        })
+
     return {
         "cantidad_ventas":   len(ventas),
         "total_usd":         round(total_usd,      2),
@@ -448,6 +533,7 @@ def ventas_resumen_dia(
         "por_metodo_cuenta": sorted(por_metodo.values(),   key=lambda x: x["monto_usd"],   reverse=True),
         "por_vendedor":      sorted(por_vendedor.values(), key=lambda x: x["subtotal_usd"], reverse=True),
         "lineas_productos":  lineas_productos,
+        "facturas":          facturas,
     }
 
 
