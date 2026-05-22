@@ -426,6 +426,17 @@ def ventas_resumen_dia(
                 precio_display   = round(precio_usd * tasa, 2)
                 subtotal_display = round(subtotal_usd * tasa, 2)
                 moneda_display   = "Bs"
+            var_obj    = variantes_map.get(d.variante_id) if d.variante_id else None
+            costo_unit = float(
+                (var_obj.costo_usd if var_obj and var_obj.costo_usd is not None
+                 else prod.costo_usd) or 0
+            ) if prod else 0
+            margen_dec = float(
+                (var_obj.margen if var_obj and var_obj.margen is not None
+                 else prod.margen) or 0
+            ) if prod else 0
+            ganancia_usd = round(subtotal_usd - (costo_unit * cantidad), 2)
+            margen_pct   = round(margen_dec * 100, 1)
             lineas_productos.append({
                 "hora":            v.fecha.strftime('%H:%M') if v.fecha else '—',
                 "venta_id":        v.id,
@@ -438,6 +449,9 @@ def ventas_resumen_dia(
                 "tasa_bcv":        round(tasa, 2) if moneda_display == "Bs" else None,
                 "precio_libre":    False,
                 "vendedor":        v.usuario or "—",
+                "costo_usd":       round(costo_unit, 4),
+                "margen_pct":      margen_pct,
+                "ganancia_usd":    ganancia_usd,
             })
 
     # ── Facturas agrupadas por venta ─────────────────────────────────────────

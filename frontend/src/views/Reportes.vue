@@ -83,6 +83,7 @@
                 <tr>
                   <th>Hora</th><th>Venta</th><th>Producto</th><th>Cant.</th>
                   <th>Precio unit.</th><th>Subtotal</th><th>USD</th><th>Vendedor</th>
+                  <th>Costo</th><th>Margen</th><th>Ganancia</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,9 +103,19 @@
                   </td>
                   <td class="txt-verde">${{ l.subtotal_usd.toFixed(2) }}</td>
                   <td class="txt-muted">{{ l.vendedor }}</td>
+                  <td class="txt-muted" style="font-size:0.8rem">${{ Number(l.costo_usd || 0).toFixed(2) }}</td>
+                  <td style="font-size:0.8rem">
+                    <span :class="l.margen_pct >= 20 ? 'txt-verde' : l.margen_pct >= 10 ? 'txt-amarillo' : 'txt-danger'">
+                      {{ l.margen_pct }}%
+                    </span>
+                  </td>
+                  <td style="font-size:0.8rem;font-weight:600"
+                    :class="l.ganancia_usd > 0 ? 'txt-verde' : 'txt-danger'">
+                    ${{ Number(l.ganancia_usd || 0).toFixed(2) }}
+                  </td>
                 </tr>
                 <tr v-if="!datos.lineas_productos || datos.lineas_productos.length === 0">
-                  <td colspan="8" class="sin-datos">Sin ventas en el período</td>
+                  <td colspan="11" class="sin-datos">Sin ventas en el período</td>
                 </tr>
               </tbody>
             </table>
@@ -902,6 +913,7 @@ export default {
 
 .fila-precio-libre td  { background: #FFFDF0; }
 .badge-precio-libre    { font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7; cursor: default; }
+.txt-amarillo { color: #996600; }
 
 /* ── Facturas del día ── */
 .facturas-dia { margin-top: 2rem; }
