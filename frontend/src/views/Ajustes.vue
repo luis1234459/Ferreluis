@@ -15,7 +15,7 @@
             @click="tabActivo = 'precios'">
             Precios
           </button>
-          <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'stock' }"
+          <button v-if="esAdmin" class="tab-btn" :class="{ 'tab-activo': tabActivo === 'stock' }"
             @click="tabActivo = 'stock'">
             Stock
           </button>
@@ -770,17 +770,25 @@
           <!-- Sub-tab: Registrar conteo -->
           <div v-show="tabConteo === 'registrar'">
             <div class="filtros-bar">
-              <select v-model="conteoFiltroTipo" @change="conteoFiltroId = ''; conteoProductos = []">
+              <select v-model="conteoFiltroTipo"
+                @change="conteoFiltroId = ''; conteoFiltroCategoria = ''; conteoCategoriasDisponibles = []; conteoProductos = []">
                 <option value="todos">Todos los productos</option>
                 <option value="departamento">Por departamento</option>
                 <option value="proveedor">Por proveedor</option>
                 <option value="pareto">Solo productos clave</option>
               </select>
               <select v-if="conteoFiltroTipo === 'departamento' || conteoFiltroTipo === 'proveedor'"
-                v-model="conteoFiltroId">
+                v-model="conteoFiltroId"
+                @change="cargarCategoriasConteo">
                 <option value="">— Seleccionar —</option>
                 <option v-for="op in (conteoFiltroTipo === 'departamento' ? departamentos : proveedores)"
                   :key="op.id" :value="op.id">{{ op.nombre }}</option>
+              </select>
+              <select
+                v-if="conteoFiltroTipo === 'departamento' && conteoCategoriasDisponibles.length > 0"
+                v-model="conteoFiltroCategoria">
+                <option value="">— Todas las categorías —</option>
+                <option v-for="c in conteoCategoriasDisponibles" :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
               <button class="btn-cargar" @click="cargarProductosConteo" :disabled="conteoCargando">
                 {{ conteoCargando ? 'Cargando...' : 'Cargar productos' }}
@@ -968,9 +976,11 @@ export default {
       // ── Tab Conteo ───────────────────────────────────────────────────────
       conteoProductos:    [],
       conteoCargando:     false,
-      conteoFiltroTipo:   'todos',
-      conteoFiltroId:     '',
-      conteoSeleccion:    [],
+      conteoFiltroTipo:            'todos',
+      conteoFiltroId:              '',
+      conteoFiltroCategoria:       '',
+      conteoCategoriasDisponibles: [],
+      conteoSeleccion:             [],
       conteoGuardando:    false,
       msgConteo:          '',
       conteoPendientes:   [],
@@ -1681,7 +1691,8 @@ export default {
       this.msgConteo      = ''
       try {
         const params = { filtro_tipo: this.conteoFiltroTipo }
-        if (this.conteoFiltroId) params.filtro_id = this.conteoFiltroId
+        if (this.conteoFiltroId)       params.filtro_id   = this.conteoFiltroId
+        if (this.conteoFiltroCategoria) params.categoria_id = this.conteoFiltroCategoria
         const res = await axios.get('/ajustes/productos', { params, headers: this._headers() })
         this.conteoProductos = res.data.map(p => ({ ...p, _contado: '' }))
         this.conteoSeleccion = []
@@ -1708,6 +1719,20 @@ export default {
       } finally {
         this.conteoGuardando = false
       }
+    },
+    async cargarCategoriasConteo() {
+      if (!this.conteoFiltroId || this.conteoFiltroTipo !== 'departamento') {
+        this.conteoCategoriasDisponibles = []
+        this.conteoFiltroCategoria       = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/categorias', {
+          params: { departamento_id: this.conteoFiltroId }
+        })
+        this.conteoCategoriasDisponibles = res.data
+        this.conteoFiltroCategoria       = ''
+      } catch { this.conteoCategoriasDisponibles = [] }
     },
     async cargarPendientes() {
       this.pendientesCargando = true
