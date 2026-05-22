@@ -164,6 +164,12 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS diferencia_pendiente INTEGER"],
         )
 
+        # ── productos: stock_minimo ──────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN stock_minimo INTEGER DEFAULT 0"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS stock_minimo INTEGER DEFAULT 0"],
+        )
+
         # ── productos: unidades de medida y paquete ──────────────────────────
         migrar(
             ["ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidad'",

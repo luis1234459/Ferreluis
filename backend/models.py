@@ -83,6 +83,7 @@ class Producto(Base):
     nombre_paquete            = Column(String,  nullable=True)     # rollo | caja | saco | …
     precio_paquete_base_usd   = Column(Float,   nullable=True)     # precio base del paquete (manual)
     precio_paquete_ref_usd    = Column(Float,   nullable=True)     # precio referencial del paquete (manual)
+    stock_minimo              = Column(Integer, default=0, nullable=True)
 
     # Auditoría de inventario
     auditado             = Column(Boolean,  default=False)

@@ -83,7 +83,7 @@
                 <tr>
                   <th>Hora</th><th>Venta</th><th>Producto</th><th>Cant.</th>
                   <th>Precio unit.</th><th>Subtotal</th><th>USD</th><th>Vendedor</th>
-                  <th>Costo</th><th>Margen</th><th>Ganancia</th>
+                  <th>Costo</th><th>Margen</th><th>Ganancia</th><th>Stock</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,9 +113,19 @@
                     :class="l.ganancia_usd > 0 ? 'txt-verde' : 'txt-danger'">
                     ${{ Number(l.ganancia_usd || 0).toFixed(2) }}
                   </td>
+                  <td>
+                    <div class="semaforo-cell">
+                      <span :class="'punto-' + l.semaforo"
+                        :title="'Stock: ' + l.stock_actual + ' · Promedio/día: ' + l.promedio_diario + ' · Cobertura: ' + l.dias_cobertura + ' días'">
+                        ●
+                      </span>
+                      <span class="stock-num">{{ l.stock_actual }}</span>
+                      <span class="dias-cob" v-if="l.dias_cobertura < 999">{{ l.dias_cobertura }}d</span>
+                    </div>
+                  </td>
                 </tr>
                 <tr v-if="!datos.lineas_productos || datos.lineas_productos.length === 0">
-                  <td colspan="11" class="sin-datos">Sin ventas en el período</td>
+                  <td colspan="12" class="sin-datos">Sin ventas en el período</td>
                 </tr>
               </tbody>
             </table>
@@ -914,6 +924,12 @@ export default {
 .fila-precio-libre td  { background: #FFFDF0; }
 .badge-precio-libre    { font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7; cursor: default; }
 .txt-amarillo { color: #996600; }
+.semaforo-cell { display: flex; align-items: center; gap: 0.3rem; }
+.punto-rojo     { color: #DC2626; font-size: 1rem; }
+.punto-amarillo { color: #D97706; font-size: 1rem; }
+.punto-verde    { color: #16A34A; font-size: 1rem; }
+.stock-num { font-size: 0.82rem; font-weight: 700; }
+.dias-cob  { font-size: 0.72rem; color: var(--texto-muted); }
 
 /* ── Facturas del día ── */
 .facturas-dia { margin-top: 2rem; }

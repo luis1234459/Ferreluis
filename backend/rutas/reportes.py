@@ -402,6 +402,18 @@ def ventas_resumen_dia(
     productos_map = {p.id: p for p in db.query(Producto).all()}
     variantes_map = {v.id: v for v in db.query(VarianteProducto).all()}
 
+    # Ventas últimos 30 días por producto (para semáforo de reposición)
+    hace_30_dias = datetime.utcnow() - timedelta(days=30)
+    detalles_30 = db.query(DetalleVenta).join(
+        Venta, DetalleVenta.venta_id == Venta.id
+    ).filter(
+        Venta.fecha >= hace_30_dias,
+        Venta.estado != 'anulada',
+    ).all()
+    ventas_30d: dict = {}
+    for d30 in detalles_30:
+        ventas_30d[d30.producto_id] = ventas_30d.get(d30.producto_id, 0) + int(d30.cantidad or 0)
+
     lineas_productos = []
     for v in sorted(ventas, key=lambda x: x.fecha or x.id):
         tasa = float(v.tasa_bcv or 1) if v.tasa_bcv else 1.0
@@ -437,6 +449,21 @@ def ventas_resumen_dia(
             ) if prod else 0
             ganancia_usd = round(subtotal_usd - (costo_unit * cantidad), 2)
             margen_pct   = round(margen_dec * 100, 1)
+            stock_actual    = int(prod.stock or 0) if prod else 0
+            stock_min       = int(prod.stock_minimo or 0) if prod else 0
+            vendidos_30d    = ventas_30d.get(d.producto_id, 0)
+            promedio_diario = round(vendidos_30d / 30, 2)
+            dias_cobertura  = round(stock_actual / promedio_diario, 1) if promedio_diario > 0 else 999
+            if stock_actual == 0:
+                semaforo = 'rojo'
+            elif stock_min > 0 and stock_actual <= stock_min:
+                semaforo = 'rojo'
+            elif dias_cobertura <= 7:
+                semaforo = 'rojo'
+            elif dias_cobertura <= 15:
+                semaforo = 'amarillo'
+            else:
+                semaforo = 'verde'
             lineas_productos.append({
                 "hora":            v.fecha.strftime('%H:%M') if v.fecha else '—',
                 "venta_id":        v.id,
@@ -452,6 +479,12 @@ def ventas_resumen_dia(
                 "costo_usd":       round(costo_unit, 4),
                 "margen_pct":      margen_pct,
                 "ganancia_usd":    ganancia_usd,
+                "stock_actual":    stock_actual,
+                "stock_minimo":    stock_min,
+                "vendidos_30d":    vendidos_30d,
+                "promedio_diario": promedio_diario,
+                "dias_cobertura":  dias_cobertura,
+                "semaforo":        semaforo,
             })
 
     # ── Facturas agrupadas por venta ─────────────────────────────────────────
