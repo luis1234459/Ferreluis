@@ -27,12 +27,28 @@
         <div class="barra-acciones">
           <div class="filtros" v-if="tieneFiltros">
             <div class="field-inline">
-              <label>Desde</label>
-              <input type="date" v-model="desde" />
+              <label>Desde (día)</label>
+              <input
+                v-model.number="desdeDia"
+                type="number" min="1" max="31"
+                placeholder="ej: 1"
+                style="width:80px"
+              />
+              <small v-if="fechaDesde" class="fecha-preview">
+                {{ formatFechaPreview(fechaDesde) }}
+              </small>
             </div>
             <div class="field-inline">
-              <label>Hasta</label>
-              <input type="date" v-model="hasta" />
+              <label>Hasta (día)</label>
+              <input
+                v-model.number="hastaDia"
+                type="number" min="1" max="31"
+                placeholder="ej: 31"
+                style="width:80px"
+              />
+              <small v-if="fechaHasta" class="fecha-preview">
+                {{ formatFechaPreview(fechaHasta) }}
+              </small>
             </div>
             <button class="btn-filtrar" @click="cargar">Filtrar</button>
             <button class="btn-rapido" @click="setHoy">Hoy</button>
@@ -579,8 +595,8 @@ export default {
       tabSub:   'resumen_dia',
       datos:    null,
       cargando: false,
-      desde:    '',
-      hasta:    '',
+      desdeDia: '',
+      hastaDia: '',
       MAIN_TABS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
@@ -590,6 +606,22 @@ export default {
     }
   },
   computed: {
+    mesActual() {
+      return String(new Date().getMonth() + 1).padStart(2, '0')
+    },
+    anioActual() {
+      return new Date().getFullYear()
+    },
+    fechaDesde() {
+      if (!this.desdeDia) return ''
+      const dia = String(parseInt(this.desdeDia)).padStart(2, '0')
+      return `${this.anioActual}-${this.mesActual}-${dia}`
+    },
+    fechaHasta() {
+      if (!this.hastaDia) return ''
+      const dia = String(parseInt(this.hastaDia)).padStart(2, '0')
+      return `${this.anioActual}-${this.mesActual}-${dia}`
+    },
     esAdmin()  { return this.usuario.rol === 'admin' },
     tienePermiso() {
       return (modulo) => {
@@ -629,8 +661,8 @@ export default {
       try {
         const params = {}
         if (this.tieneFiltros) {
-          if (this.desde) params.desde = this.desde
-          if (this.hasta) params.hasta = this.hasta
+          if (this.fechaDesde) params.desde = this.fechaDesde
+          if (this.fechaHasta) params.hasta = this.fechaHasta
         }
         const res  = await axios.get(url, { params })
         this.datos = res.data
@@ -641,34 +673,35 @@ export default {
         this.cargando = false
       }
     },
-    limpiarFiltros() { this.desde = ''; this.hasta = ''; this.cargar() },
-    setHoy()   {
-      const h = new Date().toISOString().slice(0, 10)
-      this.desde = h; this.hasta = h; this.cargar()
+    limpiarFiltros() { this.desdeDia = ''; this.hastaDia = ''; this.cargar() },
+    setHoy() {
+      const d = new Date().getDate()
+      this.desdeDia = d; this.hastaDia = d; this.cargar()
     },
     setSemana() {
       const hoy = new Date()
       const lunes = new Date(hoy)
       lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7))
-      this.desde = lunes.toISOString().slice(0, 10)
-      this.hasta = hoy.toISOString().slice(0, 10)
+      this.desdeDia = lunes.getDate()
+      this.hastaDia = hoy.getDate()
       this.cargar()
     },
     setMes() {
-      const hoy = new Date()
-      this.desde = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-01`
-      this.hasta = hoy.toISOString().slice(0, 10)
+      this.desdeDia = 1
+      this.hastaDia = new Date().getDate()
       this.cargar()
     },
     setAnio() {
-      const hoy = new Date()
-      this.desde = `${hoy.getFullYear()}-01-01`
-      this.hasta = hoy.toISOString().slice(0, 10)
+      this.desdeDia = 1
+      this.hastaDia = new Date().getDate()
       this.cargar()
     },
     exportar() { alert('Función disponible próximamente') },
     labelMetodo(m) { return LABELS_METODO[m] || m },
     formatFecha(iso) { return iso ? new Date(iso).toLocaleString('es-VE') : '—' },
+    formatFechaPreview(iso) {
+      return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },
 }
@@ -708,6 +741,7 @@ export default {
 }
 .field-inline { display: flex; flex-direction: column; gap: 0.3rem; }
 .field-inline label { color: var(--texto-sec); font-size: 0.78rem; font-weight: 600; }
+.fecha-preview { display: block; color: #16A34A; font-size: 0.75rem; margin-top: 0.25rem; font-weight: 600; }
 .btn-filtrar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; font-weight: 600; }
 .btn-limpiar  { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.45rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
 .btn-rapido   { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; align-self: flex-end; }
