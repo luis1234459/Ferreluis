@@ -973,7 +973,7 @@ def cambiar_estado_producto(
     producto_id: int,
     datos: dict,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_gestionador),
 ):
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:

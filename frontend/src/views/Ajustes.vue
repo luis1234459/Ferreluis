@@ -572,6 +572,11 @@
                     <button class="btn-editar-nombre" @click="abrirEditarNombre(p)">
                       ✏️ Nombre
                     </button>
+                    <button class="btn-desactivar-prod"
+                      @click="desactivarProducto(p)"
+                      :title="'Desactivar ' + p.nombre">
+                      🗑 Desactivar
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -1677,6 +1682,20 @@ export default {
       }
     },
 
+    async desactivarProducto(prod) {
+      if (!confirm(`¿Desactivar "${prod.nombre}"? El producto dejará de aparecer en ventas.`)) return
+      try {
+        await axios.put(`/productos/${prod.id}/estado`,
+          { activo: false },
+          { headers: this._headers() }
+        )
+        this.msgGestion = `✓ "${prod.nombre}" desactivado`
+        await this.cargarProductosGestion()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al desactivar')
+      }
+    },
+
     // ── Utilidades ─────────────────────────────────────────────────────────
     formatFecha(iso) {
       if (!iso) return '—'
@@ -1882,6 +1901,13 @@ export default {
   transition: all 0.12s;
 }
 .btn-editar-nombre:hover { background: #FFCC0033; border-color: #FFCC00; }
+.btn-desactivar-prod {
+  background: #FEF2F2; border: 1px solid #DC2626;
+  border-radius: 5px; padding: 0.25rem 0.6rem;
+  font-size: 0.78rem; cursor: pointer; color: #DC2626;
+  transition: all 0.12s;
+}
+.btn-desactivar-prod:hover { background: #DC2626; color: white; }
 .fila-seleccionada td { background: #FFCC0015 !important; }
 
 /* ── Modales de gestión ── */
