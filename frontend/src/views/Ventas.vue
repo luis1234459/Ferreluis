@@ -218,6 +218,11 @@
                     <span v-if="p.codigo_proveedor" class="cod-tag-prov" :title="`Cód. proveedor: ${p.codigo_proveedor}`">{{ p.codigo_proveedor }}</span>
                     <span v-else-if="p.codigo && !p.tiene_variantes" class="cod-tag-v">{{ p.codigo }}</span>
                   </span>
+                  <span
+                    v-if="p.auditado"
+                    class="badge-auditado-venta"
+                    :title="'Auditado' + (p.fecha_auditoria ? ' · ' + formatFechaCorta(p.fecha_auditoria) : '')"
+                  >✓</span>
                   <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo)" class="pi-vcods">
                     <span
                       v-for="v in (p.variantes_resumen || []).filter(v => v.activo).slice(0, 5)"
@@ -2071,6 +2076,10 @@ export default {
       } catch {}
     },
 
+    formatFechaCorta(iso) {
+      if (!iso) return ''
+      return new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
+    },
     salir() {
       localStorage.removeItem('usuario')
       this.$router.push('/login')
@@ -2167,6 +2176,23 @@ export default {
 }
 .aviso-fade-enter-active, .aviso-fade-leave-active { transition: opacity 0.3s; }
 .aviso-fade-enter-from, .aviso-fade-leave-to { opacity: 0; }
+
+.badge-auditado-venta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #16A34A;
+  color: white;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: default;
+  flex-shrink: 0;
+}
 
 .prod-item {
   display: flex;
