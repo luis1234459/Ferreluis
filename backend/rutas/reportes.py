@@ -467,6 +467,7 @@ def ventas_resumen_dia(
             lineas_productos.append({
                 "hora":            v.fecha.strftime('%H:%M') if v.fecha else '—',
                 "venta_id":        v.id,
+                "producto_id":     d.producto_id,
                 "producto":        nombre,
                 "cantidad":        cantidad,
                 "moneda":          moneda_display,
@@ -1119,3 +1120,39 @@ def reporte_clientes(
         "top_compras":     top_compras[:10],
         "inactivos_30d":   len(inactivos),
     }
+
+
+# ---------------------------------------------------------------------------
+# PRODUCTOS — rotación individual (panel lateral)
+# ---------------------------------------------------------------------------
+
+@router.get("/productos/{producto_id}/rotacion30")
+def rotacion_30_dias(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    hace_30 = datetime.utcnow() - timedelta(days=30)
+    detalles = db.query(DetalleVenta, Venta).join(
+        Venta, DetalleVenta.venta_id == Venta.id
+    ).filter(
+        DetalleVenta.producto_id == producto_id,
+        Venta.fecha >= hace_30,
+        Venta.estado != 'anulada',
+    ).all()
+
+    por_dia = {}
+    for dv, v in detalles:
+        dia = v.fecha.strftime('%Y-%m-%d')
+        por_dia[dia] = por_dia.get(dia, 0) + int(dv.cantidad or 0)
+
+    resultado = []
+    for i in range(29, -1, -1):
+        d = datetime.utcnow() - timedelta(days=i)
+        fecha_str = d.strftime('%Y-%m-%d')
+        resultado.append({
+            "fecha":    fecha_str,
+            "dia":      d.strftime('%d/%m'),
+            "cantidad": por_dia.get(fecha_str, 0),
+        })
+    return resultado

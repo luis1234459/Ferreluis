@@ -91,7 +91,7 @@
                     :class="l.precio_libre ? 'fila-precio-libre' : ''">
                   <td class="txt-muted" style="white-space:nowrap">{{ l.hora }}</td>
                   <td class="txt-muted">#{{ l.venta_id }}</td>
-                  <td style="font-weight:600">
+                  <td @click="abrirPanelProducto(l)" class="nombre-clickeable">
                     {{ l.producto }}
                     <span v-if="l.precio_libre" class="badge-precio-libre" title="Precio libre aplicado">✏️</span>
                   </td>
@@ -597,6 +597,90 @@
         </template>
 
       </div>
+
+      <!-- ── Panel lateral de rotación ──────────────────────────────────── -->
+      <div v-if="panelVisible" class="panel-overlay" @click.self="cerrarPanel">
+        <div class="panel-lateral">
+
+          <div class="panel-header">
+            <div class="panel-nombre">{{ panelProducto && panelProducto.producto }}</div>
+            <button class="panel-cerrar" @click="cerrarPanel">✕</button>
+          </div>
+
+          <div v-if="panelProducto" class="panel-kpis">
+            <div class="panel-kpi">
+              <span class="panel-kpi-label">Stock actual</span>
+              <span class="panel-kpi-valor">{{ panelProducto.stock_actual }}</span>
+            </div>
+            <div class="panel-kpi">
+              <span class="panel-kpi-label">Stock mínimo</span>
+              <span class="panel-kpi-valor">{{ panelProducto.stock_minimo }}</span>
+            </div>
+            <div class="panel-kpi">
+              <span class="panel-kpi-label">Vendidos 30d</span>
+              <span class="panel-kpi-valor">{{ panelProducto.vendidos_30d }}</span>
+            </div>
+            <div class="panel-kpi">
+              <span class="panel-kpi-label">Cobertura</span>
+              <span class="panel-kpi-valor">{{ panelProducto.dias_cobertura < 999 ? panelProducto.dias_cobertura + 'd' : '∞' }}</span>
+            </div>
+          </div>
+
+          <div v-if="panelProducto" class="panel-costos">
+            <div class="panel-costo-item">
+              <span>Costo</span>
+              <span>${{ Number(panelProducto.costo_usd || 0).toFixed(2) }}</span>
+            </div>
+            <div class="panel-costo-item">
+              <span>Margen</span>
+              <span :class="panelProducto.margen_pct >= 20 ? 'txt-verde' : panelProducto.margen_pct >= 10 ? 'txt-amarillo' : 'txt-danger'">
+                {{ panelProducto.margen_pct }}%
+              </span>
+            </div>
+            <div class="panel-costo-item">
+              <span>Ganancia</span>
+              <span :class="panelProducto.ganancia_usd > 0 ? 'txt-verde' : 'txt-danger'">
+                ${{ Number(panelProducto.ganancia_usd || 0).toFixed(2) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="panel-seccion-titulo">Rotación últimos 30 días</div>
+          <div v-if="panelCargando" class="panel-cargando">Cargando...</div>
+          <div v-else class="panel-barras">
+            <div v-for="(d, i) in panelRotacion" :key="i" class="panel-barra-wrap">
+              <div class="panel-barra-col">
+                <span v-if="d.cantidad > 0" class="panel-barra-val">{{ d.cantidad }}</span>
+                <div class="panel-barra"
+                  :style="{ height: maxRotacion > 0 ? (d.cantidad / maxRotacion * 80) + 'px' : '0px' }"
+                  :class="d.cantidad > 0 ? 'panel-barra-activa' : 'panel-barra-vacia'">
+                </div>
+              </div>
+              <span class="panel-barra-dia">{{ d.dia }}</span>
+            </div>
+          </div>
+
+          <button class="panel-btn-repo" @click="agregarReposicion(panelProducto)">
+            + Agregar a lista de reposición
+          </button>
+
+          <div v-if="verListaReposicion && listaReposicion.length" class="panel-lista-repo">
+            <div class="panel-seccion-titulo">Lista de reposición</div>
+            <div v-for="(r, i) in listaReposicion" :key="i" class="panel-repo-item">
+              <span>{{ r.nombre }}</span>
+              <span class="txt-muted">stock: {{ r.stock }}</span>
+              <button @click="listaReposicion.splice(i, 1)" class="panel-repo-quitar">✕</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Badge flotante lista de reposición -->
+      <div v-if="listaReposicion.length" class="badge-repo-flotante" @click="verListaReposicion = !verListaReposicion">
+        {{ listaReposicion.length }} para reponer
+      </div>
+
     </main>
   </div>
 </template>
@@ -677,7 +761,13 @@ export default {
       datos:            null,
       cargando:         false,
       facturas:         [],
-      facturaExpandida: null,
+      facturaExpandida:   null,
+      panelProducto:      null,
+      panelVisible:       false,
+      panelRotacion:      [],
+      panelCargando:      false,
+      listaReposicion:    [],
+      verListaReposicion: false,
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -720,6 +810,10 @@ export default {
     totalInventarioDept() {
       if (this.tabMain !== 'inventario' || this.tabSub !== 'departamento' || !this.datos) return 0
       return this.datos.reduce((s, r) => s + r.valor_usd, 0)
+    },
+    maxRotacion() {
+      if (!this.panelRotacion.length) return 1
+      return Math.max(...this.panelRotacion.map(d => d.cantidad), 1)
     },
   },
   async mounted() {
@@ -787,6 +881,29 @@ export default {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
+    async abrirPanelProducto(l) {
+      this.panelProducto = l
+      this.panelVisible  = true
+      this.panelRotacion = []
+      this.panelCargando = true
+      try {
+        const res = await axios.get(`/reportes/productos/${l.producto_id}/rotacion30`)
+        this.panelRotacion = res.data
+      } catch (e) {
+        console.error('Error cargando rotación', e)
+      } finally {
+        this.panelCargando = false
+      }
+    },
+    agregarReposicion(l) {
+      const ya = this.listaReposicion.find(r => r.producto_id === l.producto_id)
+      if (!ya) this.listaReposicion.push({ producto_id: l.producto_id, nombre: l.producto, stock: l.stock_actual })
+      this.verListaReposicion = true
+    },
+    cerrarPanel() {
+      this.panelVisible  = false
+      this.panelProducto = null
+    },
   },
 }
 </script>
@@ -955,4 +1072,54 @@ export default {
 .metodo-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; background: #F1F5F9; border-radius: 4px; padding: 0.15rem 0.5rem; margin: 0.1rem; }
 .cuenta-tag { color: #15803D; font-weight: 600; }
 .monto-tag { color: #1A1A1A; font-weight: 700; }
+
+/* Nombre clickeable en tabla */
+.nombre-clickeable { font-weight: 600; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+.nombre-clickeable:hover { color: #996600; }
+
+/* Panel lateral */
+.panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; display: flex; justify-content: flex-end; }
+.panel-lateral {
+  width: 400px; max-width: 95vw; background: #FFFFFF;
+  height: 100%; overflow-y: auto; padding: 1.5rem;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+  animation: slideInPanel 0.2s ease;
+}
+@keyframes slideInPanel {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.panel-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 0.75rem; }
+.panel-nombre { font-size: 1rem; font-weight: 700; color: var(--texto-principal); line-height: 1.3; flex: 1; }
+.panel-cerrar { background: transparent; border: 1px solid var(--borde); border-radius: 6px; padding: 0.2rem 0.6rem; cursor: pointer; font-size: 0.9rem; color: var(--texto-sec); flex-shrink: 0; }
+.panel-cerrar:hover { background: var(--fondo-sidebar); }
+.panel-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.panel-kpi { background: var(--fondo-sidebar); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--borde); display: flex; flex-direction: column; gap: 0.2rem; }
+.panel-kpi-label { font-size: 0.7rem; color: var(--texto-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; }
+.panel-kpi-valor { font-size: 1.2rem; font-weight: 700; color: var(--texto-principal); }
+.panel-costos { display: flex; gap: 0; margin-bottom: 1.25rem; border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+.panel-costo-item { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; align-items: center; padding: 0.75rem 0.5rem; border-right: 1px solid var(--borde); }
+.panel-costo-item:last-child { border-right: none; }
+.panel-costo-item span:first-child { font-size: 0.7rem; color: var(--texto-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.panel-costo-item span:last-child { font-size: 0.92rem; font-weight: 700; }
+.panel-seccion-titulo { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--texto-muted); letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+.panel-cargando { text-align: center; color: var(--texto-muted); font-size: 0.85rem; padding: 1.5rem; }
+.panel-barras { display: flex; align-items: flex-end; gap: 3px; height: 110px; margin-bottom: 1.25rem; overflow-x: auto; padding-bottom: 0.25rem; }
+.panel-barra-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 8px; flex: 1; }
+.panel-barra-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 88px; }
+.panel-barra-val { font-size: 0.52rem; color: var(--texto-muted); line-height: 1; margin-bottom: 1px; }
+.panel-barra { width: 100%; min-height: 1px; border-radius: 2px 2px 0 0; transition: height 0.25s ease; }
+.panel-barra-activa { background: #FFCC00; }
+.panel-barra-vacia  { background: #E5E5E0; }
+.panel-barra-dia { font-size: 0.48rem; color: var(--texto-muted); writing-mode: vertical-rl; transform: rotate(180deg); line-height: 1; }
+.panel-btn-repo { width: 100%; background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+.panel-btn-repo:hover { background: #333; }
+.panel-lista-repo { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+.panel-repo-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--borde); font-size: 0.83rem; }
+.panel-repo-item:last-child { border-bottom: none; }
+.panel-repo-item > span:first-child { flex: 1; font-weight: 600; }
+.panel-repo-quitar { background: transparent; border: none; cursor: pointer; color: var(--texto-muted); font-size: 0.8rem; padding: 0.1rem 0.35rem; }
+.panel-repo-quitar:hover { color: #DC2626; }
+.badge-repo-flotante { position: fixed; bottom: 2rem; right: 2rem; background: #1A1A1A; color: #FFCC00; font-weight: 700; font-size: 0.82rem; padding: 0.6rem 1.25rem; border-radius: 20px; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+.badge-repo-flotante:hover { background: #333; }
 </style>
