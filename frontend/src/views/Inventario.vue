@@ -410,6 +410,20 @@
                 <input v-model.number="form.margen_pct" type="number" min="0" max="999" step="1"
                   placeholder="Ej: 30" @input="actualizarMargen" />
               </div>
+              <div class="field">
+                <label>Descuento máximo en ventas %
+                  <span class="label-hint">(vacío = hereda categoría/proveedor, 0 = sin descuento)</span>
+                </label>
+                <div style="display:flex;gap:0.4rem;align-items:center">
+                  <input
+                    v-model.number="form.descuento_max_pct_display"
+                    type="number" min="0" max="100" step="0.5"
+                    placeholder="Sin límite"
+                    style="max-width:100px"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
                 <input v-model.number="form.stock" type="number" min="0" placeholder="0" />
@@ -1382,6 +1396,7 @@ export default {
         es_generico: false, _cambioGenerico: false, _proveedor_fijo_id: null, _codigo_proveedor_fijo: '',
         unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '',
         precio_paquete_base_usd: null, precio_paquete_ref_usd: null,
+        descuento_max_pct_display: null,
       }
       this.mostrarForm = true
     },
@@ -1404,8 +1419,9 @@ export default {
         unidad_medida:           p.unidad_medida               ?? 'unidad',
         unidades_por_paquete:    p.unidades_por_paquete        ?? 1,
         nombre_paquete:          p.nombre_paquete              ?? '',
-        precio_paquete_base_usd: p.precio_paquete_base_usd     ?? null,
-        precio_paquete_ref_usd:  p.precio_paquete_ref_usd      ?? null,
+        precio_paquete_base_usd:   p.precio_paquete_base_usd     ?? null,
+        precio_paquete_ref_usd:    p.precio_paquete_ref_usd      ?? null,
+        descuento_max_pct_display: p.descuento_max_pct != null ? Math.round(p.descuento_max_pct * 100 * 10) / 10 : null,
       }
       this.editando    = true
       this.error       = ''
@@ -1437,6 +1453,7 @@ export default {
           nombre_paquete:          this.form.nombre_paquete                || null,
           precio_paquete_base_usd: this.form.precio_paquete_base_usd ? Number(this.form.precio_paquete_base_usd) : null,
           precio_paquete_ref_usd:  this.form.precio_paquete_ref_usd  ? Number(this.form.precio_paquete_ref_usd)  : null,
+          descuento_max_pct:       this.form.descuento_max_pct_display != null ? this.form.descuento_max_pct_display / 100 : null,
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)

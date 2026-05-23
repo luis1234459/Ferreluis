@@ -700,6 +700,21 @@
                       placeholder="ej: Herrajes y Sifones"
                       @keydown.enter="crearCategoria" />
                   </div>
+                  <div class="field field-wide" style="margin-top:0.75rem">
+                    <label>Descuento máximo en ventas %
+                      <span class="txt-muted" style="font-weight:400">(opcional — vacío = sin límite)</span>
+                    </label>
+                    <div style="display:flex;gap:0.4rem;align-items:center">
+                      <input
+                        v-model.number="formNuevaCat.descuento_max_pct"
+                        type="number" min="0" max="100" step="0.5"
+                        placeholder="Sin límite"
+                        style="max-width:100px"
+                        class="input-field"
+                      />
+                      <span class="txt-muted">%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -974,7 +989,7 @@ export default {
       modalDeptCat:   false,
       tabDeptCat:     'departamento',
       formNuevoDepto: { nombre: '' },
-      formNuevaCat:   { nombre: '', departamento_id: null },
+      formNuevaCat:   { nombre: '', departamento_id: null, descuento_max_pct: null },
       creandoDeptCat: false,
       errorDeptCat:   '',
 
@@ -1645,10 +1660,13 @@ export default {
       this.errorDeptCat = ''
       try {
         await axios.post('/productos/categorias', {
-          nombre:          this.formNuevaCat.nombre.trim(),
-          departamento_id: this.formNuevaCat.departamento_id,
+          nombre:           this.formNuevaCat.nombre.trim(),
+          departamento_id:  this.formNuevaCat.departamento_id,
+          descuento_max_pct: this.formNuevaCat.descuento_max_pct != null
+            ? this.formNuevaCat.descuento_max_pct / 100
+            : null,
         }, { headers: this._headers() })
-        this.formNuevaCat = { nombre: '', departamento_id: null }
+        this.formNuevaCat = { nombre: '', departamento_id: null, descuento_max_pct: null }
         this.msgGestion = '✓ Categoría creada correctamente'
         this.modalDeptCat = false
         await this.cargarDepartamentos()

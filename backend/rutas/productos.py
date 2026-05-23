@@ -45,6 +45,7 @@ class ProductoSchema(BaseModel):
     nombre_paquete:          Optional[str]  = None
     precio_paquete_base_usd: Optional[float]= None
     precio_paquete_ref_usd:  Optional[float]= None
+    descuento_max_pct:       Optional[float]= None
 
     class Config:
         from_attributes = True
@@ -60,8 +61,9 @@ class DepartamentoSchema(BaseModel):
 
 
 class CategoriaSchema(BaseModel):
-    nombre:          str
-    departamento_id: int
+    nombre:           str
+    departamento_id:  int
+    descuento_max_pct: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -352,7 +354,7 @@ def actualizar_categoria(
     cat = db.query(Categoria).filter(Categoria.id == categoria_id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    for key, value in datos.dict().items():
+    for key, value in datos.dict(exclude_unset=True).items():
         setattr(cat, key, value)
     db.commit()
     db.refresh(cat)
