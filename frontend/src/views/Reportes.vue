@@ -664,21 +664,68 @@
             + Agregar a lista de reposición
           </button>
 
-          <div v-if="verListaReposicion && listaReposicion.length" class="panel-lista-repo">
-            <div class="panel-seccion-titulo">Lista de reposición</div>
-            <div v-for="(r, i) in listaReposicion" :key="i" class="panel-repo-item">
-              <span>{{ r.nombre }}</span>
-              <span class="txt-muted">stock: {{ r.stock }}</span>
-              <button @click="listaReposicion.splice(i, 1)" class="panel-repo-quitar">✕</button>
-            </div>
+        </div>
+      </div>
+
+      <!-- ── Panel lista de reposición ──────────────────────────────────── -->
+      <div v-if="verListaReposicion" class="panel-overlay" @click.self="verListaReposicion = false">
+        <div class="panel-lateral">
+
+          <div class="panel-header">
+            <h3 style="margin:0;font-size:1rem">🛒 Lista de reposición</h3>
+            <button @click="verListaReposicion = false" class="panel-cerrar">✕</button>
           </div>
 
+          <div class="panel-body">
+
+            <div v-if="listaReposicion.length === 0" class="panel-cargando">
+              No hay productos en la lista
+            </div>
+
+            <div v-else>
+              <div v-for="(p, i) in listaReposicion" :key="p.producto_id" class="repos-item">
+                <div class="repos-item-info">
+                  <span :class="'punto-' + p.semaforo">●</span>
+                  <div class="repos-item-detalle">
+                    <span class="repos-nombre">{{ p.nombre }}</span>
+                    <span class="repos-meta">
+                      Stock: {{ p.stock }} ·
+                      {{ p.dias >= 999 ? 'Sin movimiento' : p.dias + 'd cobertura' }}
+                    </span>
+                  </div>
+                </div>
+                <div class="repos-item-acciones">
+                  <input
+                    v-model.number="p.cantidad_pedir"
+                    type="number" min="1"
+                    placeholder="Cant."
+                    class="input-repos-cant"
+                  />
+                  <button class="btn-quitar-repos" @click="listaReposicion.splice(i, 1)">✕</button>
+                </div>
+              </div>
+
+              <div class="repos-resumen">
+                <p class="repos-resumen-txt">{{ listaReposicion.length }} producto(s) para reponer</p>
+                <p class="repos-hint">
+                  Cuando estés listo, crea la orden de compra formal desde el módulo de Compras.
+                </p>
+              </div>
+
+              <div class="repos-acciones">
+                <button class="btn-copiar-repos" @click="copiarListaReposicion">📋 Copiar lista</button>
+                <button class="btn-whatsapp-repos" @click="enviarReposicionWhatsApp">💬 Enviar por WhatsApp</button>
+                <button class="btn-limpiar-repos" @click="listaReposicion = []">🗑 Limpiar lista</button>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
 
       <!-- Badge flotante lista de reposición -->
       <div v-if="listaReposicion.length" class="badge-repo-flotante" @click="verListaReposicion = !verListaReposicion">
-        {{ listaReposicion.length }} para reponer
+        🛒 {{ listaReposicion.length }} para reponer
       </div>
 
     </main>
@@ -897,12 +944,37 @@ export default {
     },
     agregarReposicion(l) {
       const ya = this.listaReposicion.find(r => r.producto_id === l.producto_id)
-      if (!ya) this.listaReposicion.push({ producto_id: l.producto_id, nombre: l.producto, stock: l.stock_actual })
+      if (!ya) this.listaReposicion.push({
+        producto_id:    l.producto_id,
+        nombre:         l.producto,
+        stock:          l.stock_actual,
+        semaforo:       l.semaforo,
+        dias:           l.dias_cobertura,
+        cantidad_pedir: null,
+      })
       this.verListaReposicion = true
     },
     cerrarPanel() {
       this.panelVisible  = false
       this.panelProducto = null
+    },
+    copiarListaReposicion() {
+      const texto = this.listaReposicion.map(p =>
+        `• ${p.nombre} — Stock: ${p.stock} — Pedir: ${p.cantidad_pedir || '?'}`
+      ).join('\n')
+      navigator.clipboard.writeText(
+        `LISTA DE REPOSICIÓN\n${new Date().toLocaleDateString('es-VE')}\n\n${texto}`
+      )
+      alert('Lista copiada al portapapeles')
+    },
+    enviarReposicionWhatsApp() {
+      const lineas = this.listaReposicion.map(p =>
+        `• ${p.nombre}\n  Stock: ${p.stock} · Pedir: ${p.cantidad_pedir || 'por definir'}`
+      ).join('\n\n')
+      const msg = encodeURIComponent(
+        `*LISTA DE REPOSICIÓN - FERRE-UTIL*\n_${new Date().toLocaleDateString('es-VE')}_\n\n${lineas}`
+      )
+      window.open(`https://wa.me/?text=${msg}`, '_blank')
     },
   },
 }
@@ -1114,12 +1186,27 @@ export default {
 .panel-barra-dia { font-size: 0.48rem; color: var(--texto-muted); writing-mode: vertical-rl; transform: rotate(180deg); line-height: 1; }
 .panel-btn-repo { width: 100%; background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
 .panel-btn-repo:hover { background: #333; }
-.panel-lista-repo { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
-.panel-repo-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--borde); font-size: 0.83rem; }
-.panel-repo-item:last-child { border-bottom: none; }
-.panel-repo-item > span:first-child { flex: 1; font-weight: 600; }
-.panel-repo-quitar { background: transparent; border: none; cursor: pointer; color: var(--texto-muted); font-size: 0.8rem; padding: 0.1rem 0.35rem; }
-.panel-repo-quitar:hover { color: #DC2626; }
 .badge-repo-flotante { position: fixed; bottom: 2rem; right: 2rem; background: #1A1A1A; color: #FFCC00; font-weight: 700; font-size: 0.82rem; padding: 0.6rem 1.25rem; border-radius: 20px; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
 .badge-repo-flotante:hover { background: #333; }
+
+/* Panel lista de reposición */
+.panel-body { display: flex; flex-direction: column; }
+.repos-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--borde-suave, #F0F0EC); gap: 0.5rem; }
+.repos-item-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+.repos-item-detalle { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.repos-nombre { font-size: 0.85rem; font-weight: 600; color: #1A1A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.repos-meta { font-size: 0.72rem; color: var(--texto-muted); }
+.repos-item-acciones { display: flex; align-items: center; gap: 0.4rem; }
+.input-repos-cant { width: 65px; padding: 0.3rem 0.4rem; border: 1px solid var(--borde); border-radius: 5px; font-size: 0.82rem; text-align: center; }
+.btn-quitar-repos { background: none; border: none; color: #DC2626; cursor: pointer; font-size: 0.9rem; padding: 0.2rem; }
+.repos-resumen { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--borde); }
+.repos-resumen-txt { font-weight: 700; font-size: 0.9rem; margin: 0; }
+.repos-hint { font-size: 0.75rem; color: var(--texto-muted); margin: 0.25rem 0 0; font-style: italic; }
+.repos-acciones { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+.btn-copiar-repos { background: #F1F5F9; border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+.btn-copiar-repos:hover { background: #E2E8F0; }
+.btn-whatsapp-repos { background: #25D366; color: white; border: none; border-radius: 8px; padding: 0.6rem; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+.btn-whatsapp-repos:hover { background: #1FB957; }
+.btn-limpiar-repos { background: none; border: 1px solid #DC2626; color: #DC2626; border-radius: 8px; padding: 0.6rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+.btn-limpiar-repos:hover { background: #DC2626; color: white; }
 </style>
