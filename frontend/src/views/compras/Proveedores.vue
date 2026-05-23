@@ -84,6 +84,14 @@
                 <label>Días de crédito</label>
                 <input v-model.number="form.dias_credito" type="number" min="0" placeholder="0 = sin crédito" />
               </div>
+              <div class="field">
+                <label>Descuento permanente (%)</label>
+                <div class="input-pct-wrap">
+                  <input v-model.number="form.descuento_pct" type="number" min="0" max="100" step="0.5" placeholder="0" />
+                  <span class="pct-suffix">%</span>
+                </div>
+                <small class="label-hint">Se aplica automáticamente en Factura IA</small>
+              </div>
 
               <!-- Política de pricing -->
               <div class="field field-wide pricing-section">
@@ -223,7 +231,7 @@ export default {
       editandoId:          null,
       guardando:           false,
       error:               '',
-      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0 },
+      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0 },
       proveedorCatalogo:   null,
       catalogoItems:       [],
       nuevoItem: { producto_id: '', nombre_producto: '', codigo_proveedor: '', precio_referencia_usd: '' },
@@ -254,7 +262,7 @@ export default {
     },
     abrirNuevo() {
       this.editandoId = null
-      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0 }
+      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0 }
       this.mostrarForm = true
     },
     editar(p) {
@@ -270,6 +278,7 @@ export default {
         pricing_policy:            p.pricing_policy  || 'MARKET_FACTOR',
         ajuste_tipo:               p.ajuste_tipo     || (p.ajuste_divisa_pct > 0 ? 'manual' : 'sistema'),
         ajuste_divisa_pct_display: Math.round((p.ajuste_divisa_pct || 0) * 100 * 10) / 10,
+        descuento_pct:             p.descuento_pct   || 0,
       }
       this.mostrarForm = true
     },

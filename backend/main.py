@@ -135,13 +135,15 @@ def inicializar_datos():
              "ALTER TABLE proveedores ADD COLUMN codigo TEXT",
              "ALTER TABLE proveedores ADD COLUMN pricing_policy TEXT DEFAULT 'MARKET_FACTOR'",
              "ALTER TABLE proveedores ADD COLUMN ajuste_divisa_pct FLOAT DEFAULT 0.0",
-             "ALTER TABLE proveedores ADD COLUMN ajuste_tipo TEXT DEFAULT 'manual'"],
+             "ALTER TABLE proveedores ADD COLUMN ajuste_tipo TEXT DEFAULT 'manual'",
+             "ALTER TABLE proveedores ADD COLUMN descuento_pct FLOAT DEFAULT 0"],
             ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS dias_credito INTEGER DEFAULT 0",
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS credito_disponible FLOAT DEFAULT 0",
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS codigo TEXT",
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS pricing_policy TEXT DEFAULT 'MARKET_FACTOR'",
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS ajuste_divisa_pct FLOAT DEFAULT 0.0",
-             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS ajuste_tipo TEXT DEFAULT 'manual'"],
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS ajuste_tipo TEXT DEFAULT 'manual'",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_pct FLOAT DEFAULT 0"],
         )
 
         # ── productos: pricing_policy_override ───────────────────────────────

@@ -929,6 +929,14 @@ export default {
       this.ordenSeleccionada  = null
       this.ordenesDisponibles = []
 
+      if (p.descuento_pct && p.descuento_pct > 0) {
+        this.tieneDescuento = true
+        this.descuentoPct   = p.descuento_pct
+      } else {
+        this.tieneDescuento = false
+        this.descuentoPct   = 0
+      }
+
       const nombreIA = (this.proveedorNombreIA || '').trim()
       if (nombreIA && nombreIA.toLowerCase() !== p.nombre.toLowerCase()) {
         const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
@@ -970,6 +978,11 @@ export default {
         })
         this.proveedorId   = data.id
         this.proveedorBusq = data.nombre
+
+        if (data.descuento_pct && data.descuento_pct > 0) {
+          this.tieneDescuento = true
+          this.descuentoPct   = data.descuento_pct
+        }
 
         if (data.es_nuevo) {
           this.proveedorBusq = data.nombre
