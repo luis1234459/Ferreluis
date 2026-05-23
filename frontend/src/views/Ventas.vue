@@ -1445,6 +1445,7 @@ export default {
         precio_libre:           false,
         editandoPrecio:         false,
         precioEditandoTemp:     0,
+        descuento_max_pct:      p.descuento_max_pct ?? null,
       })
     },
 
@@ -1516,6 +1517,14 @@ export default {
         precioUSD = nuevo
       }
       precioUSD = Math.round(precioUSD * 10000) / 10000
+      const limite = item.descuento_max_pct != null ? Number(item.descuento_max_pct) : null
+      if (limite !== null && item.precio_original > 0) {
+        const minPrecio = Math.round(item.precio_original * (1 - limite) * 10000) / 10000
+        if (precioUSD < minPrecio - 0.0001) {
+          alert(`Descuento máximo permitido: ${Math.round(limite * 100)}%`)
+          precioUSD = minPrecio
+        }
+      }
       item.precio_unitario = precioUSD
       item.precio_libre    = Math.abs(precioUSD - item.precio_original) > 0.0001
       item.editandoPrecio  = false

@@ -92,6 +92,14 @@
                 </div>
                 <small class="label-hint">Se aplica automáticamente en Factura IA</small>
               </div>
+              <div class="field">
+                <label>Descuento máx. en ventas (%)</label>
+                <div class="input-pct-wrap">
+                  <input v-model.number="form.descuento_max_pct_display" type="number" min="0" max="100" step="0.5" placeholder="Sin límite" />
+                  <span class="pct-suffix">%</span>
+                </div>
+                <small class="label-hint">Vendedores no pueden superar este descuento (vacío = sin límite)</small>
+              </div>
 
               <!-- Política de pricing -->
               <div class="field field-wide pricing-section">
@@ -231,7 +239,7 @@ export default {
       editandoId:          null,
       guardando:           false,
       error:               '',
-      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0 },
+      form: { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0, descuento_max_pct_display: null },
       proveedorCatalogo:   null,
       catalogoItems:       [],
       nuevoItem: { producto_id: '', nombre_producto: '', codigo_proveedor: '', precio_referencia_usd: '' },
@@ -262,7 +270,7 @@ export default {
     },
     abrirNuevo() {
       this.editandoId = null
-      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0 }
+      this.form = { nombre: '', rif: '', telefono: '', email: '', contacto: '', direccion: '', dias_credito: 0, pricing_policy: 'MARKET_FACTOR', ajuste_tipo: 'sistema', ajuste_divisa_pct_display: 0, descuento_pct: 0, descuento_max_pct_display: null }
       this.mostrarForm = true
     },
     editar(p) {
@@ -277,8 +285,9 @@ export default {
         dias_credito:            p.dias_credito    || 0,
         pricing_policy:            p.pricing_policy  || 'MARKET_FACTOR',
         ajuste_tipo:               p.ajuste_tipo     || (p.ajuste_divisa_pct > 0 ? 'manual' : 'sistema'),
-        ajuste_divisa_pct_display: Math.round((p.ajuste_divisa_pct || 0) * 100 * 10) / 10,
-        descuento_pct:             p.descuento_pct   || 0,
+        ajuste_divisa_pct_display:  Math.round((p.ajuste_divisa_pct || 0) * 100 * 10) / 10,
+        descuento_pct:              p.descuento_pct  || 0,
+        descuento_max_pct_display:  p.descuento_max_pct != null ? Math.round(p.descuento_max_pct * 100 * 10) / 10 : null,
       }
       this.mostrarForm = true
     },
@@ -292,8 +301,12 @@ export default {
           ajuste_divisa_pct: this.form.ajuste_tipo === 'manual'
             ? (this.form.ajuste_divisa_pct_display || 0) / 100
             : null,
+          descuento_max_pct: this.form.descuento_max_pct_display != null
+            ? this.form.descuento_max_pct_display / 100
+            : null,
         }
         delete payload.ajuste_divisa_pct_display
+        delete payload.descuento_max_pct_display
         if (this.editandoId) {
           await axios.put(`/compras/proveedores/${this.editandoId}`, payload)
         } else {

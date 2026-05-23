@@ -172,6 +172,20 @@ def inicializar_datos():
             ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS stock_minimo INTEGER DEFAULT 0"],
         )
 
+        # ── descuento_max_pct en categorías, productos y proveedores ─────────
+        migrar(
+            ["ALTER TABLE categorias ADD COLUMN descuento_max_pct FLOAT"],
+            ["ALTER TABLE categorias ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
+        )
+        migrar(
+            ["ALTER TABLE productos ADD COLUMN descuento_max_pct FLOAT"],
+            ["ALTER TABLE productos ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
+        )
+        migrar(
+            ["ALTER TABLE proveedores ADD COLUMN descuento_max_pct FLOAT"],
+            ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
+        )
+
         # ── productos: unidades de medida y paquete ──────────────────────────
         migrar(
             ["ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidad'",

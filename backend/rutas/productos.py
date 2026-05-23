@@ -144,11 +144,23 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 policy: str = "MARKET_FACTOR",
                 ajuste_tipo: str = "manual",
                 ajuste_divisa_pct: float = 0.0,
-                codigo_proveedor: str = "") -> dict:
+                codigo_proveedor: str = "",
+                db: Session = None) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_tipo, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
     d["codigo_proveedor"]  = codigo_proveedor  # código del proveedor vinculado (inamovible tras 1ª compra)
+    if db is not None:
+        dmx = getattr(p, 'descuento_max_pct', None)
+        if dmx is None and p.categoria_id:
+            cat = db.query(Categoria).filter(Categoria.id == p.categoria_id).first()
+            if cat:
+                dmx = getattr(cat, 'descuento_max_pct', None)
+        if dmx is None and p.proveedor_id:
+            prov = db.query(Proveedor).filter(Proveedor.id == p.proveedor_id).first()
+            if prov:
+                dmx = getattr(prov, 'descuento_max_pct', None)
+        d["descuento_max_pct"] = dmx
     vs = variantes or []
     d["tiene_variantes"]   = len(vs) > 0
     d["variantes_resumen"] = [
@@ -578,6 +590,7 @@ def listar_productos(
     prov_ids = {p.proveedor_id for p in lista if p.proveedor_id}
     prov_policy_map: dict = {}
     prov_ajuste_map: dict = {}
+    prov_descuento_max_map: dict = {}
     if prov_ids:
         for prov in db.query(Proveedor).filter(Proveedor.id.in_(prov_ids)).all():
             prov_policy_map[prov.id] = (
@@ -585,6 +598,12 @@ def listar_productos(
                 float(prov.ajuste_divisa_pct or 0.0),
             )
             prov_ajuste_map[prov.id] = getattr(prov, 'ajuste_tipo', 'manual') or 'manual'
+            prov_descuento_max_map[prov.id] = getattr(prov, 'descuento_max_pct', None)
+    cat_ids = {p.categoria_id for p in lista if p.categoria_id}
+    cat_descuento_map: dict = {}
+    if cat_ids:
+        for cat in db.query(Categoria).filter(Categoria.id.in_(cat_ids)).all():
+            cat_descuento_map[cat.id] = getattr(cat, 'descuento_max_pct', None)
     productos = []
     for p in lista:
         policy, ajuste_divisa_pct = resolver_policy(
@@ -593,15 +612,20 @@ def listar_productos(
             prov_policy_map=prov_policy_map,
         )
         ajuste_tipo = "manual" if p.pricing_policy_override else prov_ajuste_map.get(p.proveedor_id, "manual")
-        productos.append(
-            _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
-                        plantillas_map.get(p.plantilla_garantia_id),
-                        tiene_catalogo=(p.id in catalogo_ids),
-                        policy=policy,
-                        ajuste_tipo=ajuste_tipo,
-                        ajuste_divisa_pct=ajuste_divisa_pct,
-                        codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
-        )
+        enriq = _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
+                            plantillas_map.get(p.plantilla_garantia_id),
+                            tiene_catalogo=(p.id in catalogo_ids),
+                            policy=policy,
+                            ajuste_tipo=ajuste_tipo,
+                            ajuste_divisa_pct=ajuste_divisa_pct,
+                            codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
+        dmx = getattr(p, 'descuento_max_pct', None)
+        if dmx is None and p.categoria_id:
+            dmx = cat_descuento_map.get(p.categoria_id)
+        if dmx is None and p.proveedor_id:
+            dmx = prov_descuento_max_map.get(p.proveedor_id)
+        enriq["descuento_max_pct"] = dmx
+        productos.append(enriq)
     return {"total": total, "productos": productos}
 
 
@@ -724,7 +748,7 @@ def buscar_por_codigo(codigo: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.post("/")
@@ -746,7 +770,7 @@ def crear_producto(
     db.refresh(nuevo)
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(nuevo, db)
-    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+    return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.post("/generar-codigos-masivo")
@@ -846,7 +870,7 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db),
                        tiene_catalogo=(cat is not None),
                        codigo_proveedor=cat.codigo_proveedor if cat else "",
-                       policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+                       policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.put("/edicion-masiva")
@@ -891,7 +915,7 @@ def actualizar_producto(
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.patch("/{producto_id}/genericidad")
@@ -965,7 +989,7 @@ def actualizar_codigo_producto(
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.put("/{producto_id}/estado")
@@ -983,7 +1007,7 @@ def cambiar_estado_producto(
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
-    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
 
 
 @router.delete("/{producto_id}")

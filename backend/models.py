@@ -44,9 +44,10 @@ class Departamento(Base):
 class Categoria(Base):
     __tablename__ = "categorias"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    nombre          = Column(String, nullable=False)
-    departamento_id = Column(Integer, ForeignKey("departamentos.id"), nullable=False)
+    id               = Column(Integer, primary_key=True, index=True)
+    nombre           = Column(String, nullable=False)
+    departamento_id  = Column(Integer, ForeignKey("departamentos.id"), nullable=False)
+    descuento_max_pct = Column(Float, nullable=True)  # límite de descuento en ventas (fracción, ej. 0.20 = 20%)
 
 
 class Producto(Base):
@@ -84,6 +85,8 @@ class Producto(Base):
     precio_paquete_base_usd   = Column(Float,   nullable=True)     # precio base del paquete (manual)
     precio_paquete_ref_usd    = Column(Float,   nullable=True)     # precio referencial del paquete (manual)
     stock_minimo              = Column(Integer, default=0, nullable=True)
+
+    descuento_max_pct    = Column(Float,   nullable=True)   # límite de descuento en ventas (fracción); None = hereda categoría/proveedor
 
     # Auditoría de inventario
     auditado             = Column(Boolean,  default=False)
@@ -325,6 +328,7 @@ class Proveedor(Base):
     ajuste_divisa_pct  = Column(Float,    default=0.0)
     ajuste_tipo        = Column(String,   default="manual")           # sistema | manual
     descuento_pct      = Column(Float,    default=0)
+    descuento_max_pct  = Column(Float,    nullable=True)              # límite de descuento en ventas (fracción)
 
 
 class CatalogoProveedor(Base):

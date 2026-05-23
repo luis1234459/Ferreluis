@@ -164,6 +164,8 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
         p.ajuste_tipo = datos["ajuste_tipo"] or "manual"
     if "descuento_pct" in datos:
         p.descuento_pct = float(datos["descuento_pct"] or 0)
+    if "descuento_max_pct" in datos:
+        p.descuento_max_pct = float(datos["descuento_max_pct"]) if datos["descuento_max_pct"] is not None else None
     db.commit()
     db.refresh(p)
     return p
