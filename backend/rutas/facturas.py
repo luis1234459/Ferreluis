@@ -332,23 +332,31 @@ def buscar_producto(
         sufijo = f" ({' / '.join(partes)})" if partes else ""
         cod_var = v.codigo or ""
         nombre_display = f"[{cod_var}] {p.nombre}{sufijo}" if cod_var else f"{p.nombre}{sufijo}"
+        costo = float(v.costo_usd or p.costo_usd or 0)
+        margen = float(v.margen or p.margen or 0.30)
         return {
             "id": p.id, "nombre": nombre_display,
             "codigo_proveedor": codigo_prov,
             "variante_id": v.id, "variante_codigo": cod_var,
-            "costo_usd": float(v.costo_usd or p.costo_usd or 0),
+            "costo_usd": costo,
             "stock": int(v.stock or 0),
             "match_exacto": match_exacto,
+            "margen": margen,
+            "precio_referencial_usd": round(costo * (1 + margen), 2),
         }
 
     def _res_producto(p, codigo_prov="", match_exacto=False):
+        costo  = float(p.costo_usd or 0)
+        margen = float(p.margen or 0.30)
         return {
             "id": p.id, "nombre": p.nombre,
             "codigo_proveedor": codigo_prov,
             "variante_id": None, "variante_codigo": None,
-            "costo_usd": float(p.costo_usd or 0),
+            "costo_usd": costo,
             "stock": int(p.stock or 0),
             "match_exacto": match_exacto,
+            "margen": margen,
+            "precio_referencial_usd": round(costo * (1 + margen), 2),
         }
 
     def _expandir(p, codigo_prov="", match_exacto=False):
@@ -619,6 +627,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         es_nuevo    = bool(p.get("es_nuevo", False))
         codigo_prov = (p.get("codigo_proveedor") or "").strip()
         nombre_prod = p.get("nombre_producto") or p.get("nombre_ia") or ""
+        margen_nuevo = p.get("margen")   # None si no viene en el payload
         costo_ant   = None
 
         dept_id = p.get("departamento_id") or None
@@ -631,7 +640,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 descripcion        = f"Creado desde factura IA — {numero_factura}",
                 stock              = 0,
                 costo_usd          = precio,
-                margen             = 0.30,
+                margen             = margen_nuevo if margen_nuevo is not None else 0.30,
                 proveedor_id       = proveedor_id,
                 departamento_id    = dept_id,
                 categoria_id       = cat_id,
@@ -664,6 +673,8 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                     if actualizar:
                         costo_ant      = prod.costo_usd
                         prod.costo_usd = precio
+                        if margen_nuevo is not None:
+                            prod.margen = margen_nuevo
 
         db.add(DetalleRecepcion(
             recepcion_id             = recepcion.id,

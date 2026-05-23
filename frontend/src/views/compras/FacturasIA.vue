@@ -373,7 +373,37 @@
                   <div class="lia-campos">
                     <input v-model="linea.codigo_proveedor" class="input-field input-sm lia-cod" placeholder="Cód. prov." title="Código proveedor" />
                     <input v-model.number="linea.cantidad" type="number" min="1" class="input-field input-sm lia-cant" title="Cantidad" />
-                    <input v-model.number="linea.precio_unitario" type="number" step="0.01" min="0" class="input-field input-sm lia-precio" title="Precio USD" />
+                    <input v-model.number="linea.precio_unitario" type="number" step="0.01" min="0" class="input-field input-sm lia-precio" title="Precio USD" @change="recalcularPrecioVenta(linea)" />
+                    <!-- Margen / precio venta -->
+                    <div class="lia-utilidad">
+                      <div class="utilidad-toggle">
+                        <button :class="['util-btn', linea.modo_precio === 'margen' ? 'util-activo' : '']" @click="linea.modo_precio = 'margen'" type="button" title="Editar margen %">%</button>
+                        <button :class="['util-btn', linea.modo_precio === 'precio_venta' ? 'util-activo' : '']" @click="linea.modo_precio = 'precio_venta'" type="button" title="Editar precio de venta">$</button>
+                      </div>
+                      <div v-if="linea.modo_precio === 'margen'" class="util-campo">
+                        <input
+                          v-model.number="linea.margen_display"
+                          type="number" min="0" max="500" step="0.5"
+                          class="input-field input-sm lia-margen"
+                          placeholder="Margen %"
+                          @change="linea.margen = (linea.margen_display || 0) / 100; recalcularPrecioVenta(linea)"
+                        />
+                        <span class="util-label">%</span>
+                      </div>
+                      <div v-if="linea.modo_precio === 'precio_venta'" class="util-campo">
+                        <input
+                          v-model.number="linea.precio_venta_usd"
+                          type="number" min="0" step="0.01"
+                          class="input-field input-sm lia-precio-venta"
+                          placeholder="P. venta $"
+                          @change="recalcularMargen(linea)"
+                        />
+                      </div>
+                      <div class="util-preview" v-if="linea.precio_unitario">
+                        <span v-if="linea.modo_precio === 'margen' && linea.precio_venta_usd">→ ${{ Number(linea.precio_venta_usd).toFixed(2) }}</span>
+                        <span v-if="linea.modo_precio === 'precio_venta' && linea.margen != null">→ {{ Math.round((linea.margen || 0) * 100 * 10) / 10 }}%</span>
+                      </div>
+                    </div>
                     <span class="lia-sub">{{ fmtUSD(linea.cantidad * linea.precio_unitario) }}</span>
                     <input type="checkbox" v-model="linea.actualizar_costo" :disabled="!linea.match" title="Actualizar costo en inventario" class="lia-check" />
                   </div>
@@ -858,6 +888,10 @@ export default {
         departamento_nombre: '',
         categoria_id:        null,
         categoria_nombre:    '',
+        margen:              0.30,
+        margen_display:      30,
+        precio_venta_usd:    Math.round(Number(p.precio_unitario || 0) * 1.30 * 10000) / 10000,
+        modo_precio:         'margen',
       }))
 
       this.lineas.forEach(l => this.autoMatchProducto(l))
@@ -1010,15 +1044,21 @@ export default {
         const { data } = await axios.get('/facturas/buscar-producto', { params })
         if (data.length > 0 && data[0].match_exacto) {
           // Código conocido en catálogo → vincular al producto registrado
-          linea.match      = data[0]
-          linea._busqTexto = data[0].nombre
-          linea.esNuevo    = false
+          linea.match          = data[0]
+          linea._busqTexto     = data[0].nombre
+          linea.esNuevo        = false
+          linea.margen         = data[0].margen || 0.30
+          linea.margen_display = Math.round(linea.margen * 100 * 10) / 10
+          linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
         } else if (codigo && this.proveedorId && data.length === 0) {
           // Código de proveedor conocido pero no está en catálogo aún →
           // la norma exige producto nuevo exclusivo para este (código, RIF)
-          linea.esNuevo    = true
-          linea.match      = null
-          linea._busqTexto = ''
+          linea.esNuevo        = true
+          linea.match          = null
+          linea._busqTexto     = ''
+          linea.margen         = 0.30
+          linea.margen_display = 30
+          linea.precio_venta_usd = Math.round(linea.precio_unitario * 1.30 * 10000) / 10000
         }
       } catch {}
       finally { linea.buscandoMatch = false }
@@ -1043,6 +1083,9 @@ export default {
       linea._busqAbierta    = false
       linea._busqResultados = []
       linea._busqVisible    = false
+      linea.margen          = prod.margen || 0.30
+      linea.margen_display  = Math.round(linea.margen * 100 * 10) / 10
+      linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
 
       // Si el nombre de la IA es distinto al nombre en inventario,
       // preguntar si actualizar
@@ -1067,6 +1110,15 @@ export default {
       linea._busqTexto       = ''
       linea.actualizar_costo = false
     },
+    recalcularPrecioVenta(linea) {
+      if (!linea.precio_unitario) return
+      linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + (linea.margen || 0)) * 10000) / 10000
+    },
+    recalcularMargen(linea) {
+      if (!linea.precio_unitario || !linea.precio_venta_usd) return
+      linea.margen = Math.round(((linea.precio_venta_usd / linea.precio_unitario) - 1) * 10000) / 10000
+      linea.margen_display = Math.round(linea.margen * 100 * 10) / 10
+    },
     abrirLineaDropdown(linea) {
       if (linea._busqResultados.length) linea._busqAbierta = true
     },
@@ -1085,9 +1137,12 @@ export default {
     },
     confirmarNuevoProducto() {
       if (!this.lineaPendiente) return
-      this.lineaPendiente.esNuevo     = true
-      this.lineaPendiente.match       = null
-      this.lineaPendiente.nombreFinal = this.nombreNuevoProd.trim() || this.lineaPendiente.nombre_ia
+      this.lineaPendiente.esNuevo       = true
+      this.lineaPendiente.match         = null
+      this.lineaPendiente.nombreFinal   = this.nombreNuevoProd.trim() || this.lineaPendiente.nombre_ia
+      this.lineaPendiente.margen        = 0.30
+      this.lineaPendiente.margen_display = 30
+      this.lineaPendiente.precio_venta_usd = Math.round(this.lineaPendiente.precio_unitario * 1.30 * 10000) / 10000
       this.modalNuevoProd  = false
       this.lineaPendiente  = null
       this.nombreNuevoProd = ''
@@ -1121,6 +1176,7 @@ export default {
         _busqTexto: '', _busqResultados: [], _busqAbierta: false, _busqVisible: false,
         departamento_id: null, departamento_nombre: '',
         categoria_id: null,    categoria_nombre: '',
+        margen: 0.30, margen_display: 30, precio_venta_usd: 0, modo_precio: 'margen',
       })
     },
 
@@ -1189,6 +1245,7 @@ export default {
           es_nuevo:            l.esNuevo && !l.match,
           departamento_id:     l.departamento_id  || null,
           categoria_id:        l.categoria_id     || null,
+          margen:              l.margen ?? 0.30,
         })),
       }
 
@@ -1519,6 +1576,24 @@ select.input-field { cursor: pointer; }
   font-weight: 600; color: #16A34A; padding: 0 0.3rem;
 }
 .lia-check { width: 36px; display: flex; justify-content: center; margin: 0 auto; }
+
+.lia-utilidad {
+  display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0;
+}
+.utilidad-toggle {
+  display: flex; border: 1px solid var(--borde); border-radius: 4px; overflow: hidden;
+}
+.util-btn {
+  padding: 0.2rem 0.4rem; font-size: 0.72rem; font-weight: 700;
+  border: none; cursor: pointer; background: #F1F5F9; color: var(--texto-muted);
+}
+.util-activo { background: #1A1A1A; color: #FFCC00; }
+.util-campo { display: flex; align-items: center; gap: 0.2rem; }
+.lia-margen, .lia-precio-venta { width: 70px; }
+.util-label { font-size: 0.72rem; color: var(--texto-muted); }
+.util-preview {
+  font-size: 0.72rem; color: #16A34A; font-weight: 600; white-space: nowrap;
+}
 
 .lia-vacia {
   text-align: center; padding: 1.5rem;
