@@ -627,15 +627,18 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         # Si es producto nuevo, crearlo en inventario
         if es_nuevo and not prod_id:
             nuevo_prod = Producto(
-                nombre          = nombre_prod,
-                descripcion     = f"Creado desde factura IA — {numero_factura}",
-                stock           = 0,
-                costo_usd       = precio,
-                margen          = 0.30,
-                proveedor_id    = proveedor_id,
-                departamento_id = dept_id,
-                categoria_id    = cat_id,
-                activo          = True,
+                nombre             = nombre_prod,
+                descripcion        = f"Creado desde factura IA — {numero_factura}",
+                stock              = 0,
+                costo_usd          = precio,
+                margen             = 0.30,
+                proveedor_id       = proveedor_id,
+                departamento_id    = dept_id,
+                categoria_id       = cat_id,
+                activo             = True,
+                auditado           = True,
+                fecha_auditoria    = datetime.utcnow(),
+                auditoria_pendiente = False,
             )
             db.add(nuevo_prod)
             db.flush()
