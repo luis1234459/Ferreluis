@@ -793,6 +793,15 @@ class Aviso(Base):
     destinatario = Column(String,   nullable=True)  # None = todos, o nombre usuario específico
 
 
+class AvisoVisto(Base):
+    __tablename__ = "avisos_vistos"
+
+    id       = Column(Integer,  primary_key=True, index=True)
+    aviso_id = Column(Integer,  ForeignKey("avisos.id"))
+    usuario  = Column(String,   nullable=False)
+    fecha    = Column(DateTime, default=datetime.utcnow)
+
+
 class DemandaRegistro(Base):
     __tablename__ = "demanda_registro"
 

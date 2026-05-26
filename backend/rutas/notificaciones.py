@@ -1,11 +1,12 @@
 """
 Módulo de notificaciones: avisos del admin y radar de demanda.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from typing import Optional
 from database import get_db
-from models import Aviso, DemandaRegistro, Producto
+from models import Aviso, AvisoVisto, DemandaRegistro, Producto
 from rutas.usuarios import require_admin, get_current_user
 from datetime import datetime, date
 
@@ -47,6 +48,54 @@ def eliminar_aviso(aviso_id: int, db: Session = Depends(get_db), _: dict = Depen
         raise HTTPException(status_code=404, detail="Aviso no encontrado")
     a.activo = False
     db.commit()
+    return {"ok": True}
+
+
+@router.get("/avisos/pendientes")
+def avisos_pendientes(
+    db: Session = Depends(get_db),
+    x_usuario_nombre: Optional[str] = Header(None),
+    x_usuario_rol:    Optional[str] = Header(None),
+):
+    """Avisos activos que el usuario aún no ha marcado como leídos."""
+    usuario = x_usuario_nombre or ""
+    from sqlalchemy import or_
+
+    leidos = {v.aviso_id for v in db.query(AvisoVisto).filter(
+        AvisoVisto.usuario == usuario
+    ).all()}
+
+    q = db.query(Aviso).filter(Aviso.activo == True)
+    if usuario:
+        q = q.filter(or_(Aviso.destinatario == None, Aviso.destinatario == usuario))
+    if leidos:
+        q = q.filter(~Aviso.id.in_(leidos))
+
+    return [
+        {
+            "id":      a.id,
+            "titulo":  a.titulo,
+            "mensaje": a.mensaje,
+            "fecha":   a.fecha.isoformat() if a.fecha else None,
+        }
+        for a in q.order_by(Aviso.fecha.desc()).limit(10).all()
+    ]
+
+
+@router.post("/avisos/{aviso_id}/leer")
+def marcar_leido(
+    aviso_id: int,
+    db: Session = Depends(get_db),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    usuario = x_usuario_nombre or "desconocido"
+    existe = db.query(AvisoVisto).filter(
+        AvisoVisto.aviso_id == aviso_id,
+        AvisoVisto.usuario  == usuario,
+    ).first()
+    if not existe:
+        db.add(AvisoVisto(aviso_id=aviso_id, usuario=usuario))
+        db.commit()
     return {"ok": True}
 
 

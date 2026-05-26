@@ -186,6 +186,22 @@ def inicializar_datos():
             ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
         )
 
+        # ── avisos_vistos ────────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS avisos_vistos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aviso_id INTEGER REFERENCES avisos(id),
+                usuario VARCHAR NOT NULL,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS avisos_vistos (
+                id SERIAL PRIMARY KEY,
+                aviso_id INTEGER REFERENCES avisos(id),
+                usuario VARCHAR NOT NULL,
+                fecha TIMESTAMP DEFAULT NOW()
+            )"""],
+        )
+
         # ── productos: unidades de medida y paquete ──────────────────────────
         migrar(
             ["ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidad'",

@@ -950,6 +950,32 @@
     </div>
 
   </div>
+
+  <!-- Modal avisos bloqueante para vendedor/cajero -->
+  <div v-if="modalAvisosVendedor && avisosVendedor.length > 0"
+       class="aviso-overlay-ventas">
+    <div class="aviso-modal-ventas">
+      <div class="aviso-header">
+        <h2>📢 Aviso importante</h2>
+        <span class="aviso-contador">
+          {{ avisoVendedorIdx + 1 }} / {{ avisosVendedor.length }}
+        </span>
+      </div>
+      <div class="aviso-body">
+        <h3>{{ avisosVendedor[avisoVendedorIdx]?.titulo }}</h3>
+        <p>{{ avisosVendedor[avisoVendedorIdx]?.mensaje }}</p>
+        <small class="aviso-fecha">
+          {{ new Date(avisosVendedor[avisoVendedorIdx]?.fecha)
+            .toLocaleDateString('es-VE', { day:'2-digit', month:'long', year:'numeric' }) }}
+        </small>
+      </div>
+      <div class="aviso-footer">
+        <button class="btn-confirmar-aviso-ventas" @click="confirmarAvisoVendedor">
+          ✓ Leído — Continuar
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -1124,6 +1150,11 @@ export default {
       vueltoCuenta:  null,
       vueltoMoneda:  'Bs',
       vueltoTasa:    '',
+
+      // Avisos pendientes del admin
+      avisosVendedor:      [],
+      avisoVendedorIdx:    0,
+      modalAvisosVendedor: false,
     }
   },
   computed: {
@@ -1299,8 +1330,42 @@ export default {
       this.cargarProveedores(),
       this.cargarMasVendidos(),
     ])
+
+    const usuarioLocal = JSON.parse(localStorage.getItem('usuario') || '{}')
+    if (usuarioLocal.rol === 'vendedor' || usuarioLocal.rol === 'cajero') {
+      try {
+        const res = await axios.get('/notificaciones/avisos/pendientes', {
+          headers: {
+            'x-usuario-nombre': usuarioLocal.usuario || usuarioLocal.nombre || '',
+            'x-usuario-rol':    usuarioLocal.rol || '',
+          },
+        })
+        if (res.data.length > 0) {
+          this.avisosVendedor      = res.data
+          this.avisoVendedorIdx    = 0
+          this.modalAvisosVendedor = true
+        }
+      } catch {}
+    }
   },
   methods: {
+    async confirmarAvisoVendedor() {
+      const usuario = JSON.parse(localStorage.getItem('usuario') || '{}')
+      const aviso   = this.avisosVendedor[this.avisoVendedorIdx]
+      try {
+        await axios.post(`/notificaciones/avisos/${aviso.id}/leer`, {}, {
+          headers: {
+            'x-usuario-nombre': usuario.usuario || usuario.nombre || '',
+          },
+        })
+      } catch {}
+      if (this.avisoVendedorIdx < this.avisosVendedor.length - 1) {
+        this.avisoVendedorIdx++
+      } else {
+        this.modalAvisosVendedor = false
+      }
+    },
+
     async cargarProductos() {
       const params = { limit: 100 }
       if (this.busqueda)          params.busqueda       = this.busqueda
@@ -2868,4 +2933,8 @@ export default {
 .btn-ok-precio      { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
 .btn-cancel-precio  { background: #DC2626; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
 .precio-orig-hint   { font-size: 0.72rem; color: var(--texto-muted); text-decoration: line-through; display: block; width: 100%; margin-top: 0.1rem; }
+.aviso-overlay-ventas { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.aviso-modal-ventas { background: #1A1A1A; color: #FFFFFF; border-radius: 12px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 1px solid #333; }
+.btn-confirmar-aviso-ventas { width: 100%; background: #FFCC00; color: #1A1A1A; border: none; padding: 0.75rem; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+.btn-confirmar-aviso-ventas:hover { background: #E6B800; }
 </style>
