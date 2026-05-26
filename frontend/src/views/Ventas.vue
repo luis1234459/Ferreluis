@@ -11,8 +11,10 @@
           <div class="selector-group">
             <span class="selector-label">Moneda:</span>
             <button :class="['btn-sel', monedaVenta === 'USD' ? 'activo' : '']"
+              :disabled="tipoPrecio === 'base'"
               @click="monedaVenta = 'USD'">USD</button>
             <button :class="['btn-sel', monedaVenta === 'Bs' ? 'activo' : '']"
+              :disabled="tipoPrecio === 'referencial'"
               @click="monedaVenta = 'Bs'">Bs</button>
           </div>
           <div class="selector-group">
@@ -708,6 +710,11 @@
                 <span>Vuelto:</span>
                 <strong class="txt-amarillo">{{ formatMonto(exceso, monedaVenta) }}</strong>
               </div>
+              <small v-if="tipoPrecio === 'base' && modoCobro === 'mixto'"
+                class="nota-tasa-mixto">
+                * Los pagos en Bs se valoran a tasa referencial
+                (BCV × Factor = Bs. {{ Math.round(tasaBcv * (factor || 1) * 100) / 100 }})
+              </small>
             </div>
           </template>
 
@@ -1428,6 +1435,13 @@ export default {
         item.precio_original = precio
         item.precio_unitario = precio
       })
+      if (nuevo === 'base') {
+        this.monedaVenta = 'USD'
+        this.modoCobro   = 'USD'
+      } else {
+        this.monedaVenta = 'Bs'
+        this.modoCobro   = 'Bs'
+      }
     },
     async agregar(p) {
       this.cargandoVariantes = true
@@ -1616,12 +1630,20 @@ export default {
 
     labelMetodo(metodo) { return LABELS[metodo] || metodo },
     calcularEquivalente(monto, monedaPago) {
-      if (!this.tasaBcv && monedaPago !== this.monedaVenta) return null
       if (monedaPago === this.monedaVenta) return Number(monto.toFixed(2))
-      if (monedaPago === 'USD' && this.monedaVenta === 'Bs')
-        return Number((monto * this.tasaBcv).toFixed(2))
-      if (monedaPago === 'Bs' && this.monedaVenta === 'USD')
-        return this.tasaBcv > 0 ? Number((monto / this.tasaBcv).toFixed(2)) : null
+
+      if (monedaPago === 'Bs' && this.monedaVenta === 'USD') {
+        if (!this.tasaBcv || this.tasaBcv <= 0) return null
+        const tasaConversion = this.tipoPrecio === 'base'
+          ? this.tasaBcv * (this.factor || 1)
+          : this.tasaBcv
+        return Number((monto / tasaConversion).toFixed(4))
+      }
+
+      if (monedaPago === 'USD' && this.monedaVenta === 'Bs') {
+        return this.tasaBcv > 0 ? Number((monto * this.tasaBcv).toFixed(2)) : null
+      }
+
       return null
     },
     calcularEquivPrevisualizacion() {
