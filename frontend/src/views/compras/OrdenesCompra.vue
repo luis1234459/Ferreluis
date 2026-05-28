@@ -136,10 +136,6 @@
                   <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
                 </select>
               </div>
-              <div class="field">
-                <label>Fecha esperada</label>
-                <input type="date" v-model="form.fecha_esperada" />
-              </div>
               <div class="field field-wide">
                 <label>Observación</label>
                 <input v-model="form.observacion" placeholder="Notas u observaciones" />
@@ -151,9 +147,13 @@
             <!-- Filtros de búsqueda de producto -->
             <div class="filtros-producto-oc">
               <input v-model="filtroBusquedaOC" class="filtro-busq-oc" placeholder="🔍 Buscar producto o código..." />
-              <select v-model="filtroDeptoOC" class="filtro-sel-oc">
+              <select v-model="filtroDeptoOC" class="filtro-sel-oc" @change="cargarCategoriasOC">
                 <option value="">Todos los departamentos</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+              </select>
+              <select v-model="filtroCategoriaOC" class="filtro-sel-oc" :disabled="!filtroDeptoOC">
+                <option value="">Todas las categorías</option>
+                <option v-for="c in categoriasOC" :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
               <select v-model="filtroProveedorOC" class="filtro-sel-oc">
                 <option value="">Todos los proveedores</option>
@@ -231,16 +231,17 @@ export default {
       filtroDeptoOC:      '',
       filtroProveedorOC:  '',
       filtroBusquedaOC:   '',
+      filtroCategoriaOC:  '',
+      categoriasOC:       [],
       ordenDetalle:       null,
       mostrarForm:        false,
       editandoId:         null,
       guardando:          false,
       error:              '',
       form: {
-        proveedor_id:   '',
-        fecha_esperada: '',
-        observacion:    '',
-        detalles:       [],
+        proveedor_id: '',
+        observacion:  '',
+        detalles:     [],
       },
     }
   },
@@ -273,6 +274,7 @@ export default {
               producto_id:    p.id,
               variante_id:    v.id,
               departamento_id:p.departamento_id || null,
+              categoria_id:   p.categoria_id    || null,
               proveedor_id:   p.proveedor_id    || null,
               label,
               labelBusq:      label.toLowerCase(),
@@ -287,6 +289,7 @@ export default {
             producto_id:    p.id,
             variante_id:    null,
             departamento_id:p.departamento_id || null,
+            categoria_id:   p.categoria_id    || null,
             proveedor_id:   p.proveedor_id    || null,
             label:          p.nombre,
             labelBusq:      p.nombre.toLowerCase(),
@@ -303,6 +306,10 @@ export default {
       if (this.filtroDeptoOC) {
         const id = parseInt(this.filtroDeptoOC)
         lista = lista.filter(o => o.departamento_id === id)
+      }
+      if (this.filtroCategoriaOC) {
+        const id = parseInt(this.filtroCategoriaOC)
+        lista = lista.filter(o => o.categoria_id === id)
       }
       if (this.filtroProveedorOC) {
         const id = parseInt(this.filtroProveedorOC)
@@ -340,23 +347,36 @@ export default {
         this.departamentos = res.data
       } catch {}
     },
+    async cargarCategoriasOC() {
+      if (!this.filtroDeptoOC) {
+        this.categoriasOC = []
+        this.filtroCategoriaOC = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/categorias', { params: { departamento_id: this.filtroDeptoOC } })
+        this.categoriasOC = res.data
+        this.filtroCategoriaOC = ''
+      } catch { this.categoriasOC = [] }
+    },
     _lineaVacia() {
       return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false }
     },
     abrirNueva() {
       this.editandoId = null
-      this.form = { proveedor_id: '', fecha_esperada: '', observacion: '', detalles: [] }
+      this.form = { proveedor_id: '', observacion: '', detalles: [] }
       this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
+      this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.agregarLinea()
       this.mostrarForm = true
     },
     editarOrden(o) {
       this.editandoId = o.id
       this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
+      this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.form = {
-        proveedor_id:   o.proveedor_id,
-        fecha_esperada: o.fecha_esperada ? o.fecha_esperada.split('T')[0] : '',
-        observacion:    o.observacion || '',
+        proveedor_id: o.proveedor_id,
+        observacion:  o.observacion || '',
         detalles: o.detalles.map(d => ({
           _key:               d.variante_id ? `${d.producto_id}_${d.variante_id}` : (d.producto_id ? `${d.producto_id}` : ''),
           producto_id:        d.producto_id  || null,
