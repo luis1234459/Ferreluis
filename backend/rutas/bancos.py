@@ -383,7 +383,7 @@ def deuda_proveedores(db: Session = Depends(get_db)):
             continue
         pagos_prov = db.query(MovimientoBancario).filter(
             MovimientoBancario.proveedor_id == p.id,
-            MovimientoBancario.tipo == "pago_proveedor",
+            MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
             MovimientoBancario.estado == "registrado",
         ).all()
         pagado = sum(
@@ -436,6 +436,36 @@ def pagar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(get_db
     return _serializar_movimiento(m, db)
 
 
+@router.post("/proveedores/{proveedor_id}/ajuste-deuda", dependencies=[Depends(require_admin)])
+def ajuste_deuda_proveedor(
+    proveedor_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    prov = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+    if not prov:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    monto = float(datos.get("monto", 0) or 0)
+    if monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
+    motivo = datos.get("motivo") or "Ajuste manual de deuda"
+    db.add(MovimientoBancario(
+        tipo              = "ajuste_deuda_proveedor",
+        monto             = monto,
+        moneda            = "USD",
+        cuenta_origen_id  = None,
+        cuenta_destino_id = None,
+        proveedor_id      = proveedor_id,
+        concepto          = f"Ajuste deuda: {motivo}",
+        registrado_por    = x_usuario_nombre or "admin",
+        referencia        = "AJUSTE-DEUDA",
+        monto_convertido  = monto,
+    ))
+    db.commit()
+    return {"ok": True, "monto_ajustado": monto}
+
+
 @router.get("/proveedores/{proveedor_id}/estado/", dependencies=[Depends(require_admin)])
 def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
     p = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
@@ -444,7 +474,7 @@ def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
     ordenes = db.query(OrdenCompra).filter(OrdenCompra.proveedor_id == proveedor_id).all()
     pagos   = db.query(MovimientoBancario).filter(
         MovimientoBancario.proveedor_id == proveedor_id,
-        MovimientoBancario.tipo == "pago_proveedor",
+        MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
         MovimientoBancario.estado == "registrado",
     ).order_by(MovimientoBancario.fecha.desc()).all()
     total_comprado = sum(float(o.total or 0) for o in ordenes if o.estado in ("recibida_parcial", "cerrada"))

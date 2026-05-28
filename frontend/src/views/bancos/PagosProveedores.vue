@@ -28,6 +28,7 @@
                     Registrar pago
                   </button>
                   <button class="btn-historial" @click="verHistorial(p.proveedor_id)">Historial</button>
+                  <button class="btn-ajuste-deuda" @click="abrirAjusteDeuda(p)">✏️ Ajustar deuda</button>
                 </td>
               </tr>
               <tr v-if="deuda.length === 0">
@@ -185,6 +186,39 @@
             </table>
           </div>
         </div>
+        <!-- Modal ajuste de deuda -->
+        <div class="overlay" v-if="modalAjusteDeuda" @click.self="modalAjusteDeuda = false">
+          <div class="modal" style="max-width:420px">
+            <div class="modal-header">
+              <h2>Ajustar deuda — {{ ajusteDeudaProv?.proveedor }}</h2>
+              <button class="btn-cerrar-modal" @click="modalAjusteDeuda = false">✕</button>
+            </div>
+            <div style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem">
+              <div class="field">
+                <label>Monto a descontar de la deuda (USD)</label>
+                <input v-model.number="ajusteMonto" type="number" min="0" step="0.01"
+                  placeholder="0.00" class="input-field" />
+              </div>
+              <div class="field">
+                <label>Motivo del ajuste</label>
+                <input v-model="ajusteMotivo"
+                  placeholder="ej: Nota de crédito, descuento acordado..."
+                  class="input-field" />
+              </div>
+              <p style="font-size:0.82rem;color:var(--texto-muted)">
+                ⚠ Este ajuste reduce la deuda registrada sin afectar las cuentas bancarias.
+              </p>
+            </div>
+            <div class="form-botones">
+              <button class="btn-cancelar" @click="modalAjusteDeuda = false">Cancelar</button>
+              <button class="btn-confirmar" @click="confirmarAjusteDeuda"
+                :disabled="ajustando || !ajusteMonto">
+                {{ ajustando ? 'Ajustando...' : 'Confirmar ajuste' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -207,6 +241,11 @@ export default {
       historial:        null,
       pagando:          false,
       errorPago:        '',
+      modalAjusteDeuda: false,
+      ajusteDeudaProv:  null,
+      ajusteMonto:      null,
+      ajusteMotivo:     '',
+      ajustando:        false,
       formPago: {
         cuenta_id:       '',
         monto:           '',
@@ -294,6 +333,30 @@ export default {
       const res = await axios.get(`/bancos/proveedores/${proveedorId}/estado/`)
       this.historial = res.data
     },
+    abrirAjusteDeuda(prov) {
+      this.ajusteDeudaProv  = prov
+      this.ajusteMonto      = null
+      this.ajusteMotivo     = ''
+      this.modalAjusteDeuda = true
+    },
+    async confirmarAjusteDeuda() {
+      if (!this.ajusteMonto || this.ajusteMonto <= 0) {
+        alert('Ingresa un monto válido')
+        return
+      }
+      this.ajustando = true
+      try {
+        await axios.post(
+          `/bancos/proveedores/${this.ajusteDeudaProv.proveedor_id}/ajuste-deuda`,
+          { monto: this.ajusteMonto, motivo: this.ajusteMotivo || 'Ajuste manual' },
+          { headers: { 'x-usuario-nombre': this.usuario.usuario || '' } }
+        )
+        this.modalAjusteDeuda = false
+        await this.cargar()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al ajustar deuda')
+      } finally { this.ajustando = false }
+    },
     formatFecha(iso) { return iso ? new Date(iso).toLocaleDateString('es-VE') : '—' },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },
@@ -333,4 +396,8 @@ export default {
 .aviso-sin-cuentas { display: block; margin-top: 0.25rem; font-size: 0.78rem; color: #DC2626; font-weight: 600; }
 .equiv-hist { font-size: 0.75rem; color: #16A34A; margin-left: 0.3rem; }
 .tasa-hist { font-size: 0.72rem; color: var(--texto-muted); margin-left: 0.3rem; }
+.btn-ajuste-deuda { background: #F1F5F9; border: 1px solid var(--borde); border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.82rem; cursor: pointer; color: var(--texto-sec); margin-left: 0.3rem; }
+.btn-ajuste-deuda:hover { border-color: #FFCC00; background: #FFFDF0; }
+.input-field { border: 1px solid var(--borde); border-radius: 6px; padding: 0.5rem 0.65rem; font-size: 0.875rem; color: var(--texto-principal); background: var(--fondo-app, #fff); width: 100%; box-sizing: border-box; }
+.input-field:focus { outline: none; border-color: #FFCC00; }
 </style>
