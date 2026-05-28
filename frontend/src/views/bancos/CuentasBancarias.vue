@@ -107,6 +107,25 @@
                 </select>
               </div>
               <div class="field field-wide"><label>Identificador (correo, cuenta, etc.)</label><input v-model="form.identificador" /></div>
+              <div class="field" v-if="editandoId">
+                <label>Saldo actual</label>
+                <div class="saldo-actual-display">
+                  {{ form.moneda === 'USD' ? '$' : 'Bs.' }}
+                  {{ Number(form.saldo_actual || 0).toFixed(2) }}
+                </div>
+              </div>
+              <div class="field" v-if="editandoId">
+                <label>Nuevo saldo <span class="label-hint">(dejar vacío para no cambiar)</span></label>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                  <span>{{ form.moneda === 'USD' ? '$' : 'Bs.' }}</span>
+                  <input v-model.number="form.nuevo_saldo" type="number" min="0" step="0.01"
+                    placeholder="Sin cambios" style="max-width:150px" />
+                </div>
+                <small class="label-hint"
+                  v-if="form.nuevo_saldo !== null && form.nuevo_saldo !== '' && form.saldo_actual !== null">
+                  Ajuste: {{ form.nuevo_saldo - form.saldo_actual >= 0 ? '+' : '' }}{{ (form.nuevo_saldo - form.saldo_actual).toFixed(2) }} {{ form.moneda === 'USD' ? 'USD' : 'Bs' }}
+                </small>
+              </div>
             </div>
             <div class="form-botones">
               <button class="btn-cancelar" @click="cerrarForm">Cancelar</button>
@@ -138,7 +157,7 @@ export default {
       editandoId:   null,
       guardando:    false,
       error:        '',
-      form: { nombre: '', banco: '', tipo_cuenta: 'personal', moneda: 'Bs', identificador: '' },
+      form: { nombre: '', banco: '', tipo_cuenta: 'personal', moneda: 'Bs', identificador: '', saldo_actual: null, nuevo_saldo: null },
     }
   },
   computed: {
@@ -173,12 +192,12 @@ export default {
     },
     abrirNueva() {
       this.editandoId = null
-      this.form = { nombre: '', banco: '', tipo_cuenta: 'personal', moneda: 'Bs', identificador: '' }
+      this.form = { nombre: '', banco: '', tipo_cuenta: 'personal', moneda: 'Bs', identificador: '', saldo_actual: null, nuevo_saldo: null }
       this.mostrarForm = true
     },
     editar(c) {
       this.editandoId = c.id
-      this.form = { nombre: c.nombre, banco: c.banco, tipo_cuenta: c.tipo_cuenta, moneda: c.moneda, identificador: c.identificador || '' }
+      this.form = { nombre: c.nombre, banco: c.banco, tipo_cuenta: c.tipo_cuenta, moneda: c.moneda, identificador: c.identificador || '', saldo_actual: c.saldo || 0, nuevo_saldo: null }
       this.mostrarForm = true
     },
     cerrarForm() { this.mostrarForm = false; this.error = '' },
@@ -187,7 +206,12 @@ export default {
       this.guardando = true; this.error = ''
       try {
         if (this.editandoId) {
-          await axios.put(`/bancos/cuentas/${this.editandoId}`, this.form)
+          const payload = { ...this.form }
+          if (payload.nuevo_saldo === null || payload.nuevo_saldo === '') {
+            delete payload.nuevo_saldo
+          }
+          delete payload.saldo_actual
+          await axios.put(`/bancos/cuentas/${this.editandoId}`, payload)
         } else {
           await axios.post('/bancos/cuentas/', this.form)
         }
@@ -240,4 +264,6 @@ export default {
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+.saldo-actual-display { padding: 0.5rem 0.75rem; background: var(--fondo-sidebar, #F8F8F8); border: 1px solid var(--borde); border-radius: 6px; font-weight: 700; font-size: 0.95rem; color: var(--texto-principal); }
+.label-hint { font-size: 0.72rem; color: var(--texto-muted); font-weight: 400; }
 </style>

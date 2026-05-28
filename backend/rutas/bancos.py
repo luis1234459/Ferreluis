@@ -183,6 +183,25 @@ def editar_cuenta(cuenta_id: int, datos: dict, db: Session = Depends(get_db)):
         if k in datos:
             setattr(c, k, datos[k])
     db.commit()
+
+    if "nuevo_saldo" in datos and datos["nuevo_saldo"] is not None:
+        nuevo_saldo  = float(datos["nuevo_saldo"])
+        saldo_actual = _saldo_cuenta(c.id, db)
+        diferencia   = round(nuevo_saldo - saldo_actual, 2)
+        if abs(diferencia) > 0.01:
+            tipo_mov = "ingreso_externo" if diferencia > 0 else "retiro"
+            db.add(MovimientoBancario(
+                tipo              = tipo_mov,
+                monto             = abs(diferencia),
+                moneda            = c.moneda,
+                cuenta_origen_id  = c.id if diferencia < 0 else None,
+                cuenta_destino_id = c.id if diferencia > 0 else None,
+                concepto          = f"Ajuste manual de saldo — cuenta {c.nombre}",
+                registrado_por    = "admin",
+                referencia        = "AJUSTE-SALDO",
+            ))
+            db.commit()
+
     return _serializar_cuenta(c, db)
 
 
