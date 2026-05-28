@@ -47,6 +47,41 @@
             </ul>
           </div>
 
+          <!-- ══ PEDIDOS EN CAMINO (admin + vendedor) ══ -->
+          <div class="pedidos-camino" v-if="pedidosEnCamino.length > 0">
+            <h3 class="seccion-titulo">
+              🚚 Pedidos en camino
+              <span class="badge-count">{{ pedidosEnCamino.length }}</span>
+            </h3>
+            <div v-for="p in pedidosEnCamino" :key="p.id" class="pedido-card">
+              <div class="pedido-header"
+                @click="ordenExpandida = ordenExpandida === p.id ? null : p.id">
+                <span class="pedido-num">{{ p.numero }}</span>
+                <span class="pedido-prov">{{ p.proveedor }}</span>
+                <span :class="['pedido-estado', p.estado === 'aprobada' ? 'estado-aprobada' : 'estado-parcial']">
+                  {{ p.estado === 'aprobada' ? 'En camino' : 'Recibido parcial' }}
+                </span>
+                <span class="pedido-fecha">{{ p.fecha }}</span>
+                <span class="pedido-total">${{ p.total.toFixed(2) }}</span>
+                <span class="pedido-toggle">{{ ordenExpandida === p.id ? '▲' : '▼' }}</span>
+              </div>
+              <div v-if="ordenExpandida === p.id" class="pedido-detalle">
+                <table class="tabla-pedido">
+                  <thead>
+                    <tr><th>Producto</th><th>Cantidad</th><th>Precio USD</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(prod, i) in p.productos" :key="i">
+                      <td>{{ prod.nombre }}</td>
+                      <td style="text-align:center">{{ prod.cantidad }}</td>
+                      <td>${{ prod.precio.toFixed(2) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- ══ DASHBOARD ADMIN ══ -->
           <template v-if="esAdmin">
 
@@ -337,6 +372,8 @@ export default {
         alertas: [], ultimas_ventas: [], productos_alerta: [], facturas_pendientes: [],
         ultimas_compras: [], productos_precio_subio: [],
       },
+      pedidosEnCamino: [],
+      ordenExpandida:  null,
       _timer: null,
     }
   },
@@ -368,6 +405,7 @@ export default {
       try {
         const res = await axios.get('/dashboard/resumen')
         this.d = res.data
+        this.pedidosEnCamino = res.data.pedidos_en_camino || []
       } catch (e) {
         console.error('Error cargando dashboard', e)
       } finally {
@@ -471,4 +509,24 @@ export default {
 
 .kpis-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
 @media (max-width: 700px) { .kpis-grid-3 { grid-template-columns: 1fr 1fr; } }
+
+/* Pedidos en camino */
+.pedidos-camino { margin-bottom: 1.5rem; }
+.seccion-titulo { font-size: 0.95rem; font-weight: 700; color: var(--texto-principal); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.badge-count { background: #1A1A1A; color: #FFCC00; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 10px; }
+.pedido-card { border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+.pedido-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; background: #FAFAF7; flex-wrap: wrap; }
+.pedido-header:hover { background: #F0F0E8; }
+.pedido-num { font-weight: 700; color: #996600; font-size: 0.85rem; min-width: 80px; }
+.pedido-prov { flex: 1; font-size: 0.85rem; font-weight: 600; color: var(--texto-principal); }
+.pedido-estado { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 4px; }
+.estado-aprobada { background: #DCFCE7; color: #15803D; }
+.estado-parcial { background: #FEF9C3; color: #854D0E; }
+.pedido-fecha { font-size: 0.78rem; color: var(--texto-muted); }
+.pedido-total { font-weight: 700; font-size: 0.9rem; color: var(--texto-principal); }
+.pedido-toggle { font-size: 0.75rem; color: var(--texto-muted); }
+.pedido-detalle { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
+.tabla-pedido { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.tabla-pedido th { font-size: 0.75rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--borde); }
+.tabla-pedido td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
 </style>

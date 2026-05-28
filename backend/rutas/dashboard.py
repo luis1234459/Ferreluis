@@ -224,6 +224,39 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             "fecha":         rec_p.fecha_recepcion.isoformat() if rec_p and rec_p.fecha_recepcion else None,
         })
 
+    # ── Pedidos en camino (últimos 15 días) ──────────────────────────────────
+    hace_15 = datetime.utcnow() - timedelta(days=15)
+
+    ordenes_camino = db.query(models.OrdenCompra).filter(
+        models.OrdenCompra.estado.in_(["aprobada", "recibida_parcial"]),
+        models.OrdenCompra.fecha_creacion >= hace_15,
+    ).order_by(models.OrdenCompra.fecha_creacion.desc()).all()
+
+    pedidos_en_camino = []
+    for oc in ordenes_camino:
+        prov = db.query(models.Proveedor).filter(
+            models.Proveedor.id == oc.proveedor_id
+        ).first()
+        detalles = db.query(models.DetalleOrdenCompra).filter(
+            models.DetalleOrdenCompra.orden_id == oc.id
+        ).all()
+        pedidos_en_camino.append({
+            "id":        oc.id,
+            "numero":    oc.numero,
+            "proveedor": prov.nombre if prov else "—",
+            "estado":    oc.estado,
+            "fecha":     oc.fecha_creacion.strftime('%d/%m/%Y') if oc.fecha_creacion else "—",
+            "total":     float(oc.total or 0),
+            "productos": [
+                {
+                    "nombre":   d.nombre_producto,
+                    "cantidad": d.cantidad_pedida,
+                    "precio":   float(d.precio_unitario_usd or 0),
+                }
+                for d in detalles
+            ],
+        })
+
     return {
         "ventas_hoy":                 ventas_hoy_count,
         "total_hoy_usd":              round(total_hoy_usd, 2),
@@ -246,4 +279,5 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         "facturas_pendientes":        facturas_pendientes,
         "ultimas_compras":            ultimas_compras[:15],
         "productos_precio_subio":     productos_precio_subio[:10],
+        "pedidos_en_camino":          pedidos_en_camino,
     }
