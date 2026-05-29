@@ -367,48 +367,53 @@
               <button class="btn-cerrar-modal" @click="cancelar">✕</button>
             </div>
 
+            <!-- Aviso modo vendedor -->
+            <div v-if="esVendedor" class="aviso-solo-foto">
+              Solo puedes editar la URL de imagen del producto.
+            </div>
+
             <div class="grid-form">
               <div class="field field-wide">
                 <label>Nombre *</label>
-                <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" />
+                <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" :disabled="esVendedor" />
               </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Código</label>
-                <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" />
+                <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" :disabled="esVendedor" />
               </div>
               <div class="field" v-else>
                 <label>Prefijo generador <small class="txt-muted">(base para códigos de variantes)</small></label>
-                <input v-model="form.codigo" placeholder="Ej: CABLE-12 (sugerencia para variantes)" class="input-prefijo" />
+                <input v-model="form.codigo" placeholder="Ej: CABLE-12 (sugerencia para variantes)" class="input-prefijo" :disabled="esVendedor" />
               </div>
               <div class="field">
                 <label>Departamento</label>
-                <select v-model="form.departamento_id" @change="form.categoria_id = null">
+                <select v-model="form.departamento_id" @change="form.categoria_id = null" :disabled="esVendedor">
                   <option :value="null">— Sin departamento —</option>
                   <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Categoría</label>
-                <select v-model="form.categoria_id">
+                <select v-model="form.categoria_id" :disabled="esVendedor">
                   <option :value="null">— Sin categoría —</option>
                   <option v-for="c in categoriasDelForm" :key="c.id" :value="c.id">{{ c.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Proveedor principal</label>
-                <select v-model="form.proveedor_id">
+                <select v-model="form.proveedor_id" :disabled="esVendedor">
                   <option :value="null">— Sin proveedor —</option>
                   <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Costo USD</label>
-                <input v-model.number="form.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" />
+                <input v-model.number="form.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" :disabled="esVendedor" />
               </div>
               <div class="field">
                 <label>Margen (%)</label>
                 <input v-model.number="form.margen_pct" type="number" min="0" max="999" step="1"
-                  placeholder="Ej: 30" @input="actualizarMargen" />
+                  placeholder="Ej: 30" @input="actualizarMargen" :disabled="esVendedor" />
               </div>
               <div class="field">
                 <label>Descuento máximo en ventas %
@@ -420,13 +425,14 @@
                     type="number" min="0" max="100" step="0.5"
                     placeholder="Sin límite"
                     style="max-width:100px"
+                    :disabled="esVendedor"
                   />
                   <span>%</span>
                 </div>
               </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
-                <input v-model.number="form.stock" type="number" min="0" placeholder="0" />
+                <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="esVendedor" />
               </div>
               <div class="field" v-else>
                 <label>Stock</label>
@@ -434,7 +440,7 @@
               </div>
               <div class="field">
                 <label>Descripción</label>
-                <input v-model="form.descripcion" placeholder="Descripción opcional" />
+                <input v-model="form.descripcion" placeholder="Descripción opcional" :disabled="esVendedor" />
               </div>
               <div class="field field-wide">
                 <label>URL de imagen (foto)</label>
@@ -454,7 +460,7 @@
             </div>
 
             <!-- Opciones especiales -->
-            <div class="opciones-especiales">
+            <div class="opciones-especiales" v-if="!esVendedor">
               <!-- Genericidad — solo admin -->
               <div class="campo-seccion" v-if="esAdmin">
                 <label class="campo-toggle-row">
@@ -508,7 +514,7 @@
             </div>
 
             <!-- Garantía -->
-            <div class="opciones-especiales" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+            <div class="opciones-especiales" v-if="!esVendedor" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
               <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Garantía</p>
               <label class="check-opt">
                 <input type="checkbox" v-model="form.requiere_serial" />
@@ -529,7 +535,7 @@
             </div>
 
             <!-- Unidad de medida y paquete -->
-            <div class="opciones-especiales" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+            <div class="opciones-especiales" v-if="!esVendedor" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
               <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Unidad de medida</p>
               <div class="campo-fila">
                 <div class="field" style="flex:1">
@@ -567,7 +573,7 @@
             </div>
 
             <!-- Preview precios -->
-            <div class="preview-precios" v-if="form.costo_usd > 0 && form.margen > 0">
+            <div class="preview-precios" v-if="!esVendedor && form.costo_usd > 0 && form.margen > 0">
               <p class="preview-titulo">Vista previa de precios</p>
               <div class="preview-row">
                 <span>Precio base (USD):</span>
@@ -1184,7 +1190,8 @@ export default {
   },
 
   computed: {
-    esAdmin() { return this.usuario.rol === 'admin' },
+    esAdmin()    { return this.usuario.rol === 'admin' },
+    esVendedor() { return this.usuario.rol === 'vendedor' },
 
     precioEfectivoVariante() {
       if (!this.modalVariantes) return '0.0000'
@@ -1428,6 +1435,17 @@ export default {
       this.mostrarForm = true
     },
     async guardar() {
+      if (this.esVendedor) {
+        this.guardando = true; this.error = ''
+        try {
+          await axios.put(`/productos/${this.form.id}`, { foto_url: this.form.foto_url || '' })
+          await this.cargarProductos()
+          this.cancelar()
+        } catch (e) {
+          this.error = e?.response?.data?.detail || 'Error al guardar'
+        } finally { this.guardando = false }
+        return
+      }
       if (!this.form.nombre.trim()) { this.error = 'El nombre es obligatorio'; return }
       this.guardando = true; this.error = ''
       try {
@@ -2133,6 +2151,7 @@ export default {
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .fila-stock-bajo td { background: #DC262608; }
 .aviso-stock-variantes { font-size: 0.82rem; color: var(--texto-muted); background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0; }
+.aviso-solo-foto { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #92400E; font-weight: 600; }
 .stock-variantes { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .sv-chip { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 4px; background: #F0F9FF; border: 1px solid #BAE6FD; color: #0369A1; white-space: nowrap; }
 .sv-chip.sv-bajo { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
