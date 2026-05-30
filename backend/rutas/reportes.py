@@ -486,6 +486,9 @@ def ventas_resumen_dia(
                 "promedio_diario": promedio_diario,
                 "dias_cobertura":  dias_cobertura,
                 "semaforo":        semaforo,
+                "auditado":            bool(prod.auditado) if prod else False,
+                "auditoria_pendiente": bool(prod.auditoria_pendiente) if prod else False,
+                "fecha_auditoria":     prod.fecha_auditoria.strftime('%d/%m/%Y') if prod and prod.fecha_auditoria else None,
             })
 
     # ── Facturas agrupadas por venta ─────────────────────────────────────────

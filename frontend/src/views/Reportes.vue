@@ -85,7 +85,7 @@
                 <tr>
                   <th>Hora</th><th>Venta</th><th>Producto</th><th>Cant.</th>
                   <th>Precio unit.</th><th>Subtotal</th><th>USD</th><th>Vendedor</th>
-                  <th>Costo</th><th>Margen</th><th>Ganancia</th><th>Stock</th>
+                  <th>Costo</th><th>Margen</th><th>Ganancia</th><th>Stock</th><th>Auditoría</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,9 +125,20 @@
                       <span class="dias-cob" v-if="l.dias_cobertura < 999">{{ l.dias_cobertura }}d</span>
                     </div>
                   </td>
+                  <td>
+                    <span v-if="l.auditoria_pendiente" class="badge-audit-pendiente"
+                      title="Faltante pendiente de autorización admin">
+                      ⚠ Pendiente
+                    </span>
+                    <span v-else-if="l.auditado" class="badge-audit-ok"
+                      :title="'Auditado: ' + (l.fecha_auditoria || '')">
+                      ✓ {{ l.fecha_auditoria || 'Auditado' }}
+                    </span>
+                    <span v-else class="badge-audit-sin">Sin auditar</span>
+                  </td>
                 </tr>
                 <tr v-if="!datos.lineas_productos || datos.lineas_productos.length === 0">
-                  <td colspan="12" class="sin-datos">Sin ventas en el período</td>
+                  <td colspan="13" class="sin-datos">Sin ventas en el período</td>
                 </tr>
               </tbody>
             </table>
@@ -1131,6 +1142,9 @@ export default {
 .punto-verde    { color: #16A34A; font-size: 1rem; }
 .stock-num { font-size: 0.82rem; font-weight: 700; }
 .dias-cob  { font-size: 0.72rem; color: var(--texto-muted); }
+.badge-audit-ok       { background: #DCFCE7; color: #15803D; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; white-space: nowrap; }
+.badge-audit-pendiente{ background: #FEF3C7; color: #92400E; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; white-space: nowrap; }
+.badge-audit-sin      { background: #F1F5F9; color: #6B7280; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; white-space: nowrap; }
 
 /* ── Facturas del día ── */
 .facturas-dia { margin-top: 2rem; }
