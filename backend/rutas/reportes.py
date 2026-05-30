@@ -455,12 +455,14 @@ def ventas_resumen_dia(
                 (var_obj.costo_usd if var_obj and var_obj.costo_usd is not None
                  else prod.costo_usd) or 0
             ) if prod else 0
-            margen_dec = float(
-                (var_obj.margen if var_obj and var_obj.margen is not None
-                 else prod.margen) or 0
-            ) if prod else 0
-            ganancia_usd = round(subtotal_usd - (costo_unit * cantidad), 2)
-            margen_pct   = round(margen_dec * 100, 1)
+            if v.moneda_venta == "Bs" and v.tipo_precio_usado == "referencial":
+                factor = float(v.factor_cambio or 1)
+                precio_base_equiv = precio_usd / factor if factor > 0 else precio_usd
+                ganancia_usd = round((precio_base_equiv - costo_unit) * cantidad, 2)
+                margen_pct   = round((precio_base_equiv - costo_unit) / precio_base_equiv * 100, 1) if precio_base_equiv > 0 else 0
+            else:
+                ganancia_usd = round((precio_usd - costo_unit) * cantidad, 2)
+                margen_pct   = round((precio_usd - costo_unit) / precio_usd * 100, 1) if precio_usd > 0 else 0
             stock_actual    = int(prod.stock or 0) if prod else 0
             stock_min       = int(prod.stock_minimo or 0) if prod else 0
             vendidos_30d    = ventas_30d.get(d.producto_id, 0)
