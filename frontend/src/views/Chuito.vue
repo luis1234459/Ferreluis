@@ -8,7 +8,7 @@
           <!-- Avatar Chuito -->
           <div class="chuito-avatar-wrap">
             <div class="chuito-avatar" :class="estadoAvatar">
-              <img src="/img/chuito.png"
+              <img src="/chuito.png"
                    alt="Chuito"
                    class="chuito-img"
                    :class="{
