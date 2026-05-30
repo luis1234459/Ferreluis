@@ -52,6 +52,8 @@
             </div>
             <button class="btn-filtrar" @click="cargar">Filtrar</button>
             <button class="btn-rapido" @click="setHoy">Hoy</button>
+            <button class="btn-rapido" @click="setAyer">Ayer</button>
+            <button class="btn-rapido" @click="setHace2Dias">Hace 2 días</button>
             <button class="btn-rapido" @click="setSemana">Semana</button>
             <button class="btn-rapido" @click="setMes">Mes</button>
             <button class="btn-rapido" @click="setAnio">Año</button>
@@ -902,6 +904,16 @@ export default {
     setHoy() {
       const d = new Date().getDate()
       this.desdeDia = d; this.hastaDia = d; this.cargar()
+    },
+    setAyer() {
+      const d = new Date()
+      d.setDate(d.getDate() - 1)
+      this.desdeDia = d.getDate(); this.hastaDia = d.getDate(); this.cargar()
+    },
+    setHace2Dias() {
+      const d = new Date()
+      d.setDate(d.getDate() - 2)
+      this.desdeDia = d.getDate(); this.hastaDia = d.getDate(); this.cargar()
     },
     setSemana() {
       const hoy = new Date()
