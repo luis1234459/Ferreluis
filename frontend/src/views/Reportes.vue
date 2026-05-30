@@ -536,6 +536,55 @@
           </div>
         </template>
 
+        <!-- Inventario → Conteos físicos -->
+        <template v-if="tabMain === 'inventario' && tabSub === 'conteos'">
+          <div v-if="!datos || datos.length === 0" class="sin-datos-box">
+            No hay conteos registrados en el período
+          </div>
+          <div v-else>
+            <div v-for="conteo in datos" :key="conteo.id" class="conteo-card">
+              <div class="conteo-header"
+                @click="conteoExpandido = conteoExpandido === conteo.id ? null : conteo.id">
+                <span class="conteo-fecha">
+                  {{ new Date(conteo.fecha).toLocaleDateString('es-VE',
+                    { day:'2-digit', month:'2-digit', year:'numeric',
+                      hour:'2-digit', minute:'2-digit' }) }}
+                </span>
+                <span class="conteo-usuario">{{ conteo.usuario }}</span>
+                <span class="conteo-desc">{{ conteo.descripcion }}</span>
+                <span class="badge-count">{{ conteo.productos_afectados }} productos</span>
+                <span class="conteo-toggle">{{ conteoExpandido === conteo.id ? '▲' : '▼' }}</span>
+              </div>
+              <div v-if="conteoExpandido === conteo.id" class="conteo-detalle">
+                <table class="tabla-conteo">
+                  <thead>
+                    <tr>
+                      <th>Producto</th><th>Stock sistema</th>
+                      <th>Contado</th><th>Diferencia</th><th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, i) in parsearConteo(conteo.detalle_json)" :key="i"
+                      :class="item.estado === 'pendiente' ? 'fila-pendiente' : ''">
+                      <td>{{ item.nombre }}</td>
+                      <td style="text-align:center">{{ item.stock_sistema ?? item.stock_anterior }}</td>
+                      <td style="text-align:center">{{ item.conteo ?? item.stock_nuevo }}</td>
+                      <td style="text-align:center"
+                        :class="item.diferencia < 0 ? 'txt-rojo' : item.diferencia > 0 ? 'txt-verde' : ''">
+                        {{ item.diferencia > 0 ? '+' : '' }}{{ item.diferencia }}
+                      </td>
+                      <td>
+                        <span v-if="item.estado === 'pendiente'" class="badge-audit-pendiente">⚠ Pendiente</span>
+                        <span v-else class="badge-audit-ok">✓ OK</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <!-- ══════════════════════════════════════════════════════════════════
              OTROS
         ═══════════════════════════════════════════════════════════════════ -->
@@ -776,6 +825,7 @@ const SUBTABS = {
     { key: 'proveedor',    label: 'Por proveedor' },
     { key: 'pareto',       label: 'Pareto' },
     { key: 'rotacion',     label: 'Rotación' },
+    { key: 'conteos',      label: 'Conteos físicos' },
   ],
   otros: [
     { key: 'cierres',  label: 'Cierres' },
@@ -799,6 +849,7 @@ const URL_MAP = {
   'inventario-proveedor':    '/reportes/inventario/por-proveedor',
   'inventario-pareto':       '/reportes/inventario/pareto',
   'inventario-rotacion':     '/reportes/inventario/rotacion',
+  'inventario-conteos':      '/ajustes/historial',
   'otros-cierres':           '/reportes/cierre/comparativo',
   'otros-clientes':          '/reportes/clientes/resumen',
 }
@@ -807,7 +858,7 @@ const CON_FILTROS = new Set([
   'ventas-resumen_dia', 'ventas-periodo', 'ventas-metodos', 'ventas-departamento',
   'ventas-proveedor', 'ventas-pareto', 'ventas-vendedor', 'ventas-top',
   'compras-proveedor', 'compras-departamento',
-  'inventario-pareto', 'inventario-rotacion', 'otros-clientes',
+  'inventario-pareto', 'inventario-rotacion', 'inventario-conteos', 'otros-clientes',
 ])
 
 export default {
@@ -828,6 +879,7 @@ export default {
       panelCargando:      false,
       listaReposicion:    [],
       verListaReposicion: false,
+      conteoExpandido:    null,
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -901,6 +953,9 @@ export default {
           if (this.fechaDesde) params.desde = this.fechaDesde
           if (this.fechaHasta) params.hasta = this.fechaHasta
         }
+        if (this.tabKey === 'inventario-conteos') {
+          params.tipo = 'auditoria'
+        }
         const res  = await axios.get(url, { params })
         this.datos    = res.data
         this.facturas = res.data.facturas || []
@@ -947,6 +1002,9 @@ export default {
     exportar() { alert('Función disponible próximamente') },
     labelMetodo(m) { return LABELS_METODO[m] || m },
     formatFecha(iso) { return iso ? new Date(iso).toLocaleString('es-VE') : '—' },
+    parsearConteo(jsonStr) {
+      try { return JSON.parse(jsonStr || '[]') } catch { return [] }
+    },
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     },
@@ -1088,6 +1146,19 @@ export default {
 
 /* Cierres */
 .cierre-card    { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--borde); }
+.sin-datos-box { padding: 2rem; text-align: center; color: var(--texto-muted); font-size: 0.9rem; }
+.conteo-card { border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+.conteo-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; background: #FAFAF7; flex-wrap: wrap; }
+.conteo-header:hover { background: #F0F0E8; }
+.conteo-fecha { font-size: 0.8rem; color: var(--texto-muted); min-width: 130px; }
+.conteo-usuario { font-weight: 700; font-size: 0.85rem; color: #996600; min-width: 100px; }
+.conteo-desc { flex: 1; font-size: 0.85rem; color: var(--texto-principal); }
+.conteo-toggle { font-size: 0.75rem; color: var(--texto-muted); }
+.conteo-detalle { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
+.tabla-conteo { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.tabla-conteo th { font-size: 0.75rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--borde); }
+.tabla-conteo td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
+.fila-pendiente td { background: #FFFBEB; }
 .cierre-header  { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
 .cierre-id      { color: var(--texto-principal); font-weight: 700; }
 .cierre-fecha   { color: var(--texto-muted); font-size: 0.88rem; }
