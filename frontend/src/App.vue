@@ -2,24 +2,6 @@
   <div>
     <router-view />
 
-    <!-- Chuito flotante (gestionador) -->
-    <div v-if="!modalAvisos"
-      class="chuito-flotante"
-      :class="estadoChuito === 'alerta' ? 'chuito-alerta' : 'chuito-atento'"
-      @click="estadoChuito === 'alerta' ? modalAvisos = true : $router.push('/chuito')">
-      <div class="chuito-img-wrap">
-        <img src="/chuito.png" alt="Chuito" class="chuito-flotante-img"/>
-        <span v-if="estadoChuito === 'atento'" class="chuito-carpeta">📋</span>
-        <span v-if="estadoChuito === 'alerta'" class="chuito-flotante-badge">
-          {{ avisosGestionador.length }}
-        </span>
-      </div>
-      <div class="chuito-flotante-burbuja">
-        <span v-if="estadoChuito === 'atento'">Hermanito, cualquier falla me decís... 📋</span>
-        <span v-else>{{ burbujas[burbujaIdx] }}</span>
-      </div>
-    </div>
-
     <!-- Modal avisos mejorado (gestionador) -->
     <div v-if="modalAvisos && avisosGestionador.length > 0"
       class="aviso-overlay"

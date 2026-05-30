@@ -959,7 +959,7 @@
   </div>
 
   <!-- Chuito flotante (vendedor/cajero) -->
-  <div v-if="!modalAvisosVendedor"
+  <div v-if="!modalAvisosVendedor && usuario.rol === 'vendedor'"
     class="chuito-flotante-v"
     :class="estadoChuitoV === 'alerta' ? 'chuito-alerta-v' : 'chuito-atento-v'"
     @click="estadoChuitoV === 'alerta' ? modalAvisosVendedor = true : $router.push('/chuito')">
