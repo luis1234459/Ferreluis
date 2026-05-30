@@ -542,17 +542,23 @@ def listar_productos(
     if not incluir_inactivos:
         q = q.filter(Producto.activo == True)
     if busqueda:
-        from sqlalchemy import or_
+        from sqlalchemy import or_, and_
         variante_ids = db.query(VarianteProducto.producto_id).filter(
             VarianteProducto.codigo.ilike(f"%{busqueda}%")
         ).subquery()
         catalogo_ids_busq = db.query(CatalogoProveedor.producto_id).filter(
             CatalogoProveedor.codigo_proveedor.ilike(f"%{busqueda}%")
         ).subquery()
+        terminos = [t.strip() for t in busqueda.replace('-', ' ').split() if t.strip()]
+        if terminos:
+            condicion_nombre = and_(*[Producto.nombre.ilike(f"%{t}%") for t in terminos])
+        else:
+            condicion_nombre = Producto.nombre.ilike(f"%{busqueda}%")
+        condicion_codigo = Producto.codigo.ilike(f"%{busqueda}%")
         q = q.filter(
             or_(
-                Producto.nombre.ilike(f"%{busqueda}%"),
-                Producto.codigo.ilike(f"%{busqueda}%"),
+                condicion_nombre,
+                condicion_codigo,
                 Producto.id.in_(variante_ids),
                 Producto.id.in_(catalogo_ids_busq),
             )
