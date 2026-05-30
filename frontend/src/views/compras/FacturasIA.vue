@@ -971,6 +971,10 @@ export default {
         this.descuentoPct   = 0
       }
 
+      if (p.descuento_pct && p.descuento_pct > 0 && this.lineas.length > 0) {
+        this.$nextTick(() => this.aplicarDescuento())
+      }
+
       const nombreIA = (this.proveedorNombreIA || '').trim()
       if (nombreIA && nombreIA.toLowerCase() !== p.nombre.toLowerCase()) {
         const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
@@ -1016,6 +1020,9 @@ export default {
         if (data.descuento_pct && data.descuento_pct > 0) {
           this.tieneDescuento = true
           this.descuentoPct   = data.descuento_pct
+          if (this.lineas.length > 0) {
+            this.$nextTick(() => this.aplicarDescuento())
+          }
         }
 
         if (data.es_nuevo) {
