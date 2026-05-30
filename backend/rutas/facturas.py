@@ -129,12 +129,21 @@ async def escanear_factura(archivo: UploadFile = File(...)):
                         '      "codigo_proveedor": "código del proveedor si aparece o vacío",\n'
                         '      "cantidad": numero,\n'
                         '      "precio_unitario": numero,\n'
+                        '      "descuento_linea_pct": numero o null,\n'
                         '      "subtotal_linea": numero o null\n'
                         "    }\n"
                         "  ]\n"
                         "}\n"
-                        "IMPORTANTE: Si la factura incluye IVA u otros impuestos, inclúyelos en el total final.\n"
-                        "No separes IVA — trabaja siempre con valores finales netos.\n"
+                        "IMPORTANTE:\n"
+                        "- precio_unitario: si la factura tiene columna 'precio neto', 'precio neto unitario' o 'net price' "
+                        "(precio después de descuento por línea), usar ESE valor. "
+                        "Si no existe columna neta, aplicar el descuento % al precio unitario bruto. "
+                        "NUNCA usar el precio bruto si hay precio neto disponible.\n"
+                        "- Si la factura tiene descuento por línea (columna % DESC, DESCUENTO % o similar), "
+                        "precio_unitario debe ser el precio DESPUÉS de ese descuento. "
+                        "descuento_linea_pct debe capturar el porcentaje de descuento de cada línea.\n"
+                        "- Si la factura incluye IVA u otros impuestos, inclúyelos en el total final. "
+                        "No separes IVA — trabaja siempre con valores finales netos. "
                         "precio_unitario debe ser el costo final unitario incluyendo cualquier impuesto proporcional."
                     ),
                 },
