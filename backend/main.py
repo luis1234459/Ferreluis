@@ -60,6 +60,9 @@ app.include_router(garantias.router)
 app.include_router(admin.router)
 app.include_router(notificaciones.router)
 
+from rutas import chuito as _chuito_mod
+app.include_router(_chuito_mod.router, prefix="/chuito")
+
 
 @app.on_event("startup")
 def inicializar_datos():
@@ -184,6 +187,28 @@ def inicializar_datos():
         migrar(
             ["ALTER TABLE proveedores ADD COLUMN descuento_max_pct FLOAT"],
             ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
+        )
+
+        # ── mensajes_chuito ──────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS mensajes_chuito (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo VARCHAR NOT NULL,
+                vendedor VARCHAR NOT NULL,
+                mensaje VARCHAR NOT NULL,
+                detalle TEXT,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                leido_admin BOOLEAN DEFAULT 0
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS mensajes_chuito (
+                id SERIAL PRIMARY KEY,
+                tipo VARCHAR NOT NULL,
+                vendedor VARCHAR NOT NULL,
+                mensaje VARCHAR NOT NULL,
+                detalle TEXT,
+                fecha TIMESTAMP DEFAULT NOW(),
+                leido_admin BOOLEAN DEFAULT FALSE
+            )"""],
         )
 
         # ── avisos_vistos ────────────────────────────────────────────────────

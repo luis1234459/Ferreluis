@@ -793,6 +793,18 @@ class Aviso(Base):
     destinatario = Column(String,   nullable=True)  # None = todos, o nombre usuario específico
 
 
+class MensajeChuito(Base):
+    __tablename__ = "mensajes_chuito"
+
+    id          = Column(Integer,  primary_key=True, index=True)
+    tipo        = Column(String,   nullable=False)  # "venta_perdida"|"falta_producto"|"mensaje_jefe"|"logro"
+    vendedor    = Column(String,   nullable=False)
+    mensaje     = Column(String,   nullable=False)
+    detalle     = Column(String,   nullable=True)   # JSON con datos del reporte
+    fecha       = Column(DateTime, default=datetime.utcnow)
+    leido_admin = Column(Boolean,  default=False)
+
+
 class AvisoVisto(Base):
     __tablename__ = "avisos_vistos"
 

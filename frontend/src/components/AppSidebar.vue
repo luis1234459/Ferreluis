@@ -133,7 +133,8 @@ const GRUPOS = [
     nombre: 'Comunicación',
     rutas: ['/avisos'],
     items: [
-      { ruta: '/avisos', label: 'Avisos', siempre: true },
+      { ruta: '/avisos',  label: 'Avisos',        siempre: true },
+      { ruta: '/chuito', label: '🔧 Chuito',      siempre: true },
     ],
   },
   {
