@@ -958,28 +958,47 @@
 
   </div>
 
-  <!-- Modal avisos bloqueante para vendedor/cajero -->
+  <!-- Chuito flotante (vendedor/cajero) -->
+  <div v-if="!modalAvisosVendedor"
+    class="chuito-flotante-v"
+    :class="estadoChuitoV === 'alerta' ? 'chuito-alerta-v' : 'chuito-atento-v'"
+    @click="estadoChuitoV === 'alerta' ? modalAvisosVendedor = true : $router.push('/chuito')">
+    <div class="chuito-img-wrap-v">
+      <img src="/chuito.png" alt="Chuito" class="chuito-flotante-img-v"/>
+      <span v-if="estadoChuitoV === 'atento'" class="chuito-carpeta-v">📋</span>
+      <span v-if="estadoChuitoV === 'alerta'" class="chuito-flotante-badge-v">{{ avisosVendedor.length }}</span>
+    </div>
+    <div class="chuito-flotante-burbuja-v">
+      <span v-if="estadoChuitoV === 'atento'">Hermanito, cualquier falla me decís... 📋</span>
+      <span v-else>{{ burbujaVendedor }}</span>
+    </div>
+  </div>
+
+  <!-- Modal avisos mejorado (vendedor/cajero) -->
   <div v-if="modalAvisosVendedor && avisosVendedor.length > 0"
-       class="aviso-overlay-ventas">
-    <div class="aviso-modal-ventas">
-      <div class="aviso-header">
-        <h2>📢 Aviso importante</h2>
-        <span class="aviso-contador">
-          {{ avisoVendedorIdx + 1 }} / {{ avisosVendedor.length }}
-        </span>
+    class="aviso-overlay-ventas"
+    @click.self="modalAvisosVendedor = false">
+    <div class="aviso-card-ventas">
+      <div class="aviso-card-header">
+        <img src="/chuito.png" class="aviso-header-img"/>
+        <div class="aviso-card-meta">
+          <span class="aviso-card-label">CHUITO</span>
+          <span class="aviso-card-fecha">
+            {{ new Date(avisosVendedor[avisoVendedorIdx]?.fecha)
+              .toLocaleDateString('es-VE', { day:'2-digit', month:'long', year:'numeric' }) }}
+          </span>
+        </div>
+        <span class="aviso-card-contador">{{ avisoVendedorIdx + 1 }}/{{ avisosVendedor.length }}</span>
       </div>
-      <div class="aviso-body">
-        <h3>{{ avisosVendedor[avisoVendedorIdx]?.titulo }}</h3>
-        <p>{{ avisosVendedor[avisoVendedorIdx]?.mensaje }}</p>
-        <small class="aviso-fecha">
-          {{ new Date(avisosVendedor[avisoVendedorIdx]?.fecha)
-            .toLocaleDateString('es-VE', { day:'2-digit', month:'long', year:'numeric' }) }}
+      <div class="aviso-card-body">
+        <h2 class="aviso-card-titulo">{{ avisosVendedor[avisoVendedorIdx]?.titulo }}</h2>
+        <p class="aviso-card-mensaje">{{ avisosVendedor[avisoVendedorIdx]?.mensaje }}</p>
+      </div>
+      <div class="aviso-card-footer">
+        <button class="btn-leer-aviso" @click="confirmarAvisoVendedor">✓ Entendido, mi llave</button>
+        <small class="aviso-card-hint" v-if="avisosVendedor.length > 1">
+          {{ avisosVendedor.length - avisoVendedorIdx - 1 }} mensaje(s) más
         </small>
-      </div>
-      <div class="aviso-footer">
-        <button class="btn-confirmar-aviso-ventas" @click="confirmarAvisoVendedor">
-          ✓ Leído — Continuar
-        </button>
       </div>
     </div>
   </div>
@@ -1162,6 +1181,11 @@ export default {
       avisosVendedor:      [],
       avisoVendedorIdx:    0,
       modalAvisosVendedor: false,
+      estadoChuitoV:       'atento',
+      burbujaVendedor:     '¡Hablame hermanito! 💬',
+      _burbujasV: ['¡Hablame hermanito! 💬', '¿Qué pasó mi llave? 👀', '¡Chuito al servicio! 🔧', '¿Todo bien por allá? 😄'],
+      _burbujasVIdx: 0,
+      _burbujaVTimer: null,
     }
   },
   computed: {
@@ -1319,6 +1343,7 @@ export default {
   },
   beforeUnmount() {
     clearInterval(this._timerHora)
+    clearInterval(this._burbujaVTimer)
     window.removeEventListener('popstate', this._onPopState)
   },
   async mounted() {
@@ -1348,11 +1373,20 @@ export default {
           },
         })
         if (res.data.length > 0) {
+          this.estadoChuitoV       = 'alerta'
           this.avisosVendedor      = res.data
           this.avisoVendedorIdx    = 0
           this.modalAvisosVendedor = true
+        } else {
+          this.estadoChuitoV = 'atento'
         }
       } catch {}
+      this._burbujaVTimer = setInterval(() => {
+        if (this.estadoChuitoV === 'alerta') {
+          this._burbujasVIdx = (this._burbujasVIdx + 1) % this._burbujasV.length
+          this.burbujaVendedor = this._burbujasV[this._burbujasVIdx]
+        }
+      }, 3000)
     }
   },
   methods: {
@@ -2955,8 +2989,19 @@ export default {
 .btn-ok-precio      { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
 .btn-cancel-precio  { background: #DC2626; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
 .precio-orig-hint   { font-size: 0.72rem; color: var(--texto-muted); text-decoration: line-through; display: block; width: 100%; margin-top: 0.1rem; }
-.aviso-overlay-ventas { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-.aviso-modal-ventas { background: #1A1A1A; color: #FFFFFF; border-radius: 12px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 1px solid #333; }
-.btn-confirmar-aviso-ventas { width: 100%; background: #FFCC00; color: #1A1A1A; border: none; padding: 0.75rem; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
-.btn-confirmar-aviso-ventas:hover { background: #E6B800; }
+.chuito-flotante-v { position: fixed; bottom: 2rem; right: 2rem; z-index: 9998; cursor: pointer; display: flex; flex-direction: column; align-items: center; animation: flotarChuitoV 3s ease-in-out infinite; }
+@keyframes flotarChuitoV { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+.chuito-img-wrap-v { position: relative; display: inline-block; }
+.chuito-flotante-img-v { object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3)); transition: transform 0.2s; }
+.chuito-flotante-v:hover .chuito-flotante-img-v { transform: scale(1.1); }
+.chuito-atento-v .chuito-flotante-img-v { width: 65px; height: 65px; filter: grayscale(40%) opacity(0.85); }
+.chuito-alerta-v .chuito-flotante-img-v { width: 80px; height: 80px; filter: none; }
+.chuito-atento-v .chuito-flotante-burbuja-v { background: #555; color: #DDD; font-size: 0.7rem; }
+.chuito-alerta-v .chuito-flotante-burbuja-v { background: #1A1A1A; color: #FFCC00; font-size: 0.75rem; }
+.chuito-carpeta-v { position: absolute; bottom: -4px; right: -4px; font-size: 1.1rem; animation: flotarChuitoV 3s ease-in-out infinite; }
+.chuito-flotante-badge-v { position: absolute; top: -4px; right: -4px; background: #DC2626; color: white; font-size: 0.7rem; font-weight: 800; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: pulsoV 1.5s infinite; border: 2px solid white; }
+@keyframes pulsoV { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+.chuito-flotante-burbuja-v { font-weight: 700; padding: 0.3rem 0.6rem; border-radius: 10px; margin-top: 0.3rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.aviso-overlay-ventas { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+.aviso-card-ventas { background: #1A1A1A; border-radius: 20px; width: 100%; max-width: 400px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.5); animation: entradaAvisoV 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); border: 1px solid #333; margin: 1rem; }
 </style>
