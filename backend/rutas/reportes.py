@@ -20,7 +20,17 @@ router = APIRouter(prefix="/reportes", tags=["reportes"])
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _normalizar_fechas(desde, hasta):
+    """Agrega hora a fechas ISO sin hora para que el rango sea inclusivo."""
+    if desde and "T" not in desde and " " not in desde:
+        desde = desde + " 00:00:00"
+    if hasta and "T" not in hasta and " " not in hasta:
+        hasta = hasta + " 23:59:59"
+    return desde, hasta
+
+
 def _filtro_fecha(query, modelo, desde, hasta):
+    desde, hasta = _normalizar_fechas(desde, hasta)
     if desde:
         query = query.filter(modelo.fecha >= desde)
     if hasta:
@@ -29,6 +39,7 @@ def _filtro_fecha(query, modelo, desde, hasta):
 
 
 def _venta_ids_en_periodo(db: Session, desde, hasta) -> set:
+    desde, hasta = _normalizar_fechas(desde, hasta)
     q = db.query(Venta.id)
     if desde: q = q.filter(Venta.fecha >= desde)
     if hasta: q = q.filter(Venta.fecha <= hasta)
@@ -311,6 +322,7 @@ def ventas_resumen_dia(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
+    desde, hasta = _normalizar_fechas(desde, hasta)
     q = db.query(Venta)
     if desde: q = q.filter(Venta.fecha >= desde)
     if hasta: q = q.filter(Venta.fecha <= hasta)
