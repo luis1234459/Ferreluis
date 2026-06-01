@@ -7,7 +7,7 @@
         <h1>Inventario</h1>
         <div class="top-acciones">
           <button class="btn-deptos" @click="mostrarDeptos = true">Departamentos</button>
-          <router-link to="/inventario/importar" class="btn-importar">↑ Importar Excel</router-link>
+          <router-link v-if="!esGestionador" to="/inventario/importar" class="btn-importar">↑ Importar Excel</router-link>
           <template v-if="esAdmin">
             <template v-if="!modoEdicion">
               <button class="btn-modo-edicion" @click="activarModoEdicion">✏ Modo Edición</button>
@@ -24,7 +24,7 @@
             @click="generarCodigos">
             {{ generandoCodigos ? 'Generando...' : '# Generar códigos' }}
           </button>
-          <button class="btn-nuevo" @click="abrirNuevoProducto">+ Nuevo producto</button>
+          <button v-if="!esGestionador" class="btn-nuevo" @click="abrirNuevoProducto">+ Nuevo producto</button>
         </div>
       </div>
 
@@ -264,12 +264,12 @@
                   <!-- Acciones -->
                   <td>
                     <div class="acciones">
-                      <button class="btn-editar"    @click="editar(p)">Editar</button>
+                      <button v-if="!esGestionador" class="btn-editar"    @click="editar(p)">Editar</button>
                       <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
                       <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
                       <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
                       <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
-                      <button class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
+                      <button v-if="!esGestionador" class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
                     </div>
                   </td>
                 </tr>
@@ -301,7 +301,7 @@
         <div v-show="tabActivo === 'ofertas'">
           <div class="ofertas-header">
             <span class="ofertas-desc">Descuentos y precios especiales por producto</span>
-            <button class="btn-nuevo" @click="abrirNuevaOferta">+ Nueva oferta</button>
+            <button v-if="!esGestionador" class="btn-nuevo" @click="abrirNuevaOferta">+ Nueva oferta</button>
           </div>
 
           <div class="tabla-container">
@@ -345,8 +345,8 @@
                     </span>
                   </td>
                   <td class="acciones">
-                    <button class="btn-editar"   @click="editarOferta(o)">Editar</button>
-                    <button class="btn-eliminar" @click="eliminarOferta(o.id)">Eliminar</button>
+                    <button v-if="!esGestionador" class="btn-editar"   @click="editarOferta(o)">Editar</button>
+                    <button v-if="!esGestionador" class="btn-eliminar" @click="eliminarOferta(o.id)">Eliminar</button>
                   </td>
                 </tr>
                 <tr v-if="ofertas.length === 0">
@@ -658,8 +658,8 @@
                   <td class="txt-verde">${{ Number(v.precio_base_usd || 0).toFixed(4) }}</td>
                   <td><span :class="v.activo ? 'badge-activa' : 'badge-inactiva'">{{ v.activo ? 'Activa' : 'Inactiva' }}</span></td>
                   <td class="acciones">
-                    <button class="btn-editar"   @click="editarVariante(v)">Editar</button>
-                    <button class="btn-eliminar" @click="eliminarVariante(v.id)">✕</button>
+                    <button v-if="!esGestionador" class="btn-editar"   @click="editarVariante(v)">Editar</button>
+                    <button v-if="!esGestionador" class="btn-eliminar" @click="eliminarVariante(v.id)">✕</button>
                   </td>
                 </tr>
               </tbody>
@@ -714,7 +714,7 @@
               </div>
             </div>
 
-            <button v-if="!mostrarFormVariante && modalVariantes.esquema_variante" class="btn-agregar-linea" @click="abrirFormVariante">
+            <button v-if="!esGestionador && !mostrarFormVariante && modalVariantes.esquema_variante" class="btn-agregar-linea" @click="abrirFormVariante">
               + Agregar variante
             </button>
           </div>
@@ -740,7 +740,7 @@
                   <td style="font-weight:600">{{ c.nombre_componente }}</td>
                   <td>{{ c.cantidad }}</td>
                   <td class="txt-usd">${{ Number(c.precio_base_usd).toFixed(2) }}</td>
-                  <td><button class="btn-eliminar" @click="eliminarComponente(c.id)">✕</button></td>
+                  <td><button v-if="!esGestionador" class="btn-eliminar" @click="eliminarComponente(c.id)">✕</button></td>
                 </tr>
               </tbody>
             </table>
@@ -851,7 +851,7 @@
               <span v-if="editandoDeptoId !== d.id" class="depto-nombre">{{ d.nombre }}</span>
               <input v-else v-model="formDepto.nombre" class="depto-input" @keydown.enter="guardarDepto" />
               <div class="depto-acciones">
-                <template v-if="editandoDeptoId !== d.id">
+                <template v-if="editandoDeptoId !== d.id && !esGestionador">
                   <button class="btn-editar"   @click="editarDepto(d)">Editar</button>
                   <button class="btn-eliminar" @click="eliminarDepto(d.id)">✕</button>
                 </template>
@@ -866,7 +866,7 @@
               Sin departamentos registrados
             </p>
 
-            <div class="depto-nuevo">
+            <div v-if="!esGestionador" class="depto-nuevo">
               <input v-model="nuevoDeptoNombre" placeholder="Nombre del departamento..."
                 class="depto-input-nuevo" @keydown.enter="crearDepto" />
               <button class="btn-guardar-sm" @click="crearDepto" :disabled="!nuevoDeptoNombre.trim()">
@@ -884,7 +884,7 @@
                     — {{ nombreDepartamento(c.departamento_id) }}
                   </span>
                 </span>
-                <div class="depto-acciones">
+                <div v-if="!esGestionador" class="depto-acciones">
                   <button class="btn-editar"   @click="editarCat(c)">Editar</button>
                   <button class="btn-eliminar" @click="eliminarCat(c.id)">✕</button>
                 </div>
@@ -906,7 +906,7 @@
               Sin categorías registradas
             </p>
 
-            <div class="depto-nuevo">
+            <div v-if="!esGestionador" class="depto-nuevo">
               <input v-model="nuevaCatNombre" placeholder="Nueva categoría..."
                 class="depto-input-nuevo" @keydown.enter="crearCat" />
               <select v-model="nuevaCatDeptoId" class="depto-input-nuevo" style="max-width:160px">
@@ -1190,8 +1190,9 @@ export default {
   },
 
   computed: {
-    esAdmin()    { return this.usuario.rol === 'admin' },
-    esVendedor() { return this.usuario.rol === 'vendedor' },
+    esAdmin()       { return this.usuario.rol === 'admin' },
+    esVendedor()    { return this.usuario.rol === 'vendedor' },
+    esGestionador() { return this.usuario.rol === 'gestionador' },
 
     precioEfectivoVariante() {
       if (!this.modalVariantes) return '0.0000'

@@ -70,7 +70,7 @@ const routes = [
   { path: '/compras/proveedores',  name: 'Proveedores',   component: Proveedores,   meta: { permiso: 'proveedores' } },
 
   // Rutas solo admin (no delegables)
-  { path: '/inventario',           name: 'Inventario',          component: Inventario,          meta: { soloAdminOVendedor: true } },
+  { path: '/inventario',           name: 'Inventario',          component: Inventario,          meta: { soloAdminOGestionadorOVendedor: true } },
   { path: '/inventario/importar',  name: 'ImportarInventario',  component: ImportarInventario,  meta: { soloAdmin: true } },
   { path: '/ajustes',              name: 'Ajustes',             component: Ajustes,             meta: { soloAdminOGestionador: true } },
   { path: '/vendedores',           name: 'Vendedores',          component: Vendedores,          meta: { soloAdmin: true } },
@@ -107,6 +107,9 @@ router.beforeEach((to, _from, next) => {
 
     // Rutas accesibles a admin o vendedor
     if (to.meta.soloAdminOVendedor && u.rol !== 'admin' && u.rol !== 'vendedor') return next('/dashboard')
+
+    // Rutas accesibles a admin, gestionador o vendedor
+    if (to.meta.soloAdminOGestionadorOVendedor && !['admin', 'gestionador', 'vendedor'].includes(u.rol)) return next('/dashboard')
 
     // Rutas con permiso de módulo
     if (to.meta.permiso && u.rol !== 'admin') {
