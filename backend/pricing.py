@@ -34,11 +34,14 @@ def calcular_precios(
     precio_base = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
 
     if policy == POLICY_BCV_DIRECT:
-        if ajuste_tipo == "sistema" or ajuste_divisa_pct is None:
-            precio_ref = round(precio_base * factor_normal, 4)
+        if ajuste_tipo == "sistema":
+            # Sin factor Binance/BCV: el cliente paga precio_base × tasa_bcv en Bs
+            precio_ref = precio_base
+            precio_bs  = round(precio_base * float(tasa_bcv), 2)
         else:
+            # Ajuste manual: recargo fijo % sobre precio_base
             precio_ref = round(precio_base * (1 + float(ajuste_divisa_pct or 0)), 4)
-        precio_bs = round(precio_ref * float(tasa_bcv), 2)
+            precio_bs  = round(precio_ref * float(tasa_bcv), 2)
     else:  # MARKET_FACTOR
         precio_ref = round(precio_base * factor_normal, 4)
         precio_bs  = round(precio_base * float(tasa_binance), 2)
