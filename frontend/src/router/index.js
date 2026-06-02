@@ -82,7 +82,8 @@ const routes = [
   { path: '/configuracion/garantias',      name: 'Garantias',      component: Garantias,      meta: { soloAdmin: true } },
   { path: '/configuracion/mantenimiento', name: 'Mantenimiento', component: Mantenimiento, meta: { soloAdmin: true } },
   { path: '/avisos',        name: 'Avisos',       component: Avisos,       meta: { requiresAuth: true } },
-  { path: '/chuito',        name: 'Chuito',       component: () => import('../views/Chuito.vue'), meta: { requiresAuth: true } },
+  { path: '/chuito',      name: 'Chuito',     component: () => import('../views/Chuito.vue'),     meta: { requiresAuth: true } },
+  { path: '/apartados',   name: 'Apartados',  component: () => import('../views/Apartados.vue'),  meta: { requiresAuth: true } },
   { path: '/radar-demanda', name: 'RadarDemanda',  component: RadarDemanda, meta: { soloAdmin: true } },
 ]
 

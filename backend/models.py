@@ -793,6 +793,53 @@ class Aviso(Base):
     destinatario = Column(String,   nullable=True)  # None = todos, o nombre usuario específico
 
 
+class Apartado(Base):
+    __tablename__ = "apartados"
+
+    id                 = Column(Integer,  primary_key=True, index=True)
+    numero             = Column(String,   unique=True)
+    vendedor           = Column(String,   nullable=False)
+    cliente_nombre     = Column(String,   nullable=True)
+    cliente_telefono   = Column(String,   nullable=True)
+    fecha_creacion     = Column(DateTime, default=datetime.utcnow)
+    fecha_maxima       = Column(DateTime, nullable=True)
+    cuotas             = Column(Integer,  nullable=True)
+    monto_cuota        = Column(Float,    nullable=True)
+    total_usd          = Column(Float,    default=0)
+    abonado_usd        = Column(Float,    default=0)
+    estado             = Column(String,   default="activo")  # activo|pagado|cancelado
+    observacion        = Column(String,   nullable=True)
+    moneda             = Column(String,   default="USD")
+    tasa_bcv           = Column(Float,    nullable=True)
+
+
+class DetalleApartado(Base):
+    __tablename__ = "detalles_apartado"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    apartado_id         = Column(Integer, ForeignKey("apartados.id"))
+    producto_id         = Column(Integer, ForeignKey("productos.id"))
+    variante_id         = Column(Integer, nullable=True)
+    nombre_producto     = Column(String)
+    cantidad            = Column(Integer, default=1)
+    precio_unitario_usd = Column(Float,   default=0)
+    subtotal_usd        = Column(Float,   default=0)
+
+
+class AbonoApartado(Base):
+    __tablename__ = "abonos_apartado"
+
+    id                = Column(Integer,  primary_key=True, index=True)
+    apartado_id       = Column(Integer,  ForeignKey("apartados.id"))
+    monto             = Column(Float,    default=0)
+    moneda_pago       = Column(String,   default="USD")
+    metodo_pago       = Column(String)
+    cuenta_destino_id = Column(Integer,  ForeignKey("cuentas_bancarias.id"), nullable=True)
+    fecha             = Column(DateTime, default=datetime.utcnow)
+    registrado_por    = Column(String)
+    referencia        = Column(String,   nullable=True)
+
+
 class MensajeChuito(Base):
     __tablename__ = "mensajes_chuito"
 

@@ -54,9 +54,10 @@ const GRUPOS = [
     key: 'ventas',
     icono: '💰',
     nombre: 'Ventas',
-    rutas: ['/ventas', '/presupuestos', '/devoluciones', '/cierre', '/tasa'],
+    rutas: ['/ventas', '/presupuestos', '/devoluciones', '/cierre', '/tasa', '/apartados'],
     items: [
-      { ruta: '/ventas',       label: 'Ventas',         siempre: true },
+      { ruta: '/ventas',      label: 'Ventas',         siempre: true },
+      { ruta: '/apartados',   label: '📦 Apartados',   soloAdminOVendedor: true },
       { ruta: '/presupuestos', label: 'Presupuestos',   permiso: 'presupuestos' },
       { ruta: '/devoluciones', label: 'Devoluciones',   permiso: 'devoluciones' },
       { ruta: '/cierre',       label: 'Cierre de caja', permiso: 'cierre' },

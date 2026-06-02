@@ -348,6 +348,7 @@
             <!-- Botones inferiores (siempre visibles) -->
             <div class="botones-carrito" v-if="carrito.length > 0">
               <button class="btn-guardar-presupuesto" @click="abrirModalPresupuesto">📋 Guardar como presupuesto</button>
+              <button class="btn-apartar" @click="abrirModalApartar">📦 Apartar</button>
               <button class="btn-abrir-cobro" @click="abrirModalCobro">✓ Registrar venta</button>
             </div>
 
@@ -958,6 +959,55 @@
 
   </div>
 
+  <!-- Modal Apartar -->
+  <div v-if="modalApartar" class="overlay" @click.self="modalApartar = false">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <h2>📦 Apartar productos</h2>
+        <button class="btn-cerrar-modal" @click="modalApartar = false">✕</button>
+      </div>
+      <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem">
+        <div class="field">
+          <label>Nombre del cliente *</label>
+          <input v-model="formApartar.cliente_nombre" placeholder="Nombre del cliente" class="input-apt" />
+        </div>
+        <div class="field">
+          <label>Teléfono</label>
+          <input v-model="formApartar.cliente_telefono" placeholder="0414-0000000" class="input-apt" />
+        </div>
+        <div class="field">
+          <label>Fecha máxima de retiro (opcional)</label>
+          <input v-model="formApartar.fecha_maxima" type="date" class="input-apt" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+          <div class="field">
+            <label>Cuotas (opcional)</label>
+            <input v-model.number="formApartar.cuotas" type="number" min="1" placeholder="Ej: 3" class="input-apt" />
+          </div>
+          <div class="field">
+            <label>Monto por cuota</label>
+            <input v-model.number="formApartar.monto_cuota" type="number" min="0" step="0.01" placeholder="$0.00" class="input-apt" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Observación</label>
+          <input v-model="formApartar.observacion" placeholder="Notas del apartado..." class="input-apt" />
+        </div>
+        <div class="apt-resumen-carrito">
+          <span>{{ carrito.length }} producto(s)</span>
+          <strong>${{ subtotalUSD.toFixed(2) }} USD</strong>
+        </div>
+        <p v-if="errorApartar" style="color:#DC2626;font-size:0.85rem">{{ errorApartar }}</p>
+      </div>
+      <div class="form-botones">
+        <button class="btn-cancelar" @click="modalApartar = false">Cancelar</button>
+        <button class="btn-guardar" @click="confirmarApartado" :disabled="apartando">
+          {{ apartando ? 'Guardando...' : '📦 Confirmar apartado' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Chuito flotante (vendedor/cajero) -->
   <div v-if="!modalAvisosVendedor && usuario.rol === 'vendedor'"
     class="chuito-flotante-v"
@@ -1177,6 +1227,12 @@ export default {
       vueltoMoneda:  'Bs',
       vueltoTasa:    '',
 
+      // Apartados
+      modalApartar:  false,
+      apartando:     false,
+      errorApartar:  '',
+      formApartar: { cliente_nombre: '', cliente_telefono: '', fecha_maxima: '', cuotas: null, monto_cuota: null, observacion: '' },
+
       // Avisos pendientes del admin
       avisosVendedor:      [],
       avisoVendedorIdx:    0,
@@ -1390,6 +1446,38 @@ export default {
     }
   },
   methods: {
+    abrirModalApartar() {
+      this.formApartar  = { cliente_nombre: '', cliente_telefono: '', fecha_maxima: '', cuotas: null, monto_cuota: null, observacion: '' }
+      this.errorApartar = ''
+      this.modalApartar = true
+    },
+    async confirmarApartado() {
+      if (!this.formApartar.cliente_nombre.trim()) { this.errorApartar = 'El nombre del cliente es obligatorio'; return }
+      this.apartando = true; this.errorApartar = ''
+      try {
+        await axios.post('/apartados/', {
+          ...this.formApartar,
+          fecha_maxima: this.formApartar.fecha_maxima || null,
+          moneda:   this.monedaVenta,
+          tasa_bcv: this.tasaBcv,
+          productos: this.carrito.map(item => ({
+            producto_id: item.id,
+            variante_id: item.variante_id || null,
+            nombre:      item.nombre,
+            cantidad:    item.cantidad,
+            precio_usd:  item.precio_unitario,
+          })),
+        }, {
+          headers: { 'x-usuario-nombre': this.usuario.usuario || this.usuario.nombre || '' },
+        })
+        this.modalApartar = false
+        this.carrito = []
+        alert('Apartado creado exitosamente')
+      } catch (e) {
+        this.errorApartar = e?.response?.data?.detail || 'Error al crear apartado'
+      } finally { this.apartando = false }
+    },
+
     async confirmarAvisoVendedor() {
       const usuario = JSON.parse(localStorage.getItem('usuario') || '{}')
       const aviso   = this.avisosVendedor[this.avisoVendedorIdx]
@@ -2489,6 +2577,11 @@ export default {
   transition: background 0.15s;
 }
 .btn-abrir-cobro:hover { background: #333333; }
+.btn-apartar { width: 100%; padding: 0.6rem; background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; border-radius: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 700; margin-bottom: 0.4rem; }
+.btn-apartar:hover { background: #BFDBFE; }
+.input-apt { border: 1px solid var(--borde); border-radius: 6px; padding: 0.5rem 0.65rem; font-size: 0.875rem; width: 100%; box-sizing: border-box; background: var(--fondo-app, #fff); color: var(--texto-principal); }
+.input-apt:focus { outline: none; border-color: #FFCC00; }
+.apt-resumen-carrito { background: var(--fondo-sidebar); border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; font-size: 0.85rem; }
 .btn-guardar-presupuesto {
   width: 100%;
   padding: 0.6rem;

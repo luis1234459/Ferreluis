@@ -63,6 +63,9 @@ app.include_router(notificaciones.router)
 from rutas import chuito as _chuito_mod
 app.include_router(_chuito_mod.router, prefix="/chuito")
 
+from rutas import apartados as _apartados_mod
+app.include_router(_apartados_mod.router, prefix="/apartados")
+
 
 @app.on_event("startup")
 def inicializar_datos():
@@ -187,6 +190,90 @@ def inicializar_datos():
         migrar(
             ["ALTER TABLE proveedores ADD COLUMN descuento_max_pct FLOAT"],
             ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_max_pct FLOAT"],
+        )
+
+        # ── apartados ────────────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS apartados (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero VARCHAR UNIQUE,
+                vendedor VARCHAR NOT NULL,
+                cliente_nombre VARCHAR,
+                cliente_telefono VARCHAR,
+                fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+                fecha_maxima DATETIME,
+                cuotas INTEGER,
+                monto_cuota FLOAT,
+                total_usd FLOAT DEFAULT 0,
+                abonado_usd FLOAT DEFAULT 0,
+                estado VARCHAR DEFAULT 'activo',
+                observacion VARCHAR,
+                moneda VARCHAR DEFAULT 'USD',
+                tasa_bcv FLOAT
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS apartados (
+                id SERIAL PRIMARY KEY,
+                numero VARCHAR UNIQUE,
+                vendedor VARCHAR NOT NULL,
+                cliente_nombre VARCHAR,
+                cliente_telefono VARCHAR,
+                fecha_creacion TIMESTAMP DEFAULT NOW(),
+                fecha_maxima TIMESTAMP,
+                cuotas INTEGER,
+                monto_cuota FLOAT,
+                total_usd FLOAT DEFAULT 0,
+                abonado_usd FLOAT DEFAULT 0,
+                estado VARCHAR DEFAULT 'activo',
+                observacion VARCHAR,
+                moneda VARCHAR DEFAULT 'USD',
+                tasa_bcv FLOAT
+            )"""],
+        )
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS detalles_apartado (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                apartado_id INTEGER REFERENCES apartados(id),
+                producto_id INTEGER,
+                variante_id INTEGER,
+                nombre_producto VARCHAR,
+                cantidad INTEGER DEFAULT 1,
+                precio_unitario_usd FLOAT DEFAULT 0,
+                subtotal_usd FLOAT DEFAULT 0
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS detalles_apartado (
+                id SERIAL PRIMARY KEY,
+                apartado_id INTEGER REFERENCES apartados(id),
+                producto_id INTEGER,
+                variante_id INTEGER,
+                nombre_producto VARCHAR,
+                cantidad INTEGER DEFAULT 1,
+                precio_unitario_usd FLOAT DEFAULT 0,
+                subtotal_usd FLOAT DEFAULT 0
+            )"""],
+        )
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS abonos_apartado (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                apartado_id INTEGER REFERENCES apartados(id),
+                monto FLOAT DEFAULT 0,
+                moneda_pago VARCHAR DEFAULT 'USD',
+                metodo_pago VARCHAR,
+                cuenta_destino_id INTEGER,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                registrado_por VARCHAR,
+                referencia VARCHAR
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS abonos_apartado (
+                id SERIAL PRIMARY KEY,
+                apartado_id INTEGER REFERENCES apartados(id),
+                monto FLOAT DEFAULT 0,
+                moneda_pago VARCHAR DEFAULT 'USD',
+                metodo_pago VARCHAR,
+                cuenta_destino_id INTEGER,
+                fecha TIMESTAMP DEFAULT NOW(),
+                registrado_por VARCHAR,
+                referencia VARCHAR
+            )"""],
         )
 
         # ── mensajes_chuito ──────────────────────────────────────────────────
