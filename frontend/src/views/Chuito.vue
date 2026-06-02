@@ -3,7 +3,48 @@
     <AppSidebar />
     <main class="contenido">
       <div class="contenido-inner">
-        <div class="chuito-wrap">
+
+        <!-- ── Vista admin: bandeja de reportes ── -->
+        <div v-if="esAdmin" class="bandeja-admin">
+          <div class="bandeja-header">
+            <img src="/chuito.png" class="bandeja-chuito-img"/>
+            <div>
+              <h2 class="bandeja-titulo">Reportes del equipo</h2>
+              <p class="bandeja-sub">Lo que Chuito recibió del equipo de ventas</p>
+            </div>
+            <button class="btn-refresh" @click="cargarMensajesAdmin">🔄</button>
+          </div>
+
+          <div v-if="mensajesAdmin.length === 0" class="bandeja-vacia">
+            <span>Sin reportes por ahora 📋</span>
+          </div>
+
+          <div v-else class="bandeja-lista">
+            <div v-for="m in mensajesAdmin" :key="m.id"
+              :class="['bandeja-item', !m.leido_admin ? 'bandeja-nuevo' : '']"
+              @click="marcarLeido(m)">
+              <span class="bandeja-icono">{{ iconoTipo(m.tipo) }}</span>
+              <div class="bandeja-contenido">
+                <div class="bandeja-top">
+                  <span class="bandeja-tipo">{{ labelTipo(m.tipo) }}</span>
+                  <span class="bandeja-vendedor">{{ m.vendedor }}</span>
+                  <span class="bandeja-fecha txt-muted">{{ formatFechaBandeja(m.fecha) }}</span>
+                </div>
+                <p class="bandeja-mensaje">{{ m.mensaje }}</p>
+                <div v-if="m.detalle && Object.keys(m.detalle).length > 1" class="bandeja-detalle">
+                  <span v-if="m.detalle.producto">📦 {{ m.detalle.producto }}</span>
+                  <span v-if="m.detalle.precio_competencia">💲 {{ m.detalle.precio_competencia }}</span>
+                  <span v-if="m.detalle.competidor">🏪 {{ m.detalle.competidor }}</span>
+                  <span v-if="m.detalle.clientes">👥 {{ m.detalle.clientes }} clientes lo pidieron</span>
+                </div>
+              </div>
+              <span v-if="!m.leido_admin" class="bandeja-badge-nuevo">NUEVO</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Vista vendedor: chat con Chuito ── -->
+        <div v-else class="chuito-wrap">
 
           <!-- Avatar Chuito -->
           <div class="chuito-avatar-wrap">
@@ -88,10 +129,18 @@ export default {
       flujoActual:         null,
       pasoFlujo:           0,
       datosReporte:        {},
+      mensajesAdmin:       [],
     }
   },
-  mounted() {
-    this.saludar()
+  computed: {
+    esAdmin() { return this.usuario.rol === 'admin' },
+  },
+  async mounted() {
+    if (this.esAdmin) {
+      await this.cargarMensajesAdmin()
+    } else {
+      this.saludar()
+    }
   },
   methods: {
     async saludar() {
@@ -220,6 +269,30 @@ export default {
       const box = this.$refs.chatBox
       if (box) box.scrollTop = box.scrollHeight
     },
+
+    async cargarMensajesAdmin() {
+      try {
+        const res = await axios.get('/chuito/mensajes')
+        this.mensajesAdmin = res.data
+      } catch {}
+    },
+    async marcarLeido(m) {
+      if (m.leido_admin) return
+      try {
+        await axios.patch(`/chuito/mensajes/${m.id}/leer`)
+        m.leido_admin = true
+      } catch {}
+    },
+    iconoTipo(tipo) {
+      return { venta_perdida: '🔴', falta_producto: '📦', logro: '⭐', mensaje_jefe: '💬' }[tipo] || '📋'
+    },
+    labelTipo(tipo) {
+      return { venta_perdida: 'Venta perdida', falta_producto: 'Falta producto', logro: 'Logro del día', mensaje_jefe: 'Mensaje directo' }[tipo] || tipo
+    },
+    formatFechaBandeja(iso) {
+      if (!iso) return ''
+      return new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    },
   },
 }
 </script>
@@ -339,4 +412,28 @@ export default {
   cursor: pointer; font-size: 0.85rem;
   white-space: nowrap;
 }
+
+/* ── Bandeja admin ── */
+.bandeja-admin { max-width: 600px; margin: 0 auto; padding: 1rem; }
+.bandeja-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--borde); }
+.bandeja-chuito-img { width: 60px; height: 60px; object-fit: contain; }
+.bandeja-titulo { font-size: 1.1rem; font-weight: 800; margin: 0; color: var(--texto-principal); }
+.bandeja-sub { font-size: 0.78rem; color: var(--texto-muted); margin: 0.2rem 0 0; }
+.btn-refresh { margin-left: auto; background: none; border: 1px solid var(--borde); border-radius: 8px; padding: 0.4rem 0.6rem; cursor: pointer; font-size: 1rem; }
+.btn-refresh:hover { background: var(--fondo-sidebar); }
+.bandeja-vacia { text-align: center; padding: 3rem; color: var(--texto-muted); font-size: 0.9rem; }
+.bandeja-lista { display: flex; flex-direction: column; gap: 0.5rem; }
+.bandeja-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid var(--borde); border-radius: 10px; cursor: pointer; background: #FAFAF7; transition: background 0.15s; position: relative; }
+.bandeja-item:hover { background: #F0F0E8; }
+.bandeja-nuevo { border-color: #FFCC00; background: #FFFDF0 !important; }
+.bandeja-icono { font-size: 1.5rem; flex-shrink: 0; }
+.bandeja-contenido { flex: 1; min-width: 0; }
+.bandeja-top { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem; }
+.bandeja-tipo { font-weight: 700; font-size: 0.82rem; color: var(--texto-principal); }
+.bandeja-vendedor { font-size: 0.78rem; color: #996600; font-weight: 600; }
+.bandeja-fecha { font-size: 0.72rem; margin-left: auto; }
+.bandeja-mensaje { font-size: 0.85rem; color: var(--texto-sec); margin: 0 0 0.3rem; line-height: 1.4; }
+.bandeja-detalle { display: flex; flex-wrap: wrap; gap: 0.4rem; font-size: 0.75rem; color: var(--texto-muted); }
+.bandeja-detalle span { background: #F1F5F9; padding: 0.15rem 0.4rem; border-radius: 4px; }
+.bandeja-badge-nuevo { position: absolute; top: 0.5rem; right: 0.5rem; background: #FFCC00; color: #1A1A1A; font-size: 0.62rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 4px; letter-spacing: 0.05em; }
 </style>
