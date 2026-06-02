@@ -888,6 +888,68 @@ def inventario_rotacion(
     return sorted(resultado, key=lambda x: x["rotacion"] if x["rotacion"] is not None else -1, reverse=True)
 
 
+@router.get("/inventario/valorizacion")
+def valorizacion_inventario(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    from models import Categoria
+
+    productos = db.query(Producto).filter(
+        Producto.activo == True,
+        Producto.stock > 0,
+    ).all()
+
+    deptos = {d.id: d.nombre for d in db.query(Departamento).all()}
+    cats   = {c.id: c.nombre for c in db.query(Categoria).all()}
+
+    grupos: dict = {}
+    for p in productos:
+        did = p.departamento_id or 0
+        if did not in grupos:
+            grupos[did] = {
+                "departamento_id":    did,
+                "departamento":       deptos.get(did, "Sin departamento"),
+                "productos":          [],
+                "total_unidades":     0,
+                "total_costo_usd":    0.0,
+                "total_precio_usd":   0.0,
+                "ganancia_potencial": 0.0,
+            }
+        costo       = float(p.costo_usd or 0)
+        margen      = float(p.margen or 0.30)
+        precio_base = round(costo * (1 + margen), 4)
+        stock       = int(p.stock or 0)
+        valor_costo  = round(costo * stock, 2)
+        valor_precio = round(precio_base * stock, 2)
+        ganancia     = round((precio_base - costo) * stock, 2)
+
+        grupos[did]["productos"].append({
+            "id":          p.id,
+            "nombre":      p.nombre,
+            "categoria":   cats.get(p.categoria_id, "—"),
+            "stock":       stock,
+            "costo_usd":   round(costo, 4),
+            "precio_base": round(precio_base, 4),
+            "valor_costo": valor_costo,
+            "valor_precio": valor_precio,
+            "ganancia":    ganancia,
+            "margen_pct":  round(margen * 100, 1),
+        })
+        grupos[did]["total_unidades"]     += stock
+        grupos[did]["total_costo_usd"]    += valor_costo
+        grupos[did]["total_precio_usd"]   += valor_precio
+        grupos[did]["ganancia_potencial"] += ganancia
+
+    resultado = []
+    for g in sorted(grupos.values(), key=lambda x: x["total_costo_usd"], reverse=True):
+        g["total_costo_usd"]    = round(g["total_costo_usd"], 2)
+        g["total_precio_usd"]   = round(g["total_precio_usd"], 2)
+        g["ganancia_potencial"] = round(g["ganancia_potencial"], 2)
+        resultado.append(g)
+    return resultado
+
+
 # ---------------------------------------------------------------------------
 # COMPRAS — nuevos endpoints
 # ---------------------------------------------------------------------------

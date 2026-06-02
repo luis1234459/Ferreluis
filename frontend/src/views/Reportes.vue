@@ -536,6 +536,66 @@
           </div>
         </template>
 
+        <!-- Inventario → Valorización -->
+        <template v-if="tabMain === 'inventario' && tabSub === 'valorizacion'">
+          <div v-if="!datos || datos.length === 0" class="sin-datos-box">Sin productos en inventario</div>
+          <div v-else>
+            <div class="val-totales">
+              <div class="val-total-card">
+                <span class="val-total-label">Valor al costo</span>
+                <span class="val-total-val txt-rojo">${{ totalGeneral('total_costo_usd') }}</span>
+              </div>
+              <div class="val-total-card">
+                <span class="val-total-label">Valor a precio base</span>
+                <span class="val-total-val txt-verde">${{ totalGeneral('total_precio_usd') }}</span>
+              </div>
+              <div class="val-total-card">
+                <span class="val-total-label">Ganancia potencial</span>
+                <span class="val-total-val txt-amarillo">${{ totalGeneral('ganancia_potencial') }}</span>
+              </div>
+            </div>
+            <div v-for="g in datos" :key="g.departamento_id" class="val-depto-card">
+              <div class="val-depto-header"
+                @click="deptoExpandido = deptoExpandido === g.departamento_id ? null : g.departamento_id">
+                <span class="val-depto-nombre">{{ g.departamento }}</span>
+                <span class="val-depto-meta txt-muted">{{ g.total_unidades }} uds</span>
+                <span class="val-col txt-rojo">${{ g.total_costo_usd.toFixed(2) }}</span>
+                <span class="val-col txt-verde">${{ g.total_precio_usd.toFixed(2) }}</span>
+                <span class="val-col txt-amarillo">+${{ g.ganancia_potencial.toFixed(2) }}</span>
+                <span class="val-toggle">{{ deptoExpandido === g.departamento_id ? '▲' : '▼' }}</span>
+              </div>
+              <div v-if="deptoExpandido === g.departamento_id" class="val-productos">
+                <table class="tabla-val">
+                  <thead>
+                    <tr>
+                      <th>Producto</th><th>Categoría</th><th>Stock</th>
+                      <th>Costo unit.</th><th>Precio base</th><th>Margen</th>
+                      <th>Val. costo</th><th>Val. precio</th><th>Ganancia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="p in g.productos" :key="p.id">
+                      <td style="font-weight:600">{{ p.nombre }}</td>
+                      <td class="txt-muted">{{ p.categoria }}</td>
+                      <td style="text-align:center">{{ p.stock }}</td>
+                      <td>${{ p.costo_usd.toFixed(2) }}</td>
+                      <td>${{ p.precio_base.toFixed(2) }}</td>
+                      <td>
+                        <span :class="p.margen_pct >= 20 ? 'txt-verde' : p.margen_pct >= 10 ? 'txt-amarillo' : 'txt-rojo'">
+                          {{ p.margen_pct }}%
+                        </span>
+                      </td>
+                      <td class="txt-rojo">${{ p.valor_costo.toFixed(2) }}</td>
+                      <td class="txt-verde">${{ p.valor_precio.toFixed(2) }}</td>
+                      <td class="txt-amarillo" style="font-weight:700">+${{ p.ganancia.toFixed(2) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <!-- Inventario → Conteos físicos -->
         <template v-if="tabMain === 'inventario' && tabSub === 'conteos'">
           <div v-if="!datos || datos.length === 0" class="sin-datos-box">
@@ -825,6 +885,7 @@ const SUBTABS = {
     { key: 'proveedor',    label: 'Por proveedor' },
     { key: 'pareto',       label: 'Pareto' },
     { key: 'rotacion',     label: 'Rotación' },
+    { key: 'valorizacion', label: 'Valorización' },
     { key: 'conteos',      label: 'Conteos físicos' },
   ],
   otros: [
@@ -849,6 +910,7 @@ const URL_MAP = {
   'inventario-proveedor':    '/reportes/inventario/por-proveedor',
   'inventario-pareto':       '/reportes/inventario/pareto',
   'inventario-rotacion':     '/reportes/inventario/rotacion',
+  'inventario-valorizacion': '/reportes/inventario/valorizacion',
   'inventario-conteos':      '/ajustes/historial',
   'otros-cierres':           '/reportes/cierre/comparativo',
   'otros-clientes':          '/reportes/clientes/resumen',
@@ -880,6 +942,7 @@ export default {
       listaReposicion:    [],
       verListaReposicion: false,
       conteoExpandido:    null,
+      deptoExpandido:     null,
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -1004,6 +1067,10 @@ export default {
     formatFecha(iso) { return iso ? new Date(iso).toLocaleString('es-VE') : '—' },
     parsearConteo(jsonStr) {
       try { return JSON.parse(jsonStr || '[]') } catch { return [] }
+    },
+    totalGeneral(campo) {
+      if (!this.datos || !this.datos.length) return '0.00'
+      return this.datos.reduce((s, g) => s + (g[campo] || 0), 0).toFixed(2)
     },
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -1147,6 +1214,21 @@ export default {
 /* Cierres */
 .cierre-card    { background: #FFFFFF; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--borde); }
 .sin-datos-box { padding: 2rem; text-align: center; color: var(--texto-muted); font-size: 0.9rem; }
+.val-totales { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+.val-total-card { background: #FAFAF7; border: 1px solid var(--borde); border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: center; }
+.val-total-label { font-size: 0.72rem; font-weight: 700; color: var(--texto-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.val-total-val { font-size: 1.3rem; font-weight: 800; }
+.val-depto-card { border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+.val-depto-header { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; cursor: pointer; background: #FAFAF7; flex-wrap: wrap; }
+.val-depto-header:hover { background: #F0F0E8; }
+.val-depto-nombre { flex: 1; font-weight: 700; font-size: 0.9rem; }
+.val-depto-meta { font-size: 0.78rem; min-width: 60px; }
+.val-col { font-weight: 700; font-size: 0.88rem; min-width: 90px; text-align: right; }
+.val-toggle { font-size: 0.75rem; color: var(--texto-muted); }
+.val-productos { border-top: 1px solid var(--borde); background: #FFFFFF; overflow-x: auto; }
+.tabla-val { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.tabla-val th { font-size: 0.72rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+.tabla-val td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
 .conteo-card { border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
 .conteo-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; background: #FAFAF7; flex-wrap: wrap; }
 .conteo-header:hover { background: #F0F0E8; }
