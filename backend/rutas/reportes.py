@@ -935,6 +935,9 @@ def valorizacion_inventario(
             "valor_precio": valor_precio,
             "ganancia":    ganancia,
             "margen_pct":  round(margen * 100, 1),
+            "auditado":            bool(p.auditado) if p.auditado else False,
+            "auditoria_pendiente": bool(p.auditoria_pendiente) if p.auditoria_pendiente else False,
+            "fecha_auditoria":     p.fecha_auditoria.strftime('%d/%m/%Y') if p.fecha_auditoria else None,
         })
         grupos[did]["total_unidades"]     += stock
         grupos[did]["total_costo_usd"]    += valor_costo

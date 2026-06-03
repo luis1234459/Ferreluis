@@ -570,7 +570,7 @@
                     <tr>
                       <th>Producto</th><th>Categoría</th><th>Stock</th>
                       <th>Costo unit.</th><th>Precio base</th><th>Margen</th>
-                      <th>Val. costo</th><th>Val. precio</th><th>Ganancia</th>
+                      <th>Val. costo</th><th>Val. precio</th><th>Ganancia</th><th>Auditoría</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -588,6 +588,13 @@
                       <td class="txt-rojo">${{ p.valor_costo.toFixed(2) }}</td>
                       <td class="txt-verde">${{ p.valor_precio.toFixed(2) }}</td>
                       <td class="txt-amarillo" style="font-weight:700">+${{ p.ganancia.toFixed(2) }}</td>
+                      <td>
+                        <span v-if="p.auditoria_pendiente" class="badge-audit-pendiente">⚠ Pendiente</span>
+                        <span v-else-if="p.auditado" class="badge-audit-ok" :title="p.fecha_auditoria || ''">
+                          ✓ {{ p.fecha_auditoria || 'OK' }}
+                        </span>
+                        <span v-else class="badge-audit-sin">Sin auditar</span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
