@@ -304,8 +304,9 @@ def ajuste_comisiones_lote(
 
 class MoverProductosLote(BaseModel):
     producto_ids:    List[int]
-    departamento_id: int
+    departamento_id: Optional[int] = None
     categoria_id:    Optional[int] = None
+    proveedor_id:    Optional[int] = None
 
 
 @router.post("/productos/mover-departamento")
@@ -316,9 +317,8 @@ def mover_departamento_lote(
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
-    deptos_map  = {d.id: d for d in db.query(Departamento).all()}
-    depto_nuevo = deptos_map.get(datos.departamento_id)
-    if not depto_nuevo:
+    deptos_map = {d.id: d for d in db.query(Departamento).all()}
+    if datos.departamento_id and datos.departamento_id not in deptos_map:
         raise HTTPException(404, "Departamento no encontrado")
 
     cambios = []
@@ -326,21 +326,17 @@ def mover_departamento_lote(
         p = db.query(Producto).filter(Producto.id == pid).first()
         if not p:
             continue
-        depto_ant = deptos_map.get(p.departamento_id)
-        cambios.append({
-            "producto_id":        p.id,
-            "nombre":             p.nombre,
-            "depto_anterior":     depto_ant.nombre if depto_ant else "—",
-            "depto_nuevo":        depto_nuevo.nombre,
-            "categoria_anterior": p.categoria_id,
-            "categoria_nueva":    datos.categoria_id,
-        })
-        p.departamento_id = datos.departamento_id
-        p.categoria_id    = datos.categoria_id
+        cambios.append({"producto_id": p.id, "nombre": p.nombre})
+        if datos.departamento_id is not None:
+            p.departamento_id = datos.departamento_id
+            p.categoria_id    = datos.categoria_id
+        if datos.proveedor_id is not None:
+            p.proveedor_id = datos.proveedor_id
     db.commit()
+    depto_label = deptos_map[datos.departamento_id].nombre if datos.departamento_id else "—"
     _guardar_historial(
         db, x_usuario_nombre, "gestion",
-        f"Movimiento masivo → {depto_nuevo.nombre} — {len(cambios)} productos",
+        f"Cambio masivo — {len(cambios)} productos (depto: {depto_label})",
         cambios,
     )
     return {"ok": True, "productos_afectados": len(cambios)}

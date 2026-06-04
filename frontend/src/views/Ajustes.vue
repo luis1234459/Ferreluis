@@ -502,10 +502,10 @@
             </button>
           </div>
 
-          <!-- Panel mover departamento -->
+          <!-- Panel mover departamento/proveedor -->
           <div v-if="gestionProductos.length > 0" class="panel-global">
             <p class="panel-titulo">
-              Mover seleccionados ({{ gestionSeleccion.length }}) a otro departamento
+              Cambios masivos — seleccionados ({{ gestionSeleccion.length }})
             </p>
             <div class="panel-controles">
               <select v-model="gestionDeptDestino"
@@ -521,9 +521,15 @@
                 <option v-for="c in gestionCategoriasDestino"
                   :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
+              <select v-model="proveedorDestino">
+                <option value="">— Proveedor (sin cambio) —</option>
+                <option v-for="p in proveedores" :key="p.id" :value="p.id">
+                  {{ p.nombre }}
+                </option>
+              </select>
               <button class="btn-aplicar" @click="moverDepartamento"
                 :disabled="gestionMoviendo || !gestionSeleccion.length">
-                {{ gestionMoviendo ? 'Moviendo...' : 'Mover productos' }}
+                {{ gestionMoviendo ? 'Aplicando...' : 'Aplicar cambios' }}
               </button>
             </div>
             <span v-if="msgGestion"
@@ -972,6 +978,7 @@ export default {
       gestionCategoriasDestino: [],
       gestionMoviendo:          false,
       msgGestion:               '',
+      proveedorDestino:         '',
       modalCrearProd:           false,
       formCrearProd: {
         nombre: '', departamento_id: '', categoria_id: '',
@@ -1557,24 +1564,27 @@ export default {
         this.msgGestion = 'Selecciona al menos un producto'
         return
       }
-      if (!this.gestionDeptDestino) {
-        this.msgGestion = 'Selecciona el departamento destino'
+      if (!this.gestionDeptDestino && !this.proveedorDestino) {
+        this.msgGestion = 'Selecciona al menos un cambio (departamento o proveedor)'
         return
       }
       this.gestionMoviendo = true
       this.msgGestion = ''
       try {
-        const res = await axios.post('/ajustes/productos/mover-departamento', {
+        const payload = {
           producto_ids:    this.gestionSeleccion,
-          departamento_id: parseInt(this.gestionDeptDestino),
-          categoria_id:    this.gestionCatDestino
-                           ? parseInt(this.gestionCatDestino) : null,
-        }, { headers: this._headers() })
+          departamento_id: this.gestionDeptDestino ? parseInt(this.gestionDeptDestino) : null,
+          categoria_id:    this.gestionCatDestino ? parseInt(this.gestionCatDestino) : null,
+          proveedor_id:    this.proveedorDestino ? parseInt(this.proveedorDestino) : null,
+        }
+        const res = await axios.post('/ajustes/productos/mover-departamento', payload,
+          { headers: this._headers() })
         this.msgGestion =
           `✓ ${res.data.productos_afectados} producto(s) movidos correctamente`
         this.gestionSeleccion = []
         this.gestionDeptDestino = ''
         this.gestionCatDestino = ''
+        this.proveedorDestino = ''
         await this.cargarProductosGestion()
       } catch (e) {
         this.msgGestion = e?.response?.data?.detail || 'Error al mover productos'

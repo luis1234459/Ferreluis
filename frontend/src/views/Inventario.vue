@@ -121,6 +121,7 @@
                   <th>Bs</th>
                   <th>Depto.</th>
                   <th>Categoría</th>
+                  <th>Proveedor</th>
                   <th>Costo</th>
                   <th>Margen</th>
                   <th>{{ modoEdicion ? 'Activo' : 'Ubic.' }}</th>
@@ -229,6 +230,9 @@
                       <span class="txt-muted">{{ nombreCategoria(p.categoria_id) }}</span>
                     </template>
                   </td>
+
+                  <!-- Proveedor -->
+                  <td class="txt-muted" style="font-size:0.8rem">{{ nombreProveedor(p.proveedor_id) }}</td>
 
                   <!-- Costo USD -->
                   <td>
@@ -1369,6 +1373,11 @@ export default {
       if (!id) return '—'
       const d = this.departamentos.find(x => x.id === id)
       return d ? d.nombre : '—'
+    },
+    nombreProveedor(id) {
+      if (!id) return '—'
+      const p = this.proveedores.find(x => x.id === id)
+      return p ? p.nombre : '—'
     },
     nombreCategoria(id) {
       if (!id) return '—'

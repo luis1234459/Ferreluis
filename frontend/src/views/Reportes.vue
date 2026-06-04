@@ -538,6 +538,15 @@
 
         <!-- Inventario → Valorización -->
         <template v-if="tabMain === 'inventario' && tabSub === 'valorizacion'">
+          <!-- Selector agrupación -->
+          <div class="val-agrupacion">
+            <span class="val-agrupacion-label">Agrupar por:</span>
+            <button :class="['btn-agrup', agrupacion === 'departamento' ? 'activo' : '']"
+              @click="agrupacion = 'departamento'; cargar()">Departamento</button>
+            <button :class="['btn-agrup', agrupacion === 'proveedor' ? 'activo' : '']"
+              @click="agrupacion = 'proveedor'; cargar()">Proveedor</button>
+          </div>
+
           <!-- Panel imprimir no auditados -->
           <div class="val-imprimir-panel">
             <h4 class="val-imprimir-titulo">🖨 Imprimir no auditados</h4>
@@ -969,6 +978,7 @@ export default {
       imprimirDesde:      '',
       imprimirHasta:      '',
       departamentosVal:   [],
+      agrupacion:         'departamento',
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -1047,6 +1057,9 @@ export default {
         }
         if (this.tabKey === 'inventario-conteos') {
           params.tipo = 'auditoria'
+        }
+        if (this.tabKey === 'inventario-valorizacion') {
+          params.agrupar_por = this.agrupacion
         }
         const res  = await axios.get(url, { params })
         this.datos    = res.data
@@ -1284,6 +1297,10 @@ export default {
 .tabla-conteo th { font-size: 0.75rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--borde); }
 .tabla-conteo td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
 .fila-pendiente td { background: #FFFBEB; }
+.val-agrupacion { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.val-agrupacion-label { font-size: 0.82rem; font-weight: 600; color: var(--texto-muted); }
+.btn-agrup { padding: 0.35rem 0.85rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; background: #FAFAF7; color: var(--texto-sec); }
+.btn-agrup.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
 .val-imprimir-panel { background: #FAFAF7; border: 1px solid var(--borde); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
 .val-imprimir-titulo { font-size: 0.85rem; font-weight: 700; margin: 0 0 0.75rem; color: var(--texto-principal); }
 .val-imprimir-filtros { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
