@@ -953,6 +953,97 @@ def valorizacion_inventario(
     return resultado
 
 
+@router.get("/inventario/no-auditados/pdf")
+def pdf_no_auditados(
+    departamento_id: Optional[int] = None,
+    desde_nombre:    Optional[str] = None,
+    hasta_nombre:    Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from fastapi.responses import StreamingResponse
+    import io
+    from models import Categoria
+
+    q = db.query(Producto).filter(
+        Producto.activo == True,
+        Producto.auditado == False,
+    )
+    if departamento_id:
+        q = q.filter(Producto.departamento_id == departamento_id)
+
+    productos = q.order_by(Producto.nombre).all()
+
+    if desde_nombre:
+        productos = [p for p in productos if p.nombre.upper() >= desde_nombre.upper()]
+    if hasta_nombre:
+        productos = [p for p in productos if p.nombre.upper() <= hasta_nombre.upper()]
+
+    deptos = {d.id: d.nombre for d in db.query(Departamento).all()}
+    cats   = {c.id: c.nombre for c in db.query(Categoria).all()}
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+        topMargin=0.75*inch, bottomMargin=0.75*inch,
+        leftMargin=0.75*inch, rightMargin=0.75*inch)
+
+    styles   = getSampleStyleSheet()
+    elements = []
+    fecha_hoy = datetime.utcnow().strftime('%d/%m/%Y %H:%M')
+
+    elements.append(Paragraph("<b>PRODUCTOS NO AUDITADOS — FERRE-UTIL</b>", styles['Title']))
+    elements.append(Paragraph(
+        f"Generado: {fecha_hoy} | Total: {len(productos)} productos", styles['Normal']
+    ))
+    elements.append(Spacer(1, 0.25*inch))
+
+    if not productos:
+        elements.append(Paragraph("✓ No hay productos pendientes de auditoría.", styles['Normal']))
+    else:
+        headers = ['#', 'Producto', 'Departamento', 'Categoría', 'Stock', 'Costo USD']
+        data = [headers]
+        for i, p in enumerate(productos, 1):
+            data.append([
+                str(i),
+                p.nombre[:50],
+                deptos.get(p.departamento_id, '—'),
+                cats.get(p.categoria_id, '—'),
+                str(int(p.stock or 0)),
+                f"${float(p.costo_usd or 0):.2f}",
+            ])
+
+        tabla = Table(data, colWidths=[
+            0.4*inch, 3.0*inch, 1.5*inch, 1.3*inch, 0.6*inch, 0.9*inch
+        ])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor('#1A1A1A')),
+            ('TEXTCOLOR',     (0, 0), (-1, 0), colors.HexColor('#FFCC00')),
+            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',      (0, 0), (-1, 0), 9),
+            ('FONTSIZE',      (0, 1), (-1,-1), 8),
+            ('ROWBACKGROUNDS',(0, 1), (-1,-1), [colors.white, colors.HexColor('#F8F8F4')]),
+            ('GRID',          (0, 0), (-1,-1), 0.5, colors.HexColor('#DDDDDD')),
+            ('VALIGN',        (0, 0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING',    (0, 0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1,-1), 4),
+        ]))
+        elements.append(tabla)
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=no_auditados_{fecha_hoy[:10].replace('/','-')}.pdf"},
+    )
+
+
 # ---------------------------------------------------------------------------
 # COMPRAS — nuevos endpoints
 # ---------------------------------------------------------------------------

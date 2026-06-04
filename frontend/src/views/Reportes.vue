@@ -538,6 +538,21 @@
 
         <!-- Inventario → Valorización -->
         <template v-if="tabMain === 'inventario' && tabSub === 'valorizacion'">
+          <!-- Panel imprimir no auditados -->
+          <div class="val-imprimir-panel">
+            <h4 class="val-imprimir-titulo">🖨 Imprimir no auditados</h4>
+            <div class="val-imprimir-filtros">
+              <select v-model="imprimirDeptoId" class="filtro-sel-oc">
+                <option value="">Todos los departamentos</option>
+                <option v-for="d in departamentosVal" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+              </select>
+              <input v-model="imprimirDesde" placeholder="Desde (ej: A)" class="input-field-sm" style="max-width:100px" />
+              <input v-model="imprimirHasta" placeholder="Hasta (ej: Z)" class="input-field-sm" style="max-width:100px" />
+              <button class="btn-imprimir-val" @click="imprimirNoAuditados">🖨 Generar PDF</button>
+            </div>
+            <small class="txt-muted">Vacío desde/hasta = todos los productos</small>
+          </div>
+
           <div v-if="!datos || datos.length === 0" class="sin-datos-box">Sin productos en inventario</div>
           <div v-else>
             <div class="val-totales">
@@ -950,6 +965,10 @@ export default {
       verListaReposicion: false,
       conteoExpandido:    null,
       deptoExpandido:     null,
+      imprimirDeptoId:    '',
+      imprimirDesde:      '',
+      imprimirHasta:      '',
+      departamentosVal:   [],
       desdeDia: '',
       hastaDia: '',
       MAIN_TABS: [
@@ -1011,6 +1030,9 @@ export default {
     async cambiarTabSub(sub) {
       this.tabSub = sub
       this.datos  = null
+      if (sub === 'valorizacion' && this.departamentosVal.length === 0) {
+        await this.cargarDepartamentosVal()
+      }
       await this.cargar()
     },
     async cargar() {
@@ -1078,6 +1100,20 @@ export default {
     totalGeneral(campo) {
       if (!this.datos || !this.datos.length) return '0.00'
       return this.datos.reduce((s, g) => s + (g[campo] || 0), 0).toFixed(2)
+    },
+    async cargarDepartamentosVal() {
+      try {
+        const res = await axios.get('/productos/departamentos')
+        this.departamentosVal = res.data
+      } catch {}
+    },
+    imprimirNoAuditados() {
+      const params = new URLSearchParams()
+      if (this.imprimirDeptoId) params.append('departamento_id', this.imprimirDeptoId)
+      if (this.imprimirDesde)   params.append('desde_nombre', this.imprimirDesde)
+      if (this.imprimirHasta)   params.append('hasta_nombre', this.imprimirHasta)
+      const base = import.meta.env.VITE_API_URL || ''
+      window.open(`${base}/reportes/inventario/no-auditados/pdf?${params}`, '_blank')
     },
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -1248,6 +1284,12 @@ export default {
 .tabla-conteo th { font-size: 0.75rem; font-weight: 700; color: var(--texto-muted); text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--borde); }
 .tabla-conteo td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--borde-suave, #F0F0EC); }
 .fila-pendiente td { background: #FFFBEB; }
+.val-imprimir-panel { background: #FAFAF7; border: 1px solid var(--borde); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+.val-imprimir-titulo { font-size: 0.85rem; font-weight: 700; margin: 0 0 0.75rem; color: var(--texto-principal); }
+.val-imprimir-filtros { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.btn-imprimir-val { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+.btn-imprimir-val:hover { background: #333; }
+.input-field-sm { border: 1px solid var(--borde); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
 .cierre-header  { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
 .cierre-id      { color: var(--texto-principal); font-weight: 700; }
 .cierre-fecha   { color: var(--texto-muted); font-size: 0.88rem; }
