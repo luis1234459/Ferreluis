@@ -411,9 +411,16 @@ def pagar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(get_db
     if monto <= 0:
         raise HTTPException(status_code=400, detail="Monto inválido")
 
-    tasa = float(datos.get("tasa_cambio", 0) or 0)
     moneda = datos.get("moneda", "USD")
-    monto_convertido = round(monto / tasa, 2) if moneda == "Bs" and tasa > 0 else None
+    tasa   = float(datos.get("tasa_cambio") or 0)
+    if moneda == "Bs":
+        if tasa <= 0:
+            from models import TasaCambio
+            tasa_obj = db.query(TasaCambio).order_by(TasaCambio.fecha.desc()).first()
+            tasa = float(tasa_obj.tasa if tasa_obj else 1)
+        monto_convertido = round(monto / tasa, 4)
+    else:
+        monto_convertido = None
 
     m = MovimientoBancario(
         tipo              = "pago_proveedor",
