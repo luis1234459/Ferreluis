@@ -1120,13 +1120,22 @@ export default {
         this.departamentosVal = res.data
       } catch {}
     },
-    imprimirNoAuditados() {
-      const params = new URLSearchParams()
-      if (this.imprimirDeptoId) params.append('departamento_id', this.imprimirDeptoId)
-      if (this.imprimirDesde)   params.append('desde_nombre', this.imprimirDesde)
-      if (this.imprimirHasta)   params.append('hasta_nombre', this.imprimirHasta)
-      const base = import.meta.env.VITE_API_URL || ''
-      window.open(`${base}/reportes/inventario/no-auditados/pdf?${params}`, '_blank')
+    async imprimirNoAuditados() {
+      try {
+        const params = {}
+        if (this.imprimirDeptoId) params.departamento_id = this.imprimirDeptoId
+        if (this.imprimirDesde)   params.desde_nombre    = this.imprimirDesde
+        if (this.imprimirHasta)   params.hasta_nombre    = this.imprimirHasta
+        const res = await axios.get('/reportes/inventario/no-auditados/pdf', {
+          params,
+          responseType: 'blob',
+        })
+        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
+      } catch {
+        alert('Error al generar PDF')
+      }
     },
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
