@@ -43,11 +43,12 @@ const GRUPOS = [
     key: 'inventario',
     icono: '📦',
     nombre: 'Inventario',
-    rutas: ['/inventario', '/ajustes'],
+    rutas: ['/inventario', '/ajustes', '/mapa'],
     items: [
       { ruta: '/inventario',          label: 'Inventario',     soloAdminOGestionadorOVendedor: true },
       { ruta: '/inventario/importar', label: 'Importar Excel', soloAdmin: true },
       { ruta: '/ajustes',             label: 'Ajustes',        soloAdminOGestionador: true },
+      { ruta: '/mapa',                label: '🗂 Mapa',         soloAdminOGestionador: true },
     ],
   },
   {
