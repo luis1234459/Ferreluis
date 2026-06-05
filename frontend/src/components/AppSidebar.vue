@@ -48,7 +48,7 @@ const GRUPOS = [
       { ruta: '/inventario',          label: 'Inventario',     soloAdminOGestionadorOVendedor: true },
       { ruta: '/inventario/importar', label: 'Importar Excel', soloAdmin: true },
       { ruta: '/ajustes',             label: 'Ajustes',        soloAdminOGestionador: true },
-      { ruta: '/mapa',                label: '🗂 Mapa',         soloAdminOGestionador: true },
+      { ruta: '/mapa',                label: '🗂 Mapa',         siempre: true },
     ],
   },
   {

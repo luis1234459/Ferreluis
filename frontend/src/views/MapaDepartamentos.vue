@@ -32,7 +32,14 @@
 
               <div v-if="expandido === d.id" class="depto-cats">
                 <div v-if="d.categorias.length === 0" class="cat-vacia">Sin categorías</div>
-                <div v-for="c in d.categorias" :key="c.id" class="cat-chip">{{ c.nombre }}</div>
+                <div v-else class="cats-columnas">
+                  <div v-for="(col, ci) in columnasCategoria(d.categorias)" :key="ci" class="cats-col">
+                    <div v-for="c in col" :key="c.id" class="cat-item">
+                      <span class="cat-bullet">›</span>
+                      {{ c.nombre }}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -76,6 +83,16 @@ export default {
       )
     },
   },
+  methods: {
+    columnasCategoria(cats) {
+      const porColumna = 4
+      const cols = []
+      for (let i = 0; i < cats.length; i += porColumna) {
+        cols.push(cats.slice(i, i + porColumna))
+      }
+      return cols
+    },
+  },
   async mounted() {
     try {
       const res = await axios.get('/productos/departamentos-con-categorias')
@@ -109,8 +126,12 @@ export default {
 .depto-expandido .depto-badge { background: rgba(255,204,0,0.2); color: #FFCC00; }
 .depto-toggle { font-size: 0.72rem; color: var(--texto-muted); flex-shrink: 0; }
 .depto-expandido .depto-toggle { color: #FFCC00; }
-.depto-cats { padding: 0.75rem 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
-.cat-chip { background: #F1F5F9; color: #1A1A1A; font-size: 0.78rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 20px; border: 1px solid #E2E8F0; }
+.depto-cats { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
+.cats-columnas { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.cats-col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 160px; }
+.cat-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--texto-principal); padding: 0.2rem 0; border-bottom: 1px solid #F0F0EC; }
+.cat-item:last-child { border-bottom: none; }
+.cat-bullet { color: #FFCC00; font-weight: 900; font-size: 1rem; line-height: 1; }
 .cat-vacia { font-size: 0.78rem; color: var(--texto-muted); font-style: italic; }
 .mapa-resumen { display: flex; gap: 0.5rem; font-size: 0.78rem; color: var(--texto-muted); justify-content: center; }
 .mapa-cargando { text-align: center; padding: 3rem; color: var(--texto-muted); }
