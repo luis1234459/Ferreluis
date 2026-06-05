@@ -11,6 +11,10 @@
               placeholder="🔍 Buscar departamento o categoría..."
               class="mapa-busqueda"
             />
+            <button v-if="esAdmin" class="btn-nuevo-depto"
+              @click="abrirModalDepto(null)">
+              + Nuevo departamento
+            </button>
           </div>
 
           <div v-if="cargando" class="mapa-cargando">Cargando estructura...</div>
@@ -28,6 +32,11 @@
                   {{ d.categorias.length }} {{ d.categorias.length === 1 ? 'categoría' : 'categorías' }}
                 </span>
                 <span class="depto-toggle">{{ expandido === d.id ? '▲' : '▼' }}</span>
+                <div v-if="esAdmin" class="depto-acciones" @click.stop>
+                  <button class="btn-edit-depto"
+                    @click.stop="abrirModalDepto(d)"
+                    title="Editar">✏️</button>
+                </div>
               </div>
 
               <div v-if="expandido === d.id" class="depto-cats">
@@ -37,9 +46,16 @@
                     <div v-for="c in col" :key="c.id" class="cat-item">
                       <span class="cat-bullet">›</span>
                       {{ c.nombre }}
+                      <button v-if="esAdmin" class="btn-edit-cat"
+                        @click="abrirModalCat(d.id, c)"
+                        title="Editar">✏️</button>
                     </div>
                   </div>
                 </div>
+                <button v-if="esAdmin" class="btn-nueva-cat"
+                  @click="abrirModalCat(d.id, null)">
+                  + Categoría
+                </button>
               </div>
             </div>
           </div>
@@ -52,6 +68,48 @@
         </div>
       </div>
     </main>
+
+    <!-- Modal departamento -->
+    <div v-if="modalDepto" class="mapa-overlay"
+      @click.self="modalDepto = false">
+      <div class="mapa-modal">
+        <h3>{{ formDepto.id ? 'Editar' : 'Nuevo' }} departamento</h3>
+        <input v-model="formDepto.nombre"
+          placeholder="Nombre del departamento"
+          class="mapa-input" ref="inputDepto"
+        />
+        <div class="mapa-modal-botones">
+          <button class="btn-cancelar"
+            @click="modalDepto = false">Cancelar</button>
+          <button class="btn-guardar"
+            @click="guardarDepto"
+            :disabled="guardandoDepto || !formDepto.nombre.trim()">
+            {{ guardandoDepto ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal categoría -->
+    <div v-if="modalCat" class="mapa-overlay"
+      @click.self="modalCat = false">
+      <div class="mapa-modal">
+        <h3>{{ formCat.id ? 'Editar' : 'Nueva' }} categoría</h3>
+        <input v-model="formCat.nombre"
+          placeholder="Nombre de la categoría"
+          class="mapa-input" ref="inputCat"
+        />
+        <div class="mapa-modal-botones">
+          <button class="btn-cancelar"
+            @click="modalCat = false">Cancelar</button>
+          <button class="btn-guardar"
+            @click="guardarCat"
+            :disabled="guardandoCat || !formCat.nombre.trim()">
+            {{ guardandoCat ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -64,13 +122,21 @@ export default {
   name: 'MapaDepartamentos',
   data() {
     return {
-      departamentos: [],
-      expandido:     null,
-      cargando:      true,
-      busqueda:      '',
+      departamentos:  [],
+      expandido:      null,
+      cargando:       true,
+      busqueda:       '',
+      usuario:        JSON.parse(localStorage.getItem('usuario') || '{}'),
+      modalDepto:     false,
+      formDepto:      { id: null, nombre: '' },
+      modalCat:       false,
+      formCat:        { id: null, nombre: '', departamento_id: null },
+      guardandoDepto: false,
+      guardandoCat:   false,
     }
   },
   computed: {
+    esAdmin() { return this.usuario.rol === 'admin' },
     totalCategorias() {
       return this.departamentos.reduce((s, d) => s + d.categorias.length, 0)
     },
@@ -92,11 +158,68 @@ export default {
       }
       return cols
     },
+    abrirModalDepto(d) {
+      this.formDepto = d
+        ? { id: d.id, nombre: d.nombre }
+        : { id: null, nombre: '' }
+      this.modalDepto = true
+      this.$nextTick(() => this.$refs.inputDepto?.focus())
+    },
+    abrirModalCat(deptoId, c) {
+      this.formCat = c
+        ? { id: c.id, nombre: c.nombre, departamento_id: deptoId }
+        : { id: null, nombre: '', departamento_id: deptoId }
+      this.modalCat = true
+      this.$nextTick(() => this.$refs.inputCat?.focus())
+    },
+    async guardarDepto() {
+      this.guardandoDepto = true
+      try {
+        if (this.formDepto.id) {
+          await axios.put(
+            `/productos/departamentos/${this.formDepto.id}`,
+            { nombre: this.formDepto.nombre }
+          )
+        } else {
+          await axios.post('/productos/departamentos',
+            { nombre: this.formDepto.nombre }
+          )
+        }
+        this.modalDepto = false
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar')
+      } finally { this.guardandoDepto = false }
+    },
+    async guardarCat() {
+      this.guardandoCat = true
+      try {
+        if (this.formCat.id) {
+          await axios.put(
+            `/productos/categorias/${this.formCat.id}`,
+            { nombre: this.formCat.nombre,
+              departamento_id: this.formCat.departamento_id }
+          )
+        } else {
+          await axios.post('/productos/categorias',
+            { nombre: this.formCat.nombre,
+              departamento_id: this.formCat.departamento_id }
+          )
+        }
+        this.modalCat = false
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar')
+      } finally { this.guardandoCat = false }
+    },
+    async cargarDepartamentos() {
+      const res = await axios.get('/productos/departamentos-con-categorias')
+      this.departamentos = res.data
+    },
   },
   async mounted() {
     try {
-      const res = await axios.get('/productos/departamentos-con-categorias')
-      this.departamentos = res.data
+      await this.cargarDepartamentos()
     } catch {
       this.departamentos = []
     } finally {
@@ -135,4 +258,25 @@ export default {
 .cat-vacia { font-size: 0.78rem; color: var(--texto-muted); font-style: italic; }
 .mapa-resumen { display: flex; gap: 0.5rem; font-size: 0.78rem; color: var(--texto-muted); justify-content: center; }
 .mapa-cargando { text-align: center; padding: 3rem; color: var(--texto-muted); }
+.btn-nuevo-depto { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 0.75rem; }
+.btn-nuevo-depto:hover { background: #333; }
+.depto-acciones { display: flex; gap: 0.25rem; }
+.btn-edit-depto { background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 0.1rem 0.25rem; opacity: 0.7; }
+.btn-edit-depto:hover { opacity: 1; }
+.btn-nueva-cat { background: #F1F5F9; border: 1px dashed #CBD5E1; border-radius: 6px; padding: 0.3rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #475569; margin-top: 0.25rem; width: 100%; }
+.btn-nueva-cat:hover { background: #E2E8F0; border-color: #94A3B8; }
+.btn-edit-cat { background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0; opacity: 0; margin-left: auto; }
+.cat-item:hover .btn-edit-cat { opacity: 0.6; }
+.btn-edit-cat:hover { opacity: 1 !important; }
+.mapa-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; }
+.mapa-modal { background: #FFFFFF; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 1rem; }
+.mapa-modal h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--texto-principal); }
+.mapa-input { border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.9rem; width: 100%; box-sizing: border-box; }
+.mapa-input:focus { outline: none; border-color: #FFCC00; }
+.mapa-modal-botones { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.btn-cancelar { background: #F1F5F9; border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; color: #475569; }
+.btn-cancelar:hover { background: #E2E8F0; }
+.btn-guardar { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+.btn-guardar:hover:not(:disabled) { background: #333; }
+.btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
