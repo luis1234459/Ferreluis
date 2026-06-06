@@ -486,14 +486,14 @@
               @change="gestionFiltroId = ''; gestionProductos = []">
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
-              <option value="proveedor">Por proveedor</option>
+              <option value="marca">Por marca</option>
             </select>
             <select v-if="gestionFiltroTipo === 'departamento' ||
-                          gestionFiltroTipo === 'proveedor'"
+                          gestionFiltroTipo === 'marca'"
               v-model="gestionFiltroId">
               <option value="">— Seleccionar —</option>
               <option v-for="op in gestionFiltroTipo === 'departamento'
-                                  ? departamentos : proveedores"
+                                  ? departamentos : marcas"
                 :key="op.id" :value="op.id">{{ op.nombre }}</option>
             </select>
             <button class="btn-cargar" @click="cargarProductosGestion"
@@ -521,10 +521,10 @@
                 <option v-for="c in gestionCategoriasDestino"
                   :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
-              <select v-model="proveedorDestino">
-                <option value="">— Proveedor (sin cambio) —</option>
-                <option v-for="p in proveedores" :key="p.id" :value="p.id">
-                  {{ p.nombre }}
+              <select v-model="marcaDestino">
+                <option value="">— Marca (sin cambio) —</option>
+                <option v-for="m in marcas" :key="m.id" :value="m.id">
+                  {{ m.nombre }}
                 </option>
               </select>
               <button class="btn-aplicar" @click="moverDepartamento"
@@ -557,7 +557,7 @@
                   </th>
                   <th>Nombre</th>
                   <th>Departamento</th>
-                  <th>Proveedor</th>
+                  <th>Marca</th>
                   <th>Stock</th>
                   <th>Acciones</th>
                 </tr>
@@ -572,7 +572,7 @@
                   </td>
                   <td style="font-weight:600">{{ p.nombre }}</td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
-                  <td class="txt-muted">{{ p.proveedor_nombre }}</td>
+                  <td class="txt-muted">{{ p.marca_nombre }}</td>
                   <td>{{ p.stock }}</td>
                   <td>
                     <button class="btn-editar-nombre" @click="abrirEditarNombre(p)">
@@ -978,7 +978,8 @@ export default {
       gestionCategoriasDestino: [],
       gestionMoviendo:          false,
       msgGestion:               '',
-      proveedorDestino:         '',
+      marcaDestino:             '',
+      marcas:                   [],
       modalCrearProd:           false,
       formCrearProd: {
         nombre: '', departamento_id: '', categoria_id: '',
@@ -1045,7 +1046,7 @@ export default {
   },
 
   async mounted() {
-    await Promise.all([this.cargarDepartamentos(), this.cargarProveedores()])
+    await Promise.all([this.cargarDepartamentos(), this.cargarProveedores(), this.cargarMarcas()])
     await this.cargarHistorial()
     if (!this.esAdmin && this.tabActivo === 'precios') {
       this.tabActivo = 'stock'
@@ -1072,6 +1073,13 @@ export default {
         const res = await axios.get('/compras/proveedores/')
         this.proveedores = res.data
       } catch { this.proveedores = [] }
+    },
+
+    async cargarMarcas() {
+      try {
+        const res = await axios.get('/marcas/')
+        this.marcas = res.data
+      } catch { this.marcas = [] }
     },
 
     // ── Tab Precios ────────────────────────────────────────────────────────
@@ -1564,8 +1572,8 @@ export default {
         this.msgGestion = 'Selecciona al menos un producto'
         return
       }
-      if (!this.gestionDeptDestino && !this.proveedorDestino) {
-        this.msgGestion = 'Selecciona al menos un cambio (departamento o proveedor)'
+      if (!this.gestionDeptDestino && !this.marcaDestino) {
+        this.msgGestion = 'Selecciona al menos un cambio (departamento o marca)'
         return
       }
       this.gestionMoviendo = true
@@ -1575,7 +1583,7 @@ export default {
           producto_ids:    this.gestionSeleccion,
           departamento_id: this.gestionDeptDestino ? parseInt(this.gestionDeptDestino) : null,
           categoria_id:    this.gestionCatDestino ? parseInt(this.gestionCatDestino) : null,
-          proveedor_id:    this.proveedorDestino ? parseInt(this.proveedorDestino) : null,
+          marca_id:        this.marcaDestino ? parseInt(this.marcaDestino) : null,
         }
         const res = await axios.post('/ajustes/productos/mover-departamento', payload,
           { headers: this._headers() })
@@ -1584,7 +1592,7 @@ export default {
         this.gestionSeleccion = []
         this.gestionDeptDestino = ''
         this.gestionCatDestino = ''
-        this.proveedorDestino = ''
+        this.marcaDestino = ''
         await this.cargarProductosGestion()
       } catch (e) {
         this.msgGestion = e?.response?.data?.detail || 'Error al mover productos'

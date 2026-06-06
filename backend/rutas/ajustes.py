@@ -10,7 +10,7 @@ import io
 from database import get_db
 from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
-    Departamento, Proveedor, TasaCambio,
+    Departamento, Proveedor, TasaCambio, Marca,
 )
 from rutas.usuarios import require_admin, require_admin_o_gestionador
 from pydantic import BaseModel
@@ -89,6 +89,8 @@ def _filtrar_productos(db: Session, filtro_tipo: str, filtro_id: Optional[int] =
             q = q.filter(Producto.categoria_id == categoria_id)
     elif filtro_tipo == "proveedor" and filtro_id:
         q = q.filter(Producto.proveedor_id == filtro_id)
+    elif filtro_tipo == "marca" and filtro_id:
+        q = q.filter(Producto.marca_id == filtro_id)
     elif filtro_tipo == "pareto":
         q = q.filter(Producto.es_producto_clave == True)
     return q.all()
@@ -138,23 +140,27 @@ def listar_productos_ajuste(
     productos     = _filtrar_productos(db, filtro_tipo, filtro_id, categoria_id)
     bcv, binance  = _tasas(db)
 
-    deptos_map = {d.id: d for d in db.query(Departamento).all()}
-    provs_map  = {p.id: p for p in db.query(Proveedor).all()}
+    deptos_map  = {d.id: d for d in db.query(Departamento).all()}
+    provs_map   = {p.id: p for p in db.query(Proveedor).all()}
+    marcas_map  = {m.id: m for m in db.query(Marca).all()}
 
     result = []
     for p in productos:
         precio_base     = round(float(p.costo_usd or 0) * (1 + float(p.margen or 0)), 4)
         depto           = deptos_map.get(p.departamento_id)
         prov            = provs_map.get(p.proveedor_id)
+        marca           = marcas_map.get(p.marca_id) if p.marca_id else None
         n_variantes     = _tiene_variantes(p.id, db)
         stock_real      = _stock_real(p, db)
         result.append({
             "id":                 p.id,
             "nombre":             p.nombre,
             "departamento_id":    p.departamento_id,
-            "departamento_nombre":depto.nombre if depto else "—",
+            "departamento_nombre":depto.nombre  if depto  else "—",
             "proveedor_id":       p.proveedor_id,
-            "proveedor_nombre":   prov.nombre  if prov  else "—",
+            "proveedor_nombre":   prov.nombre   if prov   else "—",
+            "marca_id":           p.marca_id,
+            "marca_nombre":       marca.nombre  if marca  else "—",
             "costo_usd":          float(p.costo_usd    or 0),
             "margen":             float(p.margen        or 0),
             "comision_pct":       float(p.comision_pct  or 0),
@@ -307,6 +313,7 @@ class MoverProductosLote(BaseModel):
     departamento_id: Optional[int] = None
     categoria_id:    Optional[int] = None
     proveedor_id:    Optional[int] = None
+    marca_id:        Optional[int] = None
 
 
 @router.post("/productos/mover-departamento")
@@ -332,6 +339,8 @@ def mover_departamento_lote(
             p.categoria_id    = datos.categoria_id
         if datos.proveedor_id is not None:
             p.proveedor_id = datos.proveedor_id
+        if datos.marca_id is not None:
+            p.marca_id = datos.marca_id
     db.commit()
     depto_label = deptos_map[datos.departamento_id].nombre if datos.departamento_id else "—"
     _guardar_historial(
