@@ -4,7 +4,7 @@ from database import get_db
 from models import Marca
 from rutas.usuarios import require_admin
 
-router = APIRouter(prefix="/marcas", tags=["marcas"])
+router = APIRouter(tags=["marcas"])
 
 
 @router.get("/")
