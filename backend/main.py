@@ -60,6 +60,9 @@ app.include_router(garantias.router)
 app.include_router(admin.router)
 app.include_router(notificaciones.router)
 
+from rutas import marcas as _marcas_mod
+app.include_router(_marcas_mod.router, prefix="/marcas")
+
 from rutas import chuito as _chuito_mod
 app.include_router(_chuito_mod.router, prefix="/chuito")
 
@@ -455,6 +458,22 @@ def inicializar_datos():
              "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS limite_credito FLOAT DEFAULT 0",
              "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_credito FLOAT DEFAULT 0",
              "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_a_favor FLOAT DEFAULT 0"],
+        )
+
+        # ── marcas ───────────────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS marcas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL UNIQUE,
+                activa BOOLEAN DEFAULT 1
+            )""",
+             "ALTER TABLE productos ADD COLUMN marca_id INTEGER REFERENCES marcas(id)"],
+            ["""CREATE TABLE IF NOT EXISTS marcas (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR NOT NULL UNIQUE,
+                activa BOOLEAN DEFAULT TRUE
+            )""",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS marca_id INTEGER REFERENCES marcas(id)"],
         )
 
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────

@@ -411,6 +411,13 @@
                 </select>
               </div>
               <div class="field">
+                <label>Marca</label>
+                <select v-model="form.marca_id" :disabled="esVendedor">
+                  <option :value="null">— Sin marca —</option>
+                  <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                </select>
+              </div>
+              <div class="field">
                 <label>Costo USD</label>
                 <input v-model.number="form.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" :disabled="esVendedor" />
               </div>
@@ -1085,6 +1092,7 @@ export default {
       productos:         [],
       departamentos:     [],
       proveedores:       [],
+      marcas:            [],
       plantillasGarantia:[],
       tasaBcv:       null,
       tasaBinance:   null,
@@ -1121,7 +1129,7 @@ export default {
       error:       '',
       form: {
         id: null, nombre: '', categoria: '', categoria_id: null,
-        departamento_id: null, proveedor_id: null,
+        departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
         es_producto_clave: false, es_producto_compuesto: false,
@@ -1294,6 +1302,7 @@ export default {
       this.cargarTasa(),
       this.cargarDepartamentos(),
       this.cargarProveedores(),
+      this.cargarMarcas(),
       this.cargarCategorias(),
       this.cargarPlantillasGarantia(),
     ])
@@ -1363,6 +1372,12 @@ export default {
         this.proveedores = res.data
       } catch { /* módulo aún no configurado */ }
     },
+    async cargarMarcas() {
+      try {
+        const res = await axios.get('/marcas/')
+        this.marcas = res.data
+      } catch { this.marcas = [] }
+    },
     async cargarOfertas() {
       const res = await axios.get('/productos/ofertas')
       this.ofertas = res.data
@@ -1404,7 +1419,7 @@ export default {
       this.error       = ''
       this.form = {
         id: null, nombre: '', categoria: '', categoria_id: null, codigo: '',
-        departamento_id: null, proveedor_id: null,
+        departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
         es_producto_clave: false, es_producto_compuesto: false,
@@ -1424,6 +1439,7 @@ export default {
         categoria_id:            p.categoria_id            ?? null,
         departamento_id:         p.departamento_id         ?? null,
         proveedor_id:            p.proveedor_id            ?? null,
+        marca_id:                p.marca_id                ?? null,
         es_producto_clave:       p.es_producto_clave       ?? false,
         es_producto_compuesto:   p.es_producto_compuesto   ?? false,
         descuento_compuesto_pct: p.descuento_compuesto_pct ?? 0,
@@ -1469,6 +1485,7 @@ export default {
           stock:                   Number(this.form.stock),
           departamento_id:         this.form.departamento_id  || null,
           proveedor_id:            this.form.proveedor_id     || null,
+          marca_id:                this.form.marca_id         || null,
           es_producto_clave:       Boolean(this.form.es_producto_clave),
           es_producto_compuesto:   Boolean(this.form.es_producto_compuesto),
           descuento_compuesto_pct: Number(this.form.descuento_compuesto_pct || 0),

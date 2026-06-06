@@ -50,6 +50,14 @@ class Categoria(Base):
     descuento_max_pct = Column(Float, nullable=True)  # límite de descuento en ventas (fracción, ej. 0.20 = 20%)
 
 
+class Marca(Base):
+    __tablename__ = "marcas"
+
+    id     = Column(Integer, primary_key=True)
+    nombre = Column(String, nullable=False, unique=True)
+    activa = Column(Boolean, default=True)
+
+
 class Producto(Base):
     __tablename__ = "productos"
 
@@ -87,6 +95,7 @@ class Producto(Base):
     stock_minimo              = Column(Integer, default=0, nullable=True)
 
     descuento_max_pct    = Column(Float,   nullable=True)   # límite de descuento en ventas (fracción); None = hereda categoría/proveedor
+    marca_id             = Column(Integer, ForeignKey("marcas.id"), nullable=True)
 
     # Auditoría de inventario
     auditado             = Column(Boolean,  default=False)

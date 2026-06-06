@@ -158,6 +158,10 @@
 
             <!-- Panel de filtros colapsable -->
             <div v-if="filtrosAbiertos" class="filtros-panel">
+              <select v-model="filtroMarca" class="filtro-sel" @change="cargarProductos()">
+                <option :value="null">Todas las marcas</option>
+                <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+              </select>
               <select v-model="filtroDepartamento" class="filtro-sel" @change="alCambiarDepartamento">
                 <option :value="null">Todos los dept.</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -166,15 +170,11 @@
                 <option :value="null">Todas las cat.</option>
                 <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
-              <select v-model="filtroProveedor" class="filtro-sel" @change="cargarProductos()">
-                <option :value="null">Todos los prov.</option>
-                <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
-              </select>
-              <button v-if="filtroDepartamento || filtroCategoria || filtroProveedor" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
+              <button v-if="filtroMarca || filtroDepartamento || filtroCategoria" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
             </div>
 
             <!-- Acceso rápido -->
-            <div v-if="!busqueda && !filtroDepartamento && !filtroCategoria && !filtroProveedor" class="acceso-rapido">
+            <div v-if="!busqueda && !filtroMarca && !filtroDepartamento && !filtroCategoria" class="acceso-rapido">
               <div v-if="masVendidos.length" class="ar-grupo">
                 <span class="ar-titulo">Más vendidos</span>
                 <div class="ar-chips">
@@ -1113,10 +1113,10 @@ export default {
       filtrosAbiertos:    false,
       departamentos:      [],
       categorias:         [],
-      proveedores:        [],
+      marcas:             [],
       filtroDepartamento: null,
       filtroCategoria:    null,
-      filtroProveedor:    null,
+      filtroMarca:        null,
       masVendidos:        [],
 
       monedaVenta:    'USD',
@@ -1415,7 +1415,7 @@ export default {
       this.cargarCuentasPorMetodo(),
       this.cargarDepartamentos(),
       this.cargarCategorias(),
-      this.cargarProveedores(),
+      this.cargarMarcas(),
       this.cargarMasVendidos(),
     ])
 
@@ -1497,10 +1497,10 @@ export default {
 
     async cargarProductos() {
       const params = { limit: 100 }
-      if (this.busqueda)          params.busqueda       = this.busqueda
+      if (this.busqueda)           params.busqueda       = this.busqueda
+      if (this.filtroMarca)        params.marca_id        = this.filtroMarca
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
-      if (this.filtroCategoria)   params.categoria_id   = this.filtroCategoria
-      if (this.filtroProveedor)   params.proveedor_id   = this.filtroProveedor
+      if (this.filtroCategoria)    params.categoria_id   = this.filtroCategoria
       const r = await axios.get('/productos/', { params })
       this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
     },
@@ -2225,11 +2225,11 @@ export default {
         this.categorias = r.data
       } catch { this.categorias = [] }
     },
-    async cargarProveedores() {
+    async cargarMarcas() {
       try {
-        const r = await axios.get('/compras/proveedores/')
-        this.proveedores = r.data
-      } catch { this.proveedores = [] }
+        const r = await axios.get('/marcas/')
+        this.marcas = r.data
+      } catch { this.marcas = [] }
     },
     async cargarMasVendidos() {
       try {
@@ -2250,9 +2250,9 @@ export default {
       } catch { /* producto no disponible */ }
     },
     limpiarFiltros() {
+      this.filtroMarca        = null
       this.filtroDepartamento = null
       this.filtroCategoria    = null
-      this.filtroProveedor    = null
       this.cargarProductos()
     },
     alCambiarDepartamento() {

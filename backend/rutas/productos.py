@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor, Marca
 from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
@@ -39,6 +39,7 @@ class ProductoSchema(BaseModel):
     requiere_serial:         bool            = False
     plantilla_garantia_id:   Optional[int]   = None
     es_generico:             bool            = False
+    marca_id:                Optional[int]   = None
 
     unidad_medida:           str            = 'unidad'
     unidades_por_paquete:    int            = 1
@@ -147,11 +148,13 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 ajuste_tipo: str = "manual",
                 ajuste_divisa_pct: float = 0.0,
                 codigo_proveedor: str = "",
-                db: Session = None) -> dict:
+                db: Session = None,
+                marca_obj=None) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_tipo, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
-    d["codigo_proveedor"]  = codigo_proveedor  # código del proveedor vinculado (inamovible tras 1ª compra)
+    d["codigo_proveedor"]  = codigo_proveedor
+    d["marca_nombre"]      = marca_obj.nombre if marca_obj else None  # código del proveedor vinculado (inamovible tras 1ª compra)
     if db is not None:
         dmx = getattr(p, 'descuento_max_pct', None)
         if dmx is None and p.categoria_id:
@@ -535,6 +538,7 @@ def listar_productos(
     departamento_id: Optional[int] = None,
     categoria_id: Optional[int] = None,
     proveedor_id: Optional[int] = None,
+    marca_id: Optional[int] = None,
     stock_cero: bool = False,
     db: Session = Depends(get_db),
 ):
@@ -569,6 +573,8 @@ def listar_productos(
         q = q.filter(Producto.categoria_id == categoria_id)
     if proveedor_id is not None:
         q = q.filter(Producto.proveedor_id == proveedor_id)
+    if marca_id is not None:
+        q = q.filter(Producto.marca_id == marca_id)
     if stock_cero:
         q = q.filter(Producto.stock <= 0)
     total = q.count()
@@ -612,6 +618,7 @@ def listar_productos(
     if cat_ids:
         for cat in db.query(Categoria).filter(Categoria.id.in_(cat_ids)).all():
             cat_descuento_map[cat.id] = getattr(cat, 'descuento_max_pct', None)
+    marcas_map: dict = {m.id: m for m in db.query(Marca).all()}
     productos = []
     for p in lista:
         policy, ajuste_divisa_pct = resolver_policy(
@@ -626,7 +633,8 @@ def listar_productos(
                             policy=policy,
                             ajuste_tipo=ajuste_tipo,
                             ajuste_divisa_pct=ajuste_divisa_pct,
-                            codigo_proveedor=catalogo_codigo_map.get(p.id, ""))
+                            codigo_proveedor=catalogo_codigo_map.get(p.id, ""),
+                            marca_obj=marcas_map.get(p.marca_id) if p.marca_id else None)
         dmx = getattr(p, 'descuento_max_pct', None)
         if dmx is None and p.categoria_id:
             dmx = cat_descuento_map.get(p.categoria_id)
@@ -875,10 +883,12 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         CatalogoProveedor.codigo_proveedor != None,
     ).first()
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    marca_obj = db.query(Marca).filter(Marca.id == p.marca_id).first() if p.marca_id else None
     return _enriquecer(p, bcv, binance, variantes, plantilla=_plantilla_de(p, db),
                        tiene_catalogo=(cat is not None),
                        codigo_proveedor=cat.codigo_proveedor if cat else "",
-                       policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
+                       policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db,
+                       marca_obj=marca_obj)
 
 
 @router.put("/edicion-masiva")

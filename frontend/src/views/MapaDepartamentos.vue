@@ -65,6 +65,22 @@
             <span>·</span>
             <span>{{ totalCategorias }} categorías en total</span>
           </div>
+
+          <div v-if="esAdmin && !cargando" class="marcas-seccion">
+            <div class="marcas-header">
+              <h2 class="marcas-titulo">🏷 Marcas</h2>
+              <button class="btn-nuevo-depto" @click="abrirModalMarca(null)">
+                + Nueva marca
+              </button>
+            </div>
+            <div class="marcas-grid">
+              <div v-for="m in marcas" :key="m.id" class="marca-chip-admin">
+                {{ m.nombre }}
+                <button class="btn-edit-cat" @click="abrirModalMarca(m)">✏️</button>
+              </div>
+              <div v-if="marcas.length === 0" class="cat-vacia">Sin marcas registradas</div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -85,6 +101,27 @@
             @click="guardarDepto"
             :disabled="guardandoDepto || !formDepto.nombre.trim()">
             {{ guardandoDepto ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal marca -->
+    <div v-if="modalMarca" class="mapa-overlay"
+      @click.self="modalMarca = false">
+      <div class="mapa-modal">
+        <h3>{{ formMarca.id ? 'Editar' : 'Nueva' }} marca</h3>
+        <input v-model="formMarca.nombre"
+          placeholder="Nombre de la marca"
+          class="mapa-input" ref="inputMarca"
+        />
+        <div class="mapa-modal-botones">
+          <button class="btn-cancelar"
+            @click="modalMarca = false">Cancelar</button>
+          <button class="btn-guardar"
+            @click="guardarMarca"
+            :disabled="guardandoMarca || !formMarca.nombre.trim()">
+            {{ guardandoMarca ? 'Guardando...' : 'Guardar' }}
           </button>
         </div>
       </div>
@@ -133,6 +170,10 @@ export default {
       formCat:        { id: null, nombre: '', departamento_id: null },
       guardandoDepto: false,
       guardandoCat:   false,
+      marcas:         [],
+      modalMarca:     false,
+      formMarca:      { id: null, nombre: '' },
+      guardandoMarca: false,
     }
   },
   computed: {
@@ -216,10 +257,40 @@ export default {
       const res = await axios.get('/productos/departamentos-con-categorias')
       this.departamentos = res.data
     },
+    async cargarMarcas() {
+      try {
+        const res = await axios.get('/marcas/')
+        this.marcas = res.data
+      } catch { this.marcas = [] }
+    },
+    abrirModalMarca(m) {
+      this.formMarca = m
+        ? { id: m.id, nombre: m.nombre }
+        : { id: null, nombre: '' }
+      this.modalMarca = true
+      this.$nextTick(() => this.$refs.inputMarca?.focus())
+    },
+    async guardarMarca() {
+      this.guardandoMarca = true
+      try {
+        if (this.formMarca.id) {
+          await axios.put(`/marcas/${this.formMarca.id}`, { nombre: this.formMarca.nombre })
+        } else {
+          await axios.post('/marcas/', { nombre: this.formMarca.nombre })
+        }
+        this.modalMarca = false
+        await this.cargarMarcas()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar')
+      } finally { this.guardandoMarca = false }
+    },
   },
   async mounted() {
     try {
-      await this.cargarDepartamentos()
+      await Promise.all([
+        this.cargarDepartamentos(),
+        this.cargarMarcas(),
+      ])
     } catch {
       this.departamentos = []
     } finally {
@@ -279,4 +350,9 @@ export default {
 .btn-guardar { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
 .btn-guardar:hover:not(:disabled) { background: #333; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
+.marcas-seccion { margin-top: 2rem; border-top: 2px solid var(--borde); padding-top: 1.5rem; }
+.marcas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.marcas-titulo { font-size: 1.1rem; font-weight: 800; margin: 0; color: var(--texto-principal); }
+.marcas-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.marca-chip-admin { background: #F1F5F9; border: 1px solid var(--borde); border-radius: 20px; padding: 0.3rem 0.75rem; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
 </style>
