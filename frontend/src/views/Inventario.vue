@@ -274,6 +274,7 @@
                       <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
                       <button v-if="esAdmin && !p.activo" class="btn-activar"    @click="cambiarEstado(p, true)">Activar</button>
                       <button v-if="!esGestionador" class="btn-eliminar"  @click="eliminar(p.id)">Eliminar</button>
+                      <button class="btn-etiqueta" @click="imprimirEtiquetaProducto(p)" title="Imprimir etiqueta Zebra">🏷️</button>
                     </div>
                   </td>
                 </tr>
@@ -1082,6 +1083,7 @@
 <script>
 import AppSidebar from '../components/AppSidebar.vue'
 import axios from 'axios'
+import { imprimirEtiqueta } from '../utils/zebra'
 
 export default {
   components: { AppSidebar },
@@ -1522,6 +1524,21 @@ export default {
         this.error = e?.response?.data?.detail || 'Error al guardar el producto'
       } finally {
         this.guardando = false
+      }
+    },
+    async imprimirEtiquetaProducto(p) {
+      const res = await imprimirEtiqueta({
+        nombre:    p.nombre,
+        codigo:    p.codigo || String(p.id),
+        precioUsd: p.precio_referencial_usd || p.precio_base_usd || 0,
+        precioBs:  p.precio_bs || 0,
+      })
+      if (res.ok) {
+        this.$toast?.add?.({ severity: 'success', summary: res.mensaje, life: 2000 })
+          || alert(res.mensaje)
+      } else {
+        this.$toast?.add?.({ severity: 'error', summary: res.mensaje, life: 4000 })
+          || alert(res.mensaje)
       }
     },
     async eliminar(id) {
@@ -2176,6 +2193,8 @@ export default {
 .btn-variantes{ background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-comp     { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
 .btn-eliminar { background: var(--danger);  color: white; border: none; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+.btn-etiqueta { background: #3A3A3A; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 5px; cursor: pointer; font-size: 0.85rem; }
+.btn-etiqueta:hover { background: #FFCC00; border-color: #FFCC00; }
 .fila-stock-bajo td { background: #DC262608; }
 .aviso-stock-variantes { font-size: 0.82rem; color: var(--texto-muted); background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0; }
 .aviso-solo-foto { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #92400E; font-weight: 600; }
