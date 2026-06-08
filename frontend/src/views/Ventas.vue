@@ -256,7 +256,7 @@
                   >📋</button>
                 </span>
               </div>
-              <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroProveedor)" class="prod-sin-res">Sin resultados</div>
+              <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroProveedor || filtroMarca)" class="prod-sin-res">Sin resultados</div>
               <div v-else-if="productosFiltrados.length === 0" class="prod-sin-res">Escribe 2+ caracteres para buscar</div>
             </div>
           </div>
@@ -1252,7 +1252,7 @@ export default {
     },
     productosFiltrados() {
       const q = this.busqueda.trim().toLowerCase()
-      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor
+      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor || this.filtroMarca
       if (q.length < 2 && !tienesFiltro) return []
       if (q.length >= 2) {
         // Código exacto en producto simple
