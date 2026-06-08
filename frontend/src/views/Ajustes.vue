@@ -52,9 +52,10 @@
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
               <option value="proveedor">Por proveedor</option>
+              <option value="marca">Por marca</option>
               <option value="pareto">Solo productos clave</option>
             </select>
-            <select v-if="filtroPrecioTipo === 'departamento' || filtroPrecioTipo === 'proveedor'"
+            <select v-if="filtroPrecioTipo === 'departamento' || filtroPrecioTipo === 'proveedor' || filtroPrecioTipo === 'marca'"
               v-model="filtroPrecioId">
               <option value="">— Seleccionar —</option>
               <option v-for="op in opcionesFiltroPrecio" :key="op.id" :value="op.id">{{ op.nombre }}</option>
@@ -144,9 +145,10 @@
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
               <option value="proveedor">Por proveedor</option>
+              <option value="marca">Por marca</option>
               <option value="pareto">Solo productos clave</option>
             </select>
-            <select v-if="filtroStockTipo === 'departamento' || filtroStockTipo === 'proveedor'"
+            <select v-if="filtroStockTipo === 'departamento' || filtroStockTipo === 'proveedor' || filtroStockTipo === 'marca'"
               v-model="filtroStockId"
               @change="cargarCategoriasStock()">
               <option value="">— Seleccionar —</option>
@@ -1031,11 +1033,13 @@ export default {
     opcionesFiltroPrecio() {
       if (this.filtroPrecioTipo === 'departamento') return this.departamentos
       if (this.filtroPrecioTipo === 'proveedor')    return this.proveedores
+      if (this.filtroPrecioTipo === 'marca')        return this.marcas
       return []
     },
     opcionesFiltroStock() {
       if (this.filtroStockTipo === 'departamento') return this.departamentos
       if (this.filtroStockTipo === 'proveedor')    return this.proveedores
+      if (this.filtroStockTipo === 'marca')        return this.marcas
       return []
     },
     opcionesFiltroComision() {

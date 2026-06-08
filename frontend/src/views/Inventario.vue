@@ -80,6 +80,10 @@
           <!-- Filtros -->
           <div class="filtros">
             <input v-model="busqueda" placeholder="Buscar producto..." class="buscador" />
+            <select v-model="filtroMarca">
+              <option value="">Todas las marcas</option>
+              <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+            </select>
             <select v-model="filtroDepartamento" @change="filtroCategoria = ''">
               <option value="">Todos los departamentos</option>
               <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -1104,6 +1108,7 @@ export default {
       busqueda:           '',
       filtroDepartamento: '',
       filtroCategoria:    '',
+      filtroMarca:        '',
       filtroTipo:         '',
 
       // Paginación
@@ -1295,6 +1300,7 @@ export default {
     },
     filtroDepartamento() { this.paginaActual = 1; this.cargarProductos() },
     filtroCategoria()    { this.paginaActual = 1; this.cargarProductos() },
+    filtroMarca()        { this.paginaActual = 1; this.cargarProductos() },
     filtroTipo()         { this.paginaActual = 1; this.cargarProductos() },
   },
 
@@ -1345,6 +1351,7 @@ export default {
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       if (this.esAdmin && this.filtroStockCero)  params.stock_cero        = true
       if (this.busqueda)           params.busqueda        = this.busqueda
+      if (this.filtroMarca)        params.marca_id        = this.filtroMarca
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
       const res = await axios.get('/productos/', { params })

@@ -679,6 +679,7 @@ def trazabilidad_producto(
     producto_id:     Optional[int]  = None,
     departamento_id: Optional[int]  = None,
     categoria_id:    Optional[int]  = None,
+    marca_id:        Optional[int]  = None,
     fecha_desde:     Optional[date] = None,
     fecha_hasta:     Optional[date] = None,
     tipo:            Optional[str]  = None,
@@ -704,6 +705,8 @@ def trazabilidad_producto(
             q = q.filter(Producto.departamento_id == departamento_id)
         if categoria_id:
             q = q.filter(Producto.categoria_id == categoria_id)
+        if marca_id:
+            q = q.filter(Producto.marca_id == marca_id)
         ids_productos = [r[0] for r in q.all()]
 
     if not ids_productos:
