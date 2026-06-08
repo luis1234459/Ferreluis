@@ -177,7 +177,7 @@
                   </div>
                   <div class="modal-body">
                     <p style="color:var(--texto-sec);font-size:0.88rem;margin:0 0 0.75rem">
-                      Este producto no existe en inventario. ¿Con qué nombre lo guardamos?
+                      Este producto no existe en inventario. Completa los datos para crearlo.
                     </p>
                     <div class="field-group">
                       <label class="field-label">Nombre en factura (IA)</label>
@@ -188,13 +188,53 @@
                     <div class="field-group">
                       <label class="field-label">Nombre a guardar en inventario *</label>
                       <input v-model="nombreNuevoProd" class="input-field" placeholder="Nombre del producto..." />
-                      <small class="txt-muted">El código del proveedor quedará fijo automáticamente.</small>
                     </div>
+                    <!-- Marca -->
+                    <div class="field-group">
+                      <label class="field-label">Marca</label>
+                      <select v-model="nuevoProdMarca" class="input-field">
+                        <option :value="null">— Sin marca —</option>
+                        <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                      </select>
+                    </div>
+                    <!-- Departamento -->
+                    <div class="field-group">
+                      <label class="field-label">Departamento *</label>
+                      <div v-if="!nuevoProdCrearDepto" style="display:flex;gap:6px">
+                        <select v-model="nuevoProdDepto" class="input-field" style="flex:1" @change="nuevoProdCategoria = null">
+                          <option :value="null">— Seleccionar —</option>
+                          <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                        </select>
+                        <button class="btn-match-nuevo" @click="nuevoProdCrearDepto = true" title="Crear departamento" style="white-space:nowrap">+ Nuevo</button>
+                      </div>
+                      <div v-else style="display:flex;gap:6px">
+                        <input v-model="nuevoProdNuevoDepto" class="input-field" style="flex:1" placeholder="Nombre del departamento..." />
+                        <button class="btn-confirmar" style="padding:0.4rem 0.8rem;font-size:0.85rem" @click="crearDeptoNuevoProd" :disabled="!nuevoProdNuevoDepto.trim()">Crear</button>
+                        <button class="btn-condicion" style="padding:0.4rem 0.6rem;font-size:0.85rem" @click="nuevoProdCrearDepto = false; nuevoProdNuevoDepto = ''">✕</button>
+                      </div>
+                    </div>
+                    <!-- Categoría (cascada del depto) -->
+                    <div class="field-group" v-if="nuevoProdDepto">
+                      <label class="field-label">Categoría</label>
+                      <div v-if="!nuevoProdCrearCat" style="display:flex;gap:6px">
+                        <select v-model="nuevoProdCategoria" class="input-field" style="flex:1">
+                          <option :value="null">— Sin categoría —</option>
+                          <option v-for="c in nuevoProdCategorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                        </select>
+                        <button class="btn-match-nuevo" @click="nuevoProdCrearCat = true" title="Crear categoría" style="white-space:nowrap">+ Nuevo</button>
+                      </div>
+                      <div v-else style="display:flex;gap:6px">
+                        <input v-model="nuevoProdNuevaCat" class="input-field" style="flex:1" placeholder="Nombre de la categoría..." />
+                        <button class="btn-confirmar" style="padding:0.4rem 0.8rem;font-size:0.85rem" @click="crearCatNuevoProd" :disabled="!nuevoProdNuevaCat.trim()">Crear</button>
+                        <button class="btn-condicion" style="padding:0.4rem 0.6rem;font-size:0.85rem" @click="nuevoProdCrearCat = false; nuevoProdNuevaCat = ''">✕</button>
+                      </div>
+                    </div>
+                    <small class="txt-muted">El código del proveedor quedará fijo automáticamente.</small>
                   </div>
                   <div class="modal-footer">
                     <button class="btn-condicion" @click="modalNuevoProd = false">Cancelar</button>
                     <button class="btn-confirmar" style="width:auto;padding:0.6rem 1.5rem"
-                      @click="confirmarNuevoProducto" :disabled="!nombreNuevoProd.trim()">
+                      @click="confirmarNuevoProducto" :disabled="!nombreNuevoProd.trim() || !nuevoProdDepto">
                       Guardar como nuevo
                     </button>
                   </div>
@@ -339,26 +379,43 @@
                       ✚ {{ linea.nombreFinal || linea.nombre_ia }}
                       <span class="prov-desvincular" @click="linea.esNuevo = false; linea.nombreFinal = ''">✕</span>
                     </div>
-                    <div v-if="!linea.match && !linea.esNuevo && linea._busqVisible" style="position:relative; margin-top:4px">
-                      <input
-                        v-model="linea._busqTexto"
-                        class="input-field input-sm"
-                        placeholder="Buscar en inventario..."
-                        @input="buscarProductoLinea(linea)"
-                        @focus="abrirLineaDropdown(linea)"
-                        @blur="cerrarLineaDropdown(linea)"
-                      />
-                      <ul v-if="linea._busqAbierta && linea._busqResultados.length" class="dropdown-list dropdown-sm">
-                        <li
-                          v-for="prod in linea._busqResultados"
-                          :key="`${prod.id}_${prod.variante_id||''}`"
-                          @mousedown="seleccionarMatch(linea, prod)"
-                        >
-                          {{ prod.nombre }}
-                          <small v-if="prod.codigo_proveedor" class="stock-hint"> · Cód: {{ prod.codigo_proveedor }}</small>
-                          <small class="stock-hint"> · Stock: {{ prod.stock }}</small>
-                        </li>
-                      </ul>
+                    <div v-if="pickerLinea === linea" class="picker-inline" style="margin-top:6px; border-top:1px solid #3A3A3A; padding-top:8px">
+                      <!-- Filtros cascada: Marca → Depto → Categoría + texto -->
+                      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1.5fr; gap:5px; margin-bottom:6px">
+                        <select v-model="pickerMarca" class="input-field input-sm" @change="pickerCategoria=null; pickerBuscar()" style="font-size:0.8rem">
+                          <option :value="null">Marca</option>
+                          <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                        </select>
+                        <select v-model="pickerDepto" class="input-field input-sm" @change="pickerCategoria=null; pickerBuscar()" style="font-size:0.8rem">
+                          <option :value="null">Depto</option>
+                          <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                        </select>
+                        <select v-model="pickerCategoria" class="input-field input-sm" @change="pickerBuscar()" style="font-size:0.8rem" :disabled="!pickerDepto">
+                          <option :value="null">Categoría</option>
+                          <option v-for="c in pickerCategorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                        </select>
+                        <input v-model="pickerTexto" class="input-field input-sm" placeholder="Buscar..." @input="pickerBuscar()" style="font-size:0.8rem" />
+                      </div>
+                      <!-- Resultados -->
+                      <div v-if="pickerCargando" style="padding:4px 0; font-size:0.8rem; color:#A0A0A0">Buscando...</div>
+                      <div v-if="!pickerCargando && pickerResultados.length" class="picker-results" style="max-height:180px; overflow-y:auto">
+                        <div v-for="prod in pickerResultados" :key="prod.id"
+                          class="picker-row" @click="pickerSeleccionar(prod)"
+                          style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:0.8rem; cursor:pointer; border-bottom:1px solid #2A2A2A">
+                          <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ prod.nombre }}</span>
+                          <span style="color:#A0A0A0; min-width:55px; text-align:right">${{ Number(prod.costo_usd || 0).toFixed(2) }}</span>
+                          <span style="color:#A0A0A0; min-width:55px; text-align:right">${{ Number(prod.precio_base_usd || 0).toFixed(2) }}</span>
+                          <span style="min-width:35px; text-align:right">{{ prod.stock || 0 }}</span>
+                          <span v-if="prod.auditado" style="background:#16A34A; color:#04210F; font-size:0.7rem; padding:1px 5px; border-radius:4px">Aud</span>
+                          <span v-else style="background:#FFCC00; color:#1A1A1A; font-size:0.7rem; padding:1px 5px; border-radius:4px">Pend</span>
+                        </div>
+                      </div>
+                      <div v-if="!pickerCargando && pickerTexto.length >= 2 && !pickerResultados.length && (pickerTexto || pickerMarca || pickerDepto)"
+                        style="padding:4px 0; font-size:0.8rem; color:#A0A0A0">Sin resultados</div>
+                      <div style="margin-top:4px; display:flex; justify-content:space-between">
+                        <button class="btn-match-nuevo" @mousedown.prevent="cerrarPicker(); abrirModalNuevoProducto(linea)" style="font-size:0.8rem">✚ Crear nuevo</button>
+                        <button class="btn-condicion" @mousedown.prevent="cerrarPicker()" style="font-size:0.75rem; padding:2px 8px">Cerrar</button>
+                      </div>
                     </div>
                   </div>
                   <!-- Ubicación: departamento / categoría -->
@@ -727,16 +784,33 @@ export default {
       // Selector OC existente
       ordenesDisponibles: [],
       ordenSeleccionada: null,
-      // Modal producto nuevo
+      // Modal producto nuevo (expandido: Marca → Depto → Categoría)
       modalNuevoProd:  false,
       lineaPendiente:  null,
       nombreNuevoProd: '',
+      nuevoProdMarca:     null,
+      nuevoProdDepto:     null,
+      nuevoProdCategoria: null,
+      nuevoProdCrearDepto: false,
+      nuevoProdNuevoDepto: '',
+      nuevoProdCrearCat:   false,
+      nuevoProdNuevaCat:   '',
       // Panel departamento/categoría
       panelDeptVisible:      false,
       panelDeptLinea:        null,
       departamentos:         [],
       panelDeptSeleccionado: null,
       panelCatSeleccionada:  null,
+      // Picker inline con filtros (Problema 1)
+      marcas:           [],
+      pickerLinea:       null,
+      pickerMarca:       null,
+      pickerDepto:       null,
+      pickerCategoria:   null,
+      pickerTexto:       '',
+      pickerResultados:  [],
+      pickerCargando:    false,
+      pickerTimer:       null,
       // Modal actualizar nombre al vincular
       modalActualizarNombre:  false,
       lineaActualizarNombre:  null,
@@ -756,9 +830,23 @@ export default {
       const { data } = await axios.get('/productos/departamentos-con-categorias')
       this.departamentos = data
     } catch {}
+    try {
+      const { data } = await axios.get('/marcas/')
+      this.marcas = data
+    } catch {}
   },
 
   computed: {
+    pickerCategorias() {
+      if (!this.pickerDepto) return []
+      const d = this.departamentos.find(x => x.id === this.pickerDepto)
+      return d ? (d.categorias || []) : []
+    },
+    nuevoProdCategorias() {
+      if (!this.nuevoProdDepto) return []
+      const d = this.departamentos.find(x => x.id === this.nuevoProdDepto)
+      return d ? (d.categorias || []) : []
+    },
     subtotalCalculado() {
       return this.lineas.reduce(
         (s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precio_unitario) || 0),
@@ -888,6 +976,7 @@ export default {
         departamento_nombre: '',
         categoria_id:        null,
         categoria_nombre:    '',
+        marca_id:            null,
         margen:              0.30,
         margen_display:      30,
         precio_venta_usd:    Math.round(Number(p.precio_unitario || 0) * 1.30 * 10000) / 10000,
@@ -1071,7 +1160,76 @@ export default {
       finally { linea.buscandoMatch = false }
     },
 
-    // ── Búsqueda inline por línea ─────────────────────────────────────
+    // ── Picker inline con filtros (Problema 1) ────────────────────────
+    abrirBusquedaLinea(linea) {
+      // Solo un picker abierto a la vez
+      if (this.pickerLinea === linea) { this.cerrarPicker(); return }
+      this.cerrarPicker()
+      this.pickerLinea      = linea
+      this.pickerMarca      = null
+      this.pickerDepto      = null
+      this.pickerCategoria  = null
+      this.pickerTexto      = linea.nombre_ia || ''
+      this.pickerResultados = []
+      linea._busqVisible    = true
+      this.pickerBuscar()
+    },
+    cerrarPicker() {
+      if (this.pickerLinea) this.pickerLinea._busqVisible = false
+      this.pickerLinea      = null
+      this.pickerResultados = []
+      this.pickerTexto      = ''
+    },
+    pickerBuscar() {
+      clearTimeout(this.pickerTimer)
+      this.pickerTimer = setTimeout(() => this._ejecutarBusqueda(), 300)
+    },
+    async _ejecutarBusqueda() {
+      const params = { por_pagina: 15, pagina: 1 }
+      if (this.pickerTexto.trim().length >= 2) params.busqueda = this.pickerTexto.trim()
+      if (this.pickerMarca)     params.marca_id        = this.pickerMarca
+      if (this.pickerDepto)     params.departamento_id  = this.pickerDepto
+      if (this.pickerCategoria) params.categoria_id     = this.pickerCategoria
+      if (!params.busqueda && !params.marca_id && !params.departamento_id) {
+        this.pickerResultados = []
+        return
+      }
+      this.pickerCargando = true
+      try {
+        const { data } = await axios.get('/productos/', { params })
+        this.pickerResultados = data.productos || []
+      } catch { this.pickerResultados = [] }
+      finally { this.pickerCargando = false }
+    },
+    pickerSeleccionar(prod) {
+      const linea = this.pickerLinea
+      if (!linea) return
+      linea.match           = {
+        id:               prod.id,
+        nombre:           prod.nombre,
+        margen:           prod.margen || 0.30,
+        stock:            prod.stock,
+        variante_id:      null,
+        variante_codigo:  null,
+        match_exacto:     false,
+        codigo_proveedor: prod.codigo_proveedor || '',
+      }
+      linea._busqTexto      = prod.nombre
+      linea._busqAbierta    = false
+      linea._busqResultados = []
+      linea.margen          = prod.margen || 0.30
+      linea.margen_display  = Math.round(linea.margen * 100 * 10) / 10
+      linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
+      this.cerrarPicker()
+      // Preguntar si actualizar nombre si difiere
+      const nombreIA = (linea.nombre_ia || '').trim()
+      const nombreSistema = (prod.nombre || '').trim()
+      if (nombreIA && nombreIA.toLowerCase() !== nombreSistema.toLowerCase()) {
+        this.lineaActualizarNombre = linea
+        this.modalActualizarNombre = true
+      }
+    },
+    // Mantener buscarProductoLinea para auto-match post-escaneo (no usa picker)
     async buscarProductoLinea(linea) {
       const q = linea._busqTexto.trim()
       if (q.length < 2) { linea._busqResultados = []; linea._busqAbierta = false; return }
@@ -1133,26 +1291,68 @@ export default {
       setTimeout(() => { linea._busqAbierta = false }, 200)
     },
 
-    abrirBusquedaLinea(linea) {
-      linea._busqVisible = true
-      linea._busqAbierta = true
-    },
     abrirModalNuevoProducto(linea) {
-      this.lineaPendiente  = linea
-      this.nombreNuevoProd = linea.nombre_ia
-      this.modalNuevoProd  = true
+      this.lineaPendiente      = linea
+      this.nombreNuevoProd     = linea.nombre_ia
+      this.nuevoProdMarca      = null
+      this.nuevoProdDepto      = null
+      this.nuevoProdCategoria  = null
+      this.nuevoProdCrearDepto = false
+      this.nuevoProdNuevoDepto = ''
+      this.nuevoProdCrearCat   = false
+      this.nuevoProdNuevaCat   = ''
+      this.modalNuevoProd      = true
     },
     confirmarNuevoProducto() {
       if (!this.lineaPendiente) return
       this.lineaPendiente.esNuevo       = true
       this.lineaPendiente.match         = null
       this.lineaPendiente.nombreFinal   = this.nombreNuevoProd.trim() || this.lineaPendiente.nombre_ia
+      this.lineaPendiente.marca_id         = this.nuevoProdMarca
+      this.lineaPendiente.departamento_id  = this.nuevoProdDepto
+      this.lineaPendiente.categoria_id     = this.nuevoProdCategoria
+      // Nombres para mostrar en badge de ubicación
+      const dObj = this.departamentos.find(d => d.id === this.nuevoProdDepto)
+      this.lineaPendiente.departamento_nombre = dObj ? dObj.nombre : ''
+      const cObj = dObj ? (dObj.categorias || []).find(c => c.id === this.nuevoProdCategoria) : null
+      this.lineaPendiente.categoria_nombre = cObj ? cObj.nombre : ''
       this.lineaPendiente.margen        = 0.30
       this.lineaPendiente.margen_display = 30
       this.lineaPendiente.precio_venta_usd = Math.round(this.lineaPendiente.precio_unitario * 1.30 * 10000) / 10000
       this.modalNuevoProd  = false
       this.lineaPendiente  = null
       this.nombreNuevoProd = ''
+    },
+    async crearDeptoNuevoProd() {
+      const nombre = this.nuevoProdNuevoDepto.trim()
+      if (!nombre) return
+      try {
+        await axios.post('/productos/departamentos', { nombre, activo: true })
+        const { data } = await axios.get('/productos/departamentos-con-categorias')
+        this.departamentos = data
+        const nuevo = data.find(d => d.nombre.toLowerCase() === nombre.toLowerCase())
+        if (nuevo) this.nuevoProdDepto = nuevo.id
+        this.nuevoProdCrearDepto = false
+        this.nuevoProdNuevoDepto = ''
+      } catch (e) {
+        alert('Error al crear departamento: ' + (e.response?.data?.detail || e.message))
+      }
+    },
+    async crearCatNuevoProd() {
+      const nombre = this.nuevoProdNuevaCat.trim()
+      if (!nombre || !this.nuevoProdDepto) return
+      try {
+        await axios.post('/productos/categorias', { nombre, departamento_id: this.nuevoProdDepto, activo: true })
+        const { data } = await axios.get('/productos/departamentos-con-categorias')
+        this.departamentos = data
+        const dObj = data.find(d => d.id === this.nuevoProdDepto)
+        const nueva = dObj ? (dObj.categorias || []).find(c => c.nombre.toLowerCase() === nombre.toLowerCase()) : null
+        if (nueva) this.nuevoProdCategoria = nueva.id
+        this.nuevoProdCrearCat = false
+        this.nuevoProdNuevaCat = ''
+      } catch (e) {
+        alert('Error al crear categoría: ' + (e.response?.data?.detail || e.message))
+      }
     },
     async confirmarActualizarNombre(actualizar) {
       const linea = this.lineaActualizarNombre
@@ -1183,6 +1383,7 @@ export default {
         _busqTexto: '', _busqResultados: [], _busqAbierta: false, _busqVisible: false,
         departamento_id: null, departamento_nombre: '',
         categoria_id: null,    categoria_nombre: '',
+        marca_id: null,
         margen: 0.30, margen_display: 30, precio_venta_usd: 0, modo_precio: 'margen',
       })
     },
@@ -1250,6 +1451,7 @@ export default {
           subtotal:            Math.round((Number(l.cantidad) * Number(l.precio_unitario)) * 100) / 100,
           actualizar_costo:    l.actualizar_costo && !!l.match,
           es_nuevo:            l.esNuevo && !l.match,
+          marca_id:            l.marca_id         || null,
           departamento_id:     l.departamento_id  || null,
           categoria_id:        l.categoria_id     || null,
           margen:              l.margen ?? 0.30,
@@ -1337,6 +1539,7 @@ export default {
         departamento_nombre: '',
         categoria_id:        null,
         categoria_nombre:    '',
+        marca_id:            null,
       }))
     },
     desvincularOrden() {
@@ -1879,4 +2082,9 @@ select.input-field { cursor: pointer; }
 }
 .btn-guardar-dept:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-guardar-dept:not(:disabled):hover { background: #FFD700; }
+/* Picker inline con filtros */
+.picker-row:hover { background: #242424; }
+.picker-row:active { background: #2A2A2A; border-left: 2px solid #FFCC00; }
+.picker-inline select, .picker-inline input { background: #242424; color: #F5F5F5; border-color: #3A3A3A; }
+.picker-inline select:focus, .picker-inline input:focus { border-color: #FFCC00; }
 </style>
