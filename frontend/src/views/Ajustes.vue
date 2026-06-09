@@ -388,6 +388,10 @@
 
           <!-- Filtros -->
           <div class="filtros-bar" style="flex-wrap:wrap;gap:0.6rem">
+            <select v-model="filtroTrazMarca">
+              <option value="">Todas las marcas</option>
+              <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+            </select>
             <select v-model="filtroTrazDepto" @change="filtroTrazCategoria = ''; cargarCategoriasTraz()">
               <option value="">Todos los departamentos</option>
               <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -488,14 +492,16 @@
               @change="gestionFiltroId = ''; gestionProductos = []">
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
+              <option value="proveedor">Por proveedor</option>
               <option value="marca">Por marca</option>
             </select>
             <select v-if="gestionFiltroTipo === 'departamento' ||
+                          gestionFiltroTipo === 'proveedor' ||
                           gestionFiltroTipo === 'marca'"
               v-model="gestionFiltroId">
               <option value="">— Seleccionar —</option>
               <option v-for="op in gestionFiltroTipo === 'departamento'
-                                  ? departamentos : marcas"
+                                  ? departamentos : gestionFiltroTipo === 'marca' ? marcas : proveedores"
                 :key="op.id" :value="op.id">{{ op.nombre }}</option>
             </select>
             <button class="btn-cargar" @click="cargarProductosGestion"
@@ -803,13 +809,14 @@
                 <option value="todos">Todos los productos</option>
                 <option value="departamento">Por departamento</option>
                 <option value="proveedor">Por proveedor</option>
+                <option value="marca">Por marca</option>
                 <option value="pareto">Solo productos clave</option>
               </select>
-              <select v-if="conteoFiltroTipo === 'departamento' || conteoFiltroTipo === 'proveedor'"
+              <select v-if="conteoFiltroTipo === 'departamento' || conteoFiltroTipo === 'proveedor' || conteoFiltroTipo === 'marca'"
                 v-model="conteoFiltroId"
                 @change="cargarCategoriasConteo">
                 <option value="">— Seleccionar —</option>
-                <option v-for="op in (conteoFiltroTipo === 'departamento' ? departamentos : proveedores)"
+                <option v-for="op in (conteoFiltroTipo === 'departamento' ? departamentos : conteoFiltroTipo === 'marca' ? marcas : proveedores)"
                   :key="op.id" :value="op.id">{{ op.nombre }}</option>
               </select>
               <select
@@ -960,6 +967,7 @@ export default {
       trazabilidad:         [],
       cargandoTraz:         false,
       filtroTrazProducto:   null,
+      filtroTrazMarca:      '',
       filtroTrazDepto:      '',
       filtroTrazCategoria:  '',
       filtroTrazDesde:      '',
@@ -1508,6 +1516,7 @@ export default {
       try {
         const params = {}
         if (this.filtroTrazProducto)  params.producto_id     = this.filtroTrazProducto
+        if (this.filtroTrazMarca)     params.marca_id        = this.filtroTrazMarca
         if (this.filtroTrazDepto)     params.departamento_id = this.filtroTrazDepto
         if (this.filtroTrazCategoria) params.categoria_id    = this.filtroTrazCategoria
         if (this.filtroTrazDesde)     params.fecha_desde     = this.filtroTrazDesde

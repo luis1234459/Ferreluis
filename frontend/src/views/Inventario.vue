@@ -446,6 +446,18 @@
                   <span>%</span>
                 </div>
               </div>
+              <div class="field" v-if="!esVendedor">
+                <label>
+                  🔥 Comisión empuje (USD fijo)
+                  <span class="label-hint">(vacío = sin empuje, ej: 5 = $5 fijos por venta)</span>
+                </label>
+                <input
+                  v-model.number="form.comision_push"
+                  type="number" min="0" step="0.5"
+                  placeholder="Sin empuje"
+                  style="max-width:120px"
+                />
+              </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
                 <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="esVendedor" />

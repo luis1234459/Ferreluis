@@ -171,10 +171,12 @@
                 <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
               </select>
               <button v-if="filtroMarca || filtroDepartamento || filtroCategoria" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
+              <button :class="['btn-empuje', filtroEmpuje ? 'btn-empuje-activo' : '']"
+                @click="filtroEmpuje = !filtroEmpuje; cargarProductos()">🔥 Empuje</button>
             </div>
 
             <!-- Acceso rápido -->
-            <div v-if="!busqueda && !filtroMarca && !filtroDepartamento && !filtroCategoria" class="acceso-rapido">
+            <div v-if="!busqueda && !filtroMarca && !filtroDepartamento && !filtroCategoria && !filtroEmpuje" class="acceso-rapido">
               <div v-if="masVendidos.length" class="ar-grupo">
                 <span class="ar-titulo">Más vendidos</span>
                 <div class="ar-chips">
@@ -225,6 +227,8 @@
                     class="badge-auditado-venta"
                     :title="'Auditado' + (p.fecha_auditoria ? ' · ' + formatFechaCorta(p.fecha_auditoria) : '')"
                   >✓</span>
+                  <span v-if="p.comision_push" class="badge-push"
+                    :title="'Comisión empuje: $' + p.comision_push">🔥 ${{ p.comision_push }}</span>
                   <div v-if="p.tiene_variantes && (p.variantes_resumen || []).some(v => v.activo)" class="pi-vcods">
                     <span
                       v-for="v in (p.variantes_resumen || []).filter(v => v.activo).slice(0, 5)"
@@ -1117,6 +1121,7 @@ export default {
       filtroDepartamento: null,
       filtroCategoria:    null,
       filtroMarca:        null,
+      filtroEmpuje:       false,
       masVendidos:        [],
 
       monedaVenta:    'USD',
@@ -1252,8 +1257,14 @@ export default {
     },
     productosFiltrados() {
       const q = this.busqueda.trim().toLowerCase()
-      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor || this.filtroMarca
+      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor || this.filtroMarca || this.filtroEmpuje
       if (q.length < 2 && !tienesFiltro) return []
+      let lista = this.productos
+      if (this.filtroEmpuje) {
+        lista = lista.filter(p => p.comision_push && p.comision_push > 0)
+          .sort((a, b) => (b.comision_push || 0) - (a.comision_push || 0))
+        if (!q || q.length < 2) return lista
+      }
       if (q.length >= 2) {
         // Código exacto en producto simple
         const exactCodigo = this.productos.filter(p =>
@@ -2251,6 +2262,7 @@ export default {
     },
     limpiarFiltros() {
       this.filtroMarca        = null
+      this.filtroEmpuje       = false
       this.filtroDepartamento = null
       this.filtroCategoria    = null
       this.cargarProductos()
@@ -2411,6 +2423,20 @@ export default {
   cursor: default;
   flex-shrink: 0;
 }
+.badge-push {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: #DC2626; color: white; border-radius: 4px;
+  font-size: 0.7rem; font-weight: 700; padding: 1px 5px;
+  margin-left: 4px; vertical-align: middle; flex-shrink: 0;
+  animation: pushPulse 2s infinite;
+}
+@keyframes pushPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.btn-empuje {
+  background: #3A3A3A; color: #F5F5F5; border: 1px solid #555;
+  padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem;
+}
+.btn-empuje:hover { border-color: #FFCC00; }
+.btn-empuje-activo { background: #DC2626; color: white; border-color: #DC2626; }
 
 .prod-item {
   display: flex;

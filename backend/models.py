@@ -78,6 +78,7 @@ class Producto(Base):
     es_producto_compuesto   = Column(Boolean, default=False)
     descuento_compuesto_pct = Column(Float,   default=0)       # % dto solo admin
     comision_pct            = Column(Float,   default=0.0)     # % comisión al vendedor por este producto
+    comision_push           = Column(Float,   nullable=True)   # USD fijo comisión empuje (NULL = no aplica)
     codigo                  = Column(String,  nullable=True, unique=True, index=True)
     activo                  = Column(Boolean, default=True)
     esquema_variante        = Column(String,  nullable=True)   # 'clase' | 'clase_color'
