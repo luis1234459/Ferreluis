@@ -489,7 +489,7 @@
           <!-- Filtros para cargar productos -->
           <div class="filtros-bar">
             <select v-model="gestionFiltroTipo"
-              @change="gestionFiltroId = ''; gestionProductos = []">
+              @change="gestionFiltroId = ''; gestionFiltroCategoria = ''; gestionCategoriasOpc = []; gestionProductos = []">
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
               <option value="proveedor">Por proveedor</option>
@@ -498,11 +498,17 @@
             <select v-if="gestionFiltroTipo === 'departamento' ||
                           gestionFiltroTipo === 'proveedor' ||
                           gestionFiltroTipo === 'marca'"
-              v-model="gestionFiltroId">
+              v-model="gestionFiltroId"
+              @change="cargarCategoriasGestion">
               <option value="">— Seleccionar —</option>
               <option v-for="op in gestionFiltroTipo === 'departamento'
                                   ? departamentos : gestionFiltroTipo === 'marca' ? marcas : proveedores"
                 :key="op.id" :value="op.id">{{ op.nombre }}</option>
+            </select>
+            <select v-if="gestionFiltroTipo === 'departamento' && gestionCategoriasOpc.length > 0"
+              v-model="gestionFiltroCategoria">
+              <option value="">— Todas las categorías —</option>
+              <option v-for="c in gestionCategoriasOpc" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
             <button class="btn-cargar" @click="cargarProductosGestion"
               :disabled="gestionCargando">
@@ -565,6 +571,7 @@
                   </th>
                   <th>Nombre</th>
                   <th>Departamento</th>
+                  <th>Categoría</th>
                   <th>Marca</th>
                   <th>Stock</th>
                   <th>Acciones</th>
@@ -580,6 +587,7 @@
                   </td>
                   <td style="font-weight:600">{{ p.nombre }}</td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
+                  <td class="txt-muted">{{ p.categoria_nombre }}</td>
                   <td class="txt-muted">{{ p.marca_nombre }}</td>
                   <td>{{ p.stock }}</td>
                   <td>
@@ -980,6 +988,8 @@ export default {
       // ── Tab Gestión ──────────────────────────────────────────────────────
       gestionFiltroTipo:        'todos',
       gestionFiltroId:          '',
+      gestionFiltroCategoria:   '',
+      gestionCategoriasOpc:     [],
       gestionProductos:         [],
       gestionCargando:          false,
       gestionSeleccion:         [],
@@ -1542,12 +1552,22 @@ export default {
       try {
         const params = { filtro_tipo: this.gestionFiltroTipo }
         if (this.gestionFiltroId) params.filtro_id = this.gestionFiltroId
+        if (this.gestionFiltroCategoria) params.categoria_id = this.gestionFiltroCategoria
         const res = await axios.get('/ajustes/productos',
           { params, headers: this._headers() })
         this.gestionProductos = res.data
       } finally {
         this.gestionCargando = false
       }
+    },
+    async cargarCategoriasGestion() {
+      this.gestionFiltroCategoria = ''
+      this.gestionCategoriasOpc = []
+      if (this.gestionFiltroTipo !== 'departamento' || !this.gestionFiltroId) return
+      try {
+        const res = await axios.get('/productos/categorias', { params: { departamento_id: this.gestionFiltroId } })
+        this.gestionCategoriasOpc = res.data
+      } catch { this.gestionCategoriasOpc = [] }
     },
 
     toggleGestionSeleccion(id) {

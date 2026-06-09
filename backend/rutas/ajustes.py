@@ -10,7 +10,7 @@ import io
 from database import get_db
 from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
-    Departamento, Proveedor, TasaCambio, Marca,
+    Departamento, Categoria, Proveedor, TasaCambio, Marca,
 )
 from rutas.usuarios import require_admin, require_admin_o_gestionador
 from pydantic import BaseModel
@@ -143,6 +143,7 @@ def listar_productos_ajuste(
     deptos_map  = {d.id: d for d in db.query(Departamento).all()}
     provs_map   = {p.id: p for p in db.query(Proveedor).all()}
     marcas_map  = {m.id: m for m in db.query(Marca).all()}
+    cats_map    = {c.id: c for c in db.query(Categoria).all()}
 
     result = []
     for p in productos:
@@ -150,6 +151,7 @@ def listar_productos_ajuste(
         depto           = deptos_map.get(p.departamento_id)
         prov            = provs_map.get(p.proveedor_id)
         marca           = marcas_map.get(p.marca_id) if p.marca_id else None
+        cat             = cats_map.get(p.categoria_id) if p.categoria_id else None
         n_variantes     = _tiene_variantes(p.id, db)
         stock_real      = _stock_real(p, db)
         result.append({
@@ -157,6 +159,8 @@ def listar_productos_ajuste(
             "nombre":             p.nombre,
             "departamento_id":    p.departamento_id,
             "departamento_nombre":depto.nombre  if depto  else "—",
+            "categoria_id":       p.categoria_id,
+            "categoria_nombre":   cat.nombre    if cat    else "—",
             "proveedor_id":       p.proveedor_id,
             "proveedor_nombre":   prov.nombre   if prov   else "—",
             "marca_id":           p.marca_id,
