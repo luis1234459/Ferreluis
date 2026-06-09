@@ -79,34 +79,6 @@ def _normalizar(texto: str) -> str:
     return texto
 
 
-def _fila_codigo_bloqueada(db: Session, proveedor_id, codigo, excluir_prod_id):
-    """
-    Candado código↔producto. Devuelve la fila de catálogo BLOQUEADA con ese
-    código en el proveedor que apunta a OTRO producto NO genérico (= conflicto),
-    o None si no hay conflicto.
-
-    Los productos genéricos quedan exentos: su código se puede repetir.
-    El match usa la huella tolerante (igual que el resto del módulo).
-    """
-    if not (proveedor_id and codigo):
-        return None
-    huella = _huella_codigo(codigo)
-    if not huella:
-        return None
-    candidatas = db.query(CatalogoProveedor).filter(
-        CatalogoProveedor.proveedor_id == proveedor_id,
-        CatalogoProveedor.bloqueado == True,
-    ).all()
-    for c in candidatas:
-        if not c.producto_id or c.producto_id == excluir_prod_id:
-            continue
-        if c.codigo_huella == huella or _huella_codigo(c.codigo_proveedor or "") == huella:
-            otro = db.query(Producto).filter(Producto.id == c.producto_id).first()
-            if otro and not otro.es_generico:
-                return c
-    return None
-
-
 # ---------------------------------------------------------------------------
 # POST /facturas/escanear
 # ---------------------------------------------------------------------------
@@ -573,40 +545,6 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         for p in productos_data
     )
 
-    # ── Pre-validación: candado código↔producto (antes de escribir nada) ──────
-    # Si un código ya está bloqueado a otro producto NO genérico, no se crea el
-    # duplicado en silencio: se devuelve 409 con los conflictos para que el
-    # admin elija (en el frontend) entre: corregir el producto, reasignar el
-    # código, vincular sin código, o marcar genérico.
-    conflictos = []
-    for p in productos_data:
-        if bool(p.get("es_nuevo", False)):
-            continue
-        if bool(p.get("reasignar_codigo", False)):
-            continue  # el admin ya pidió mover el código a este producto
-        prod_id_v   = p.get("producto_id")
-        codigo_v    = (p.get("codigo_proveedor") or "").strip()
-        if not (prod_id_v and codigo_v and proveedor_id):
-            continue
-        prod_v = db.query(Producto).filter(Producto.id == prod_id_v).first()
-        if not prod_v or prod_v.es_generico:
-            continue  # genéricos exentos del candado
-        fila_conf = _fila_codigo_bloqueada(db, proveedor_id, codigo_v, prod_id_v)
-        if fila_conf:
-            otro = db.query(Producto).filter(Producto.id == fila_conf.producto_id).first()
-            conflictos.append({
-                "codigo":                  codigo_v,
-                "producto_destino_id":     prod_id_v,
-                "producto_destino_nombre": prod_v.nombre,
-                "producto_actual_id":      fila_conf.producto_id,
-                "producto_actual_nombre":  otro.nombre if otro else "",
-            })
-    if conflictos:
-        raise HTTPException(
-            status_code=409,
-            detail={"tipo": "conflicto_codigo", "conflictos": conflictos},
-        )
-
     # ── Orden de compra ───────────────────────────────────────────────────────
     if orden_id_existente:
         # Vincular a OC existente (aprobada o recibida_parcial)
@@ -701,9 +639,8 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
         margen_nuevo = p.get("margen")   # None si no viene en el payload
         costo_ant   = None
 
-        dept_id  = p.get("departamento_id") or None
-        cat_id   = p.get("categoria_id")  or None
-        marca_id = p.get("marca_id")      or None
+        dept_id = p.get("departamento_id") or None
+        cat_id  = p.get("categoria_id")  or None
 
         # Si es producto nuevo, crearlo en inventario
         if es_nuevo and not prod_id:
@@ -716,7 +653,6 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                 proveedor_id       = proveedor_id,
                 departamento_id    = dept_id,
                 categoria_id       = cat_id,
-                marca_id           = marca_id,
                 activo             = True,
                 auditado           = True,
                 fecha_auditoria    = datetime.utcnow(),
@@ -760,44 +696,14 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             costo_anterior           = costo_ant,
         ))
 
-        # ── Vincular código en catálogo (candado código↔producto) ────────────
+        # ── Vincular código en catálogo (inamovible una vez guardado) ─────────
         if prod_id and proveedor_id:
-            prod_obj    = db.query(Producto).filter(Producto.id == prod_id).first()
-            es_gen      = bool(prod_obj.es_generico) if prod_obj else False
+            existente_catalogo = db.query(CatalogoProveedor).filter(
+                CatalogoProveedor.proveedor_id == proveedor_id,
+                CatalogoProveedor.producto_id  == prod_id,
+                CatalogoProveedor.variante_id  == variante_id,
+            ).first()
             huella_prov = _huella_codigo(codigo_prov) if codigo_prov else None
-
-            # Acción "reasignar": el admin decidió que el código pertenece a
-            # ESTE producto → liberar el código del dueño viejo (otro producto).
-            if codigo_prov and not es_gen and bool(p.get("reasignar_codigo", False)):
-                for c in db.query(CatalogoProveedor).filter(
-                    CatalogoProveedor.proveedor_id == proveedor_id,
-                    CatalogoProveedor.bloqueado == True,
-                ).all():
-                    if c.producto_id and c.producto_id != prod_id and (
-                        c.codigo_huella == huella_prov
-                        or _huella_codigo(c.codigo_proveedor or "") == huella_prov
-                    ):
-                        c.codigo_proveedor = None
-                        c.codigo_huella    = None
-
-            # Buscar fila existente: código-primero si hay código; si no, por producto.
-            existente_catalogo = None
-            if codigo_prov and not es_gen:
-                for c in db.query(CatalogoProveedor).filter(
-                    CatalogoProveedor.proveedor_id == proveedor_id,
-                    CatalogoProveedor.producto_id  == prod_id,
-                    CatalogoProveedor.variante_id  == variante_id,
-                ).all():
-                    if c.codigo_huella == huella_prov or _huella_codigo(c.codigo_proveedor or "") == huella_prov:
-                        existente_catalogo = c
-                        break
-            if existente_catalogo is None:
-                existente_catalogo = db.query(CatalogoProveedor).filter(
-                    CatalogoProveedor.proveedor_id == proveedor_id,
-                    CatalogoProveedor.producto_id  == prod_id,
-                    CatalogoProveedor.variante_id  == variante_id,
-                ).first()
-
             if not existente_catalogo:
                 db.add(CatalogoProveedor(
                     proveedor_id          = proveedor_id,
@@ -808,12 +714,12 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                     codigo_huella         = huella_prov,
                     rif_proveedor         = rif_prov if rif_prov else None,
                     precio_referencia_usd = precio,
-                    bloqueado             = (not es_gen),  # genéricos NO se bloquean
+                    bloqueado             = True,  # primera compra → asociación inamovible
                 ))
             else:
                 existente_catalogo.precio_referencia_usd = precio
-                existente_catalogo.bloqueado             = (not es_gen)
-                if codigo_prov:  # factura siempre sobreescribe (fuente autoritativa)
+                existente_catalogo.bloqueado              = True  # confirmar compra bloquea
+                if not existente_catalogo.codigo_proveedor and codigo_prov:
                     existente_catalogo.codigo_proveedor = codigo_prov
                     existente_catalogo.codigo_huella     = huella_prov
                 elif existente_catalogo.codigo_proveedor and not existente_catalogo.codigo_huella:
