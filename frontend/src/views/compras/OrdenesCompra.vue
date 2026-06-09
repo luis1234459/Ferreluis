@@ -91,6 +91,13 @@
             </div>
             <p v-if="ordenDetalle.observacion" class="obs">{{ ordenDetalle.observacion }}</p>
 
+            <!-- Acciones: PDF + WhatsApp -->
+            <div class="oc-acciones">
+              <button class="btn-pdf" @click="descargarPDF(ordenDetalle)">📄 Descargar PDF</button>
+              <button class="btn-whatsapp" @click="enviarWhatsApp(ordenDetalle)"
+                :disabled="!ordenDetalle.proveedor_telefono">💬 Enviar por WhatsApp</button>
+            </div>
+
             <!-- Recepciones -->
             <div v-if="recepcionesDetalle.length > 0" class="recepciones-section">
               <h3 class="rec-titulo">Recepciones registradas</h3>
@@ -500,6 +507,35 @@ export default {
         console.error('Error cargando recepciones:', e?.response?.status, e?.response?.data)
       }
     },
+    async descargarPDF(orden) {
+      try {
+        const res = await axios.get(`/compras/ordenes/${orden.id}/pdf`, { responseType: 'blob' })
+        const url = URL.createObjectURL(res.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `OC_${orden.numero || orden.id}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (e) {
+        alert('Error al generar PDF: ' + (e?.response?.data?.detail || e.message))
+      }
+    },
+    enviarWhatsApp(orden) {
+      let tel = (orden.proveedor_telefono || '').replace(/[^0-9]/g, '')
+      if (!tel) { alert('El proveedor no tiene teléfono registrado'); return }
+      // Formato Venezuela: si empieza con 0, quitar y agregar 58
+      if (tel.startsWith('0')) tel = '58' + tel.substring(1)
+      if (!tel.startsWith('58') && tel.length === 10) tel = '58' + tel
+      const msg = encodeURIComponent(
+        `Hola, le envío la Orden de Compra *${orden.numero}* de Comercial Ferre-Util C.A. `
+        + `por un total de *$${orden.total.toFixed(2)}*. Adjunto el PDF.`
+      )
+      // Primero descarga el PDF, luego abre WhatsApp
+      this.descargarPDF(orden)
+      setTimeout(() => {
+        window.open(`https://wa.me/${tel}?text=${msg}`, '_blank')
+      }, 500)
+    },
     async devolverRecepcion(rec) {
       if (!confirm(`¿Devolver recepción #${rec.id} por $${rec.total_recibido.toFixed(2)}?\nEsto revertirá el stock y los costos actualizados.`)) return
       this.devolviendo     = rec.id
@@ -632,4 +668,11 @@ export default {
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+.oc-acciones { display: flex; gap: 8px; margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--borde); }
+.btn-pdf { background: #3A3A3A; color: #F5F5F5; border: 1px solid #555; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.btn-pdf:hover { border-color: #FFCC00; background: #FFCC0022; }
+.btn-whatsapp { background: #16A34A; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.btn-whatsapp:hover { background: #15803D; }
+.btn-whatsapp:disabled { opacity: 0.4; cursor: not-allowed; }
+.sel-inline { max-width: 120px; font-size: 0.8rem; height: 30px; }
 </style>

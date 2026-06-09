@@ -9,6 +9,7 @@ Flujo de estado:
   cerrada → inmutable
 """
 from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from database import get_db
@@ -43,6 +44,7 @@ def _serializar_orden(o: OrdenCompra, db: Session) -> dict:
         "numero":           o.numero,
         "proveedor_id":     o.proveedor_id,
         "proveedor_nombre": prov.nombre if prov else None,
+        "proveedor_telefono": prov.telefono if prov else None,
         "fecha_creacion":   o.fecha_creacion.isoformat() if o.fecha_creacion else None,
         "fecha_aprobacion": o.fecha_aprobacion.isoformat() if o.fecha_aprobacion else None,
         "fecha_esperada":   o.fecha_esperada.isoformat() if o.fecha_esperada else None,
@@ -372,6 +374,121 @@ def anular_orden(orden_id: int, datos: dict = {}, db: Session = Depends(get_db),
     o.estado = "anulada"
     db.commit()
     return _serializar_orden(o, db)
+
+
+@router.get("/ordenes/{orden_id}/pdf")
+def generar_pdf_orden(orden_id: int, db: Session = Depends(get_db)):
+    """Genera un PDF profesional de la Orden de Compra para envío al proveedor."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    import io
+
+    o = db.query(OrdenCompra).filter(OrdenCompra.id == orden_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    prov = db.query(Proveedor).filter(Proveedor.id == o.proveedor_id).first()
+    detalles = db.query(DetalleOrdenCompra).filter(
+        DetalleOrdenCompra.orden_id == orden_id
+    ).all()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter,
+                            leftMargin=20*mm, rightMargin=20*mm,
+                            topMargin=15*mm, bottomMargin=15*mm)
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='Empresa', fontName='Helvetica-Bold',
+                              fontSize=14, spaceAfter=2))
+    styles.add(ParagraphStyle(name='SubInfo', fontName='Helvetica',
+                              fontSize=9, textColor=colors.grey))
+    story = []
+
+    # ── Encabezado empresa ────────────────────────────────────────────────
+    story.append(Paragraph("COMERCIAL FERRE-UTIL C.A.", styles['Empresa']))
+    story.append(Paragraph("RIF: J-30299737-5 · Ciudad Ojeda, Zulia, Venezuela", styles['SubInfo']))
+    story.append(Spacer(1, 6*mm))
+
+    # ── Título OC ──────────────────────────────────────────────────────────
+    fecha = o.fecha_creacion.strftime('%d/%m/%Y') if o.fecha_creacion else ''
+    estado_txt = (o.estado or '').upper()
+    story.append(Paragraph(
+        f"<b>ORDEN DE COMPRA {o.numero or ''}</b> &nbsp; — &nbsp; {fecha} "
+        f"&nbsp; <font color='grey'>[{estado_txt}]</font>",
+        styles['Heading2']))
+    story.append(Spacer(1, 4*mm))
+
+    # ── Datos del proveedor ────────────────────────────────────────────────
+    if prov:
+        info_prov = [
+            ["Proveedor:", prov.nombre or '', "RIF:", prov.rif or '—'],
+            ["Teléfono:", prov.telefono or '—', "Contacto:", prov.contacto or '—'],
+            ["Email:", prov.email or '—', "Dirección:", (prov.direccion or '—')[:50]],
+        ]
+        t = Table(info_prov, colWidths=[60, 170, 60, 170])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(t)
+    story.append(Spacer(1, 6*mm))
+
+    # ── Tabla de productos ─────────────────────────────────────────────────
+    header = ['#', 'Producto', 'Cant.', 'Precio USD', 'Subtotal USD']
+    data = [header]
+    for i, d in enumerate(detalles, 1):
+        nombre = d.nombre_producto or ''
+        if d.es_producto_nuevo:
+            nombre += ' [NUEVO]'
+        data.append([
+            str(i),
+            nombre,
+            str(int(d.cantidad_pedida) if d.cantidad_pedida == int(d.cantidad_pedida) else d.cantidad_pedida),
+            f"${d.precio_unitario_usd:,.2f}",
+            f"${d.subtotal:,.2f}",
+        ])
+    # Fila total
+    data.append(['', '', '', 'TOTAL:', f"${o.total:,.2f}"])
+
+    col_widths = [25, 230, 45, 75, 85]
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, 0), 9),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A1A1A')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.HexColor('#FFCC00')),
+        ('FONTNAME',   (0, 1), (-1, -2), 'Helvetica'),
+        ('FONTSIZE',   (0, 1), (-1, -2), 9),
+        ('ALIGN',      (2, 0), (-1, -1), 'RIGHT'),
+        ('GRID',       (0, 0), (-1, -2), 0.5, colors.lightgrey),
+        ('LINEABOVE',  (0, -1), (-1, -1), 1, colors.black),
+        ('FONTNAME',   (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, -1), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t)
+
+    # ── Observaciones ──────────────────────────────────────────────────────
+    if o.observacion:
+        story.append(Spacer(1, 6*mm))
+        story.append(Paragraph(f"<b>Observaciones:</b> {o.observacion}", styles['Normal']))
+
+    story.append(Spacer(1, 10*mm))
+    story.append(Paragraph("Generado por Ferreutil — Sistema Administrativo", styles['SubInfo']))
+
+    doc.build(story)
+    buf.seek(0)
+    filename = f"OC_{o.numero or orden_id}.pdf"
+    return Response(
+        content=buf.read(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------
