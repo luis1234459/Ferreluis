@@ -129,100 +129,143 @@
 
         <!-- Modal nueva/editar orden -->
         <div class="overlay" v-if="mostrarForm" @click.self="cerrarForm">
-          <div class="modal modal-form">
+          <div class="modal modal-form modal-catalogo">
             <div class="modal-header">
-              <h2>{{ editandoId ? 'Editar orden' : 'Nueva orden de compra' }}</h2>
+              <h2>{{ editandoId ? 'Editar orden' : 'Nueva orden a proveedor' }}</h2>
               <button class="btn-cerrar-modal" @click="cerrarForm">✕</button>
             </div>
 
-            <div class="form-grid">
-              <div class="field">
-                <label>Proveedor</label>
-                <select v-model="form.proveedor_id">
-                  <option value="">— Selecciona —</option>
-                  <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
-                </select>
-              </div>
-              <div class="field field-wide">
-                <label>Observación</label>
-                <input v-model="form.observacion" placeholder="Notas u observaciones" />
-              </div>
-            </div>
-
-            <h3 class="subtitulo">Productos</h3>
-
-            <!-- Filtros de búsqueda de producto -->
-            <div class="filtros-producto-oc">
-              <input v-model="filtroBusquedaOC" class="filtro-busq-oc" placeholder="🔍 Buscar producto o código..." />
-              <select v-model="filtroMarcaOC" class="filtro-sel-oc">
-                <option value="">Todas las marcas</option>
-                <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
-              </select>
-              <select v-model="filtroDeptoOC" class="filtro-sel-oc" @change="cargarCategoriasOC">
-                <option value="">Todos los departamentos</option>
-                <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
-              </select>
-              <select v-model="filtroCategoriaOC" class="filtro-sel-oc" :disabled="!filtroDeptoOC">
-                <option value="">Todas las categorías</option>
-                <option v-for="c in categoriasOC" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-              </select>
-              <select v-model="filtroProveedorOC" class="filtro-sel-oc">
-                <option value="">Todos los proveedores</option>
+            <!-- Proveedor selector (arriba) -->
+            <div class="oc-prov-bar">
+              <label>Proveedor</label>
+              <select v-model="form.proveedor_id">
+                <option value="">— Selecciona proveedor —</option>
                 <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
               </select>
-              <span class="filtro-contador">{{ opcionesFiltradas.length }} opciones</span>
             </div>
 
-            <!-- Cabecera tabla de líneas -->
-            <div class="lineas-head">
-              <span>Producto / Variante</span>
-              <span>Nombre</span>
-              <span class="tc">Cant.</span>
-              <span class="tc">Precio $</span>
-              <span class="tr">Subtotal</span>
-              <span></span>
-            </div>
-            <!-- Filas de líneas (scrollable) -->
-            <div class="lineas-scroll">
-              <div v-for="(linea, i) in form.detalles" :key="i" class="fila-linea">
-                <select v-model="linea._key" @change="llenarDesdeInventario(linea)">
-                  <option value="">— Nuevo producto —</option>
-                  <option v-for="op in opcionesFiltradas" :key="op.key" :value="op.key">
-                    {{ op.label }}{{ op.stock_label }}
-                  </option>
-                </select>
-                <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea._key" />
-                <template v-if="!linea._key">
-                  <select v-model="linea.marca_id" class="filtro-sel-oc sel-inline" title="Marca">
-                    <option :value="null">Marca</option>
+            <!-- Two-panel layout -->
+            <div class="oc-panels">
+
+              <!-- LEFT: Catálogo de productos -->
+              <div class="oc-catalogo">
+                <div class="oc-cat-header">
+                  <i class="ti ti-building-store" style="color:#FFCC00;font-size:18px" aria-hidden="true"></i>
+                  <span>Catálogo de productos</span>
+                  <span class="oc-cat-count">{{ opcionesFiltradas.length }} opciones</span>
+                </div>
+
+                <!-- Filtros -->
+                <div class="oc-filtros">
+                  <select v-model="filtroMarcaOC" class="oc-filtro-sel">
+                    <option value="">Marca</option>
                     <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                   </select>
-                  <select v-model="linea.departamento_id" class="filtro-sel-oc sel-inline" @change="linea.categoria_id = null" title="Departamento">
-                    <option :value="null">Depto</option>
+                  <select v-model="filtroDeptoOC" class="oc-filtro-sel" @change="cargarCategoriasOC">
+                    <option value="">Departamento</option>
                     <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
                   </select>
-                </template>
-                <input v-model.number="linea.cantidad_pedida" type="number" min="1" class="tc" />
-                <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" class="tc" />
-                <span class="fila-sub">${{ subtotalLinea(linea).toFixed(2) }}</span>
-                <button class="btn-del-fila" @click="quitarLinea(i)" title="Quitar">✕</button>
-              </div>
-              <div v-if="form.detalles.length === 0" class="fila-vacia">Sin productos — agrega uno abajo</div>
-            </div>
-            <button class="btn-agregar-linea" @click="agregarLinea">+ Agregar producto</button>
+                  <select v-model="filtroCategoriaOC" class="oc-filtro-sel" :disabled="!filtroDeptoOC">
+                    <option value="">Categoría</option>
+                    <option v-for="c in categoriasOC" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                  </select>
+                </div>
+                <div class="oc-filtros">
+                  <div class="oc-busqueda">
+                    <i class="ti ti-search" style="color:#A0A0A0;font-size:15px" aria-hidden="true"></i>
+                    <input v-model="filtroBusquedaOC" placeholder="Buscar producto o código..." />
+                  </div>
+                </div>
 
-            <div class="form-footer">
-              <div class="totales-form">
-                <span>Total: <strong class="txt-verde">${{ totalForm.toFixed(2) }}</strong></span>
+                <!-- Lista de productos -->
+                <div class="oc-prod-list">
+                  <div v-for="op in opcionesFiltradas" :key="op.key" class="oc-prod-item"
+                    :class="{ 'oc-prod-en-orden': productoEnOrden(op.key) }">
+                    <div class="oc-prod-info">
+                      <div class="oc-prod-nombre">{{ op.label }}</div>
+                      <div class="oc-prod-meta">
+                        <span v-if="op.departamento_id">{{ deptoNombre(op.departamento_id) }}</span>
+                        <span v-if="op.categoria_id"> > {{ catNombre(op) }}</span>
+                        <span v-if="op.marca_id"> · {{ marcaNombre(op.marca_id) }}</span>
+                      </div>
+                    </div>
+                    <div class="oc-prod-nums">
+                      <span class="oc-prod-costo">${{ op.costo.toFixed(2) }}</span>
+                      <span class="oc-prod-stock" :class="{ 'oc-stock-bajo': op.stock < 5 }">stk: {{ op.stock }}</span>
+                    </div>
+                    <button v-if="!productoEnOrden(op.key)" class="oc-btn-add" @click="agregarDesdeCatalogo(op)">+</button>
+                    <span v-else class="oc-ya-agregado">
+                      <i class="ti ti-check" aria-hidden="true"></i>
+                    </span>
+                  </div>
+
+                  <div v-if="opcionesFiltradas.length === 0" class="oc-prod-vacio">
+                    Usa los filtros para encontrar productos
+                  </div>
+
+                  <!-- Crear producto nuevo -->
+                  <div class="oc-crear-nuevo" @click="agregarLinea">
+                    <i class="ti ti-plus" style="font-size:14px" aria-hidden="true"></i> Crear producto nuevo
+                  </div>
+                </div>
               </div>
-              <div class="form-botones">
-                <button class="btn-cancelar" @click="cerrarForm">Cancelar</button>
-                <button class="btn-guardar" @click="guardar" :disabled="guardando">
-                  {{ guardando ? 'Guardando...' : (editandoId ? 'Actualizar' : 'Crear orden') }}
-                </button>
+
+              <!-- RIGHT: Orden en preparación -->
+              <div class="oc-orden">
+                <div class="oc-orden-header">
+                  <i class="ti ti-clipboard-list" style="color:#FFCC00;font-size:18px" aria-hidden="true"></i>
+                  <span>Orden en preparación</span>
+                </div>
+
+                <div class="oc-orden-items">
+                  <div v-for="(linea, i) in form.detalles" :key="i" class="oc-orden-item">
+                    <div class="oc-item-nombre">
+                      <span v-if="linea._key">{{ linea.nombre_producto }}</span>
+                      <input v-else v-model="linea.nombre_producto" placeholder="Nombre producto nuevo"
+                        class="oc-input-nombre" />
+                      <span v-if="linea.es_producto_nuevo" class="tag-nuevo">NUEVO</span>
+                    </div>
+                    <!-- Marca/Depto para nuevo -->
+                    <div v-if="!linea._key" class="oc-item-clasif">
+                      <select v-model="linea.marca_id" class="oc-sel-mini">
+                        <option :value="null">Marca</option>
+                        <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                      </select>
+                      <select v-model="linea.departamento_id" class="oc-sel-mini" @change="linea.categoria_id = null">
+                        <option :value="null">Depto</option>
+                        <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                      </select>
+                    </div>
+                    <div class="oc-item-nums">
+                      <input v-model.number="linea.cantidad_pedida" type="number" min="1" class="oc-input-cant" />
+                      <span class="oc-item-x">×</span>
+                      <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" class="oc-input-precio" />
+                      <span class="oc-item-sub">${{ subtotalLinea(linea).toFixed(2) }}</span>
+                      <button class="oc-btn-del" @click="quitarLinea(i)" title="Quitar">
+                        <i class="ti ti-x" style="font-size:13px" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="form.detalles.length === 0" class="oc-orden-vacia">
+                    Agrega productos desde el catálogo
+                  </div>
+                </div>
+
+                <!-- Footer orden -->
+                <div class="oc-orden-footer">
+                  <div class="oc-orden-total">
+                    <span>{{ form.detalles.length }} producto{{ form.detalles.length !== 1 ? 's' : '' }}</span>
+                    <span class="oc-total-monto">${{ totalForm.toFixed(2) }}</span>
+                  </div>
+                  <input v-model="form.observacion" placeholder="Observaciones..." class="oc-input-obs" />
+                  <button class="oc-btn-crear" @click="guardar" :disabled="guardando || !form.proveedor_id || form.detalles.length === 0">
+                    {{ guardando ? 'Guardando...' : (editandoId ? 'Actualizar orden' : 'Crear orden') }}
+                  </button>
+                  <p class="msg-error" v-if="error" style="margin:4px 0 0;font-size:0.8rem">{{ error }}</p>
+                </div>
               </div>
             </div>
-            <p class="msg-error" v-if="error">{{ error }}</p>
           </div>
         </div>
       </div>
@@ -372,7 +415,7 @@ export default {
     },
     async cargarDepartamentos() {
       try {
-        const res = await axios.get('/productos/departamentos')
+        const res = await axios.get('/productos/departamentos-con-categorias')
         this.departamentos = res.data
       } catch {}
     },
@@ -426,6 +469,41 @@ export default {
     },
     cerrarForm() { this.mostrarForm = false; this.error = '' },
     agregarLinea() { this.form.detalles.push(this._lineaVacia()) },
+    agregarDesdeCatalogo(op) {
+      if (this.productoEnOrden(op.key)) return
+      this.form.detalles.push({
+        _key:               op.key,
+        producto_id:        op.producto_id,
+        variante_id:        op.variante_id,
+        nombre_producto:    op.label,
+        cantidad_pedida:    1,
+        precio_unitario_usd: op.costo,
+        es_producto_nuevo:  false,
+        marca_id:           op.marca_id || null,
+        departamento_id:    op.departamento_id || null,
+        categoria_id:       op.categoria_id || null,
+      })
+    },
+    productoEnOrden(key) {
+      return this.form.detalles.some(d => d._key === key && d._key !== '')
+    },
+    deptoNombre(id) {
+      const d = this.departamentos.find(x => x.id === id)
+      return d ? d.nombre : ''
+    },
+    catNombre(op) {
+      if (!op.categoria_id) return ''
+      const d = this.departamentos.find(x => x.id === op.departamento_id)
+      if (!d) return ''
+      // buscar en departamentos-con-categorias si disponible
+      const cats = d.categorias || []
+      const c = cats.find(x => x.id === op.categoria_id)
+      return c ? c.nombre : ''
+    },
+    marcaNombre(id) {
+      const m = this.marcas.find(x => x.id === id)
+      return m ? m.nombre : ''
+    },
     quitarLinea(i) { this.form.detalles.splice(i, 1) },
     llenarDesdeInventario(linea) {
       if (!linea._key) {
@@ -675,4 +753,57 @@ export default {
 .btn-whatsapp:hover { background: #15803D; }
 .btn-whatsapp:disabled { opacity: 0.4; cursor: not-allowed; }
 .sel-inline { max-width: 120px; font-size: 0.8rem; height: 30px; }
+/* ── Nuevo diseño: Orden a proveedor (dos paneles) ────────────────── */
+.modal-catalogo { max-width: 900px !important; width: 95vw; }
+.oc-prov-bar { padding: 0 1.25rem 0.5rem; display: flex; align-items: center; gap: 8px; }
+.oc-prov-bar label { font-size: 0.82rem; color: var(--texto-sec); white-space: nowrap; }
+.oc-prov-bar select { flex: 1; }
+.oc-panels { display: flex; flex: 1; min-height: 380px; border-top: 1px solid var(--borde); overflow: hidden; }
+.oc-catalogo { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--borde); }
+.oc-cat-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.9rem; font-weight: 500; }
+.oc-cat-count { margin-left: auto; font-size: 0.75rem; color: var(--texto-sec); font-weight: 400; }
+.oc-filtros { display: flex; gap: 5px; padding: 0 14px 6px; }
+.oc-filtro-sel { flex: 1; min-width: 0; font-size: 0.78rem; height: 30px; }
+.oc-busqueda { display: flex; align-items: center; gap: 6px; flex: 1; background: var(--fondo); border: 0.5px solid var(--borde); border-radius: 6px; height: 30px; padding: 0 8px; }
+.oc-busqueda input { background: transparent; border: none; color: var(--texto-principal); font-size: 0.8rem; flex: 1; outline: none; }
+.oc-prod-list { flex: 1; overflow-y: auto; padding: 0 14px 8px; }
+.oc-prod-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--borde); cursor: default; }
+.oc-prod-item:hover { background: var(--fondo-hover, rgba(255,204,0,0.03)); }
+.oc-prod-en-orden { opacity: 0.5; }
+.oc-prod-info { flex: 1; min-width: 0; }
+.oc-prod-nombre { font-size: 0.82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-prod-meta { font-size: 0.72rem; color: var(--texto-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-prod-nums { text-align: right; min-width: 50px; }
+.oc-prod-costo { display: block; font-size: 0.78rem; color: var(--texto-sec); }
+.oc-prod-stock { display: block; font-size: 0.72rem; color: var(--texto-sec); }
+.oc-stock-bajo { color: #DC2626 !important; }
+.oc-btn-add { background: #FFCC00; color: #1A1A1A; border: none; border-radius: 6px; width: 26px; height: 26px; font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.oc-btn-add:hover { background: #FFD700; }
+.oc-ya-agregado { color: #16A34A; font-size: 15px; width: 26px; text-align: center; flex-shrink: 0; }
+.oc-prod-vacio { padding: 2rem 0; text-align: center; color: var(--texto-sec); font-size: 0.82rem; }
+.oc-crear-nuevo { padding: 10px 0; text-align: center; color: #FFCC00; font-size: 0.8rem; cursor: pointer; border-top: 1px dashed var(--borde); margin-top: 4px; }
+.oc-crear-nuevo:hover { text-decoration: underline; }
+/* Panel derecho: orden */
+.oc-orden { width: 260px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
+.oc-orden-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.88rem; font-weight: 500; border-bottom: 0.5px solid var(--borde); }
+.oc-orden-items { flex: 1; overflow-y: auto; padding: 4px 12px; }
+.oc-orden-item { padding: 8px 0; border-bottom: 0.5px solid var(--borde); }
+.oc-item-nombre { font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.oc-input-nombre { background: transparent; border: none; border-bottom: 1px dashed var(--borde); color: var(--texto-principal); font-size: 0.8rem; flex: 1; outline: none; padding: 2px 0; }
+.oc-item-clasif { display: flex; gap: 4px; margin-top: 3px; }
+.oc-sel-mini { font-size: 0.72rem; height: 24px; flex: 1; min-width: 0; }
+.oc-item-nums { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.oc-input-cant { width: 44px; text-align: center; font-size: 0.8rem; height: 26px; padding: 0; }
+.oc-item-x { font-size: 0.72rem; color: var(--texto-sec); }
+.oc-input-precio { width: 60px; text-align: right; font-size: 0.8rem; height: 26px; padding: 0 4px; }
+.oc-item-sub { font-size: 0.82rem; font-weight: 500; margin-left: auto; white-space: nowrap; }
+.oc-btn-del { background: transparent; border: none; color: #DC2626; cursor: pointer; padding: 2px; flex-shrink: 0; }
+.oc-orden-vacia { padding: 2rem 0; text-align: center; color: var(--texto-sec); font-size: 0.8rem; }
+.oc-orden-footer { padding: 10px 12px; border-top: 1px solid var(--borde); }
+.oc-orden-total { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.8rem; color: var(--texto-sec); }
+.oc-total-monto { font-size: 1rem; font-weight: 600; color: #16A34A; }
+.oc-input-obs { width: 100%; font-size: 0.75rem; height: 28px; margin-bottom: 8px; box-sizing: border-box; }
+.oc-btn-crear { width: 100%; background: #FFCC00; color: #1A1A1A; border: none; border-radius: 8px; height: 36px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.oc-btn-crear:hover { background: #FFD700; }
+.oc-btn-crear:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
