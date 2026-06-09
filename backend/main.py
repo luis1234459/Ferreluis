@@ -380,19 +380,6 @@ def inicializar_datos():
             ["ALTER TABLE catalogo_proveedor ADD COLUMN IF NOT EXISTS bloqueado BOOLEAN DEFAULT FALSE"],
         )
 
-        # ── catalogo_proveedor: candado código↔producto (índice único parcial) ─
-        # Garantiza a nivel de base que un mismo (proveedor, código) no se
-        # bloquee a dos productos. Solo aplica a filas bloqueadas; los genéricos
-        # nunca se bloquean, así que quedan exentos automáticamente.
-        migrar(
-            ["CREATE UNIQUE INDEX IF NOT EXISTS ix_catalogo_prov_cod_unico "
-             "ON catalogo_proveedor (proveedor_id, codigo_proveedor) "
-             "WHERE bloqueado = 1 AND codigo_proveedor IS NOT NULL"],
-            ["CREATE UNIQUE INDEX IF NOT EXISTS ix_catalogo_prov_cod_unico "
-             "ON catalogo_proveedor (proveedor_id, codigo_proveedor) "
-             "WHERE bloqueado = TRUE AND codigo_proveedor IS NOT NULL"],
-        )
-
         # ── recepciones_compra: devuelta ─────────────────────────────────────
         migrar(
             ["ALTER TABLE recepciones_compra ADD COLUMN devuelta BOOLEAN DEFAULT 0"],
