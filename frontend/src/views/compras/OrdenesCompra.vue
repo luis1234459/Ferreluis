@@ -445,7 +445,6 @@ export default {
       this.form = { proveedor_id: '', observacion: '', detalles: [] }
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
-      this.agregarLinea()
       this.mostrarForm = true
     },
     editarOrden(o) {
@@ -754,7 +753,7 @@ export default {
 .btn-whatsapp:disabled { opacity: 0.4; cursor: not-allowed; }
 .sel-inline { max-width: 120px; font-size: 0.8rem; height: 30px; }
 /* ── Nuevo diseño: Orden a proveedor (dos paneles) ────────────────── */
-.modal-catalogo { max-width: 900px !important; width: 95vw; }
+.modal-catalogo { max-width: 1200px !important; width: 98vw; }
 .oc-prov-bar { padding: 0 1.25rem 0.5rem; display: flex; align-items: center; gap: 8px; }
 .oc-prov-bar label { font-size: 0.82rem; color: var(--texto-sec); white-space: nowrap; }
 .oc-prov-bar select { flex: 1; }
@@ -784,7 +783,7 @@ export default {
 .oc-crear-nuevo { padding: 10px 0; text-align: center; color: #FFCC00; font-size: 0.8rem; cursor: pointer; border-top: 1px dashed var(--borde); margin-top: 4px; }
 .oc-crear-nuevo:hover { text-decoration: underline; }
 /* Panel derecho: orden */
-.oc-orden { width: 260px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
+.oc-orden { width: 350px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
 .oc-orden-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.88rem; font-weight: 500; border-bottom: 0.5px solid var(--borde); }
 .oc-orden-items { flex: 1; overflow-y: auto; padding: 4px 12px; }
 .oc-orden-item { padding: 8px 0; border-bottom: 0.5px solid var(--borde); }
