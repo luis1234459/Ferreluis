@@ -147,6 +147,10 @@
             <!-- Filtros de búsqueda de producto -->
             <div class="filtros-producto-oc">
               <input v-model="filtroBusquedaOC" class="filtro-busq-oc" placeholder="🔍 Buscar producto o código..." />
+              <select v-model="filtroMarcaOC" class="filtro-sel-oc">
+                <option value="">Todas las marcas</option>
+                <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+              </select>
               <select v-model="filtroDeptoOC" class="filtro-sel-oc" @change="cargarCategoriasOC">
                 <option value="">Todos los departamentos</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -181,6 +185,16 @@
                   </option>
                 </select>
                 <input v-model="linea.nombre_producto" placeholder="Nombre del producto" :disabled="!!linea._key" />
+                <template v-if="!linea._key">
+                  <select v-model="linea.marca_id" class="filtro-sel-oc sel-inline" title="Marca">
+                    <option :value="null">Marca</option>
+                    <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+                  </select>
+                  <select v-model="linea.departamento_id" class="filtro-sel-oc sel-inline" @change="linea.categoria_id = null" title="Departamento">
+                    <option :value="null">Depto</option>
+                    <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                  </select>
+                </template>
                 <input v-model.number="linea.cantidad_pedida" type="number" min="1" class="tc" />
                 <input v-model.number="linea.precio_unitario_usd" type="number" min="0" step="0.01" class="tc" />
                 <span class="fila-sub">${{ subtotalLinea(linea).toFixed(2) }}</span>
@@ -226,8 +240,10 @@ export default {
       devolviendo:        null,
       errorDevolucion:    '',
       departamentos:      [],
+      marcas:             [],
       filtroEstado:       '',
       filtroProveedor:    '',
+      filtroMarcaOC:      '',
       filtroDeptoOC:      '',
       filtroProveedorOC:  '',
       filtroBusquedaOC:   '',
@@ -276,6 +292,7 @@ export default {
               departamento_id:p.departamento_id || null,
               categoria_id:   p.categoria_id    || null,
               proveedor_id:   p.proveedor_id    || null,
+              marca_id:       p.marca_id        || null,
               label,
               labelBusq:      label.toLowerCase(),
               costo,
@@ -291,6 +308,7 @@ export default {
             departamento_id:p.departamento_id || null,
             categoria_id:   p.categoria_id    || null,
             proveedor_id:   p.proveedor_id    || null,
+            marca_id:       p.marca_id        || null,
             label:          p.nombre,
             labelBusq:      p.nombre.toLowerCase(),
             costo:          p.costo_usd || 0,
@@ -303,6 +321,10 @@ export default {
     },
     opcionesFiltradas() {
       let lista = this.opcionesProductos
+      if (this.filtroMarcaOC) {
+        const id = parseInt(this.filtroMarcaOC)
+        lista = lista.filter(o => o.marca_id === id)
+      }
       if (this.filtroDeptoOC) {
         const id = parseInt(this.filtroDeptoOC)
         lista = lista.filter(o => o.departamento_id === id)
@@ -323,7 +345,7 @@ export default {
     },
   },
   async mounted() {
-    await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario(), this.cargarDepartamentos()])
+    await Promise.all([this.cargar(), this.cargarProveedores(), this.cargarInventario(), this.cargarDepartamentos(), this.cargarMarcas()])
   },
   methods: {
     async cargar() {
@@ -347,6 +369,12 @@ export default {
         this.departamentos = res.data
       } catch {}
     },
+    async cargarMarcas() {
+      try {
+        const res = await axios.get('/marcas/')
+        this.marcas = res.data
+      } catch { this.marcas = [] }
+    },
     async cargarCategoriasOC() {
       if (!this.filtroDeptoOC) {
         this.categoriasOC = []
@@ -360,19 +388,19 @@ export default {
       } catch { this.categoriasOC = [] }
     },
     _lineaVacia() {
-      return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false }
+      return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false, marca_id: null, departamento_id: null, categoria_id: null }
     },
     abrirNueva() {
       this.editandoId = null
       this.form = { proveedor_id: '', observacion: '', detalles: [] }
-      this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
+      this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.agregarLinea()
       this.mostrarForm = true
     },
     editarOrden(o) {
       this.editandoId = o.id
-      this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
+      this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.form = {
         proveedor_id: o.proveedor_id,
