@@ -35,7 +35,7 @@
 /* Nav links */
 nav { display: flex; flex-direction: column; gap: 0.2rem; position: relative; z-index: 2; }
 nav a {
-  color: rgba(255,255,255,0.4); text-decoration: none;
+  color: rgba(255,255,255,0.9); text-decoration: none;
   padding: 0.45rem 0.85rem; border-radius: 6px;
   transition: all 0.15s; font-size: 0.875rem; font-weight: 500;
   border-left: 3px solid transparent;

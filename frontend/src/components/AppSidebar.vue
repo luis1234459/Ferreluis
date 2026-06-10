@@ -399,12 +399,12 @@ export default {
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.85);
   letter-spacing: 0.04em;
 }
 .grupo-flecha {
   font-size: 0.65rem;
-  color: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.85);
   margin-left: auto;
 }
 
