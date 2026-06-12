@@ -529,6 +529,27 @@ def eliminar_productos_stock_cero(db: Session = Depends(get_db)):
     db.commit()
     return {"eliminados": cantidad}
 
+
+class EliminarSeleccionados(BaseModel):
+    ids: list[int]
+
+
+@router.post("/stock-cero/eliminar-seleccionados", dependencies=[Depends(require_admin)])
+def eliminar_stock_cero_seleccionados(body: EliminarSeleccionados, db: Session = Depends(get_db)):
+    """Elimina solo los productos seleccionados, validando que su stock siga en 0
+    (protege contra borrar algo que cambió de estado mientras estaba marcado)."""
+    if not body.ids:
+        return {"eliminados": 0}
+    productos = db.query(Producto).filter(
+        Producto.id.in_(body.ids),
+        Producto.stock <= 0,
+    ).all()
+    cantidad = len(productos)
+    for p in productos:
+        db.delete(p)
+    db.commit()
+    return {"eliminados": cantidad}
+
 @router.get("/")
 def listar_productos(
     incluir_inactivos: bool = False,

@@ -107,8 +107,17 @@
               @click="toggleStockCero">
               {{ filtroStockCero ? '📦 Stock 0 activo' : '📦 Ver stock 0' }}
             </button>
-            <button v-if="esAdmin" class="btn-eliminar-stock0" @click="eliminarStockCero">
-              🗑 Eliminar stock 0
+          </div>
+
+          <!-- Barra de acciones masivas (solo en vista Stock 0) -->
+          <div v-if="esAdmin && filtroStockCero" class="barra-seleccion-stock0">
+            <label class="check-todos">
+              <input type="checkbox" :checked="todosStock0Seleccionados" @change="toggleSeleccionarTodosStock0" />
+              Seleccionar todos ({{ productosFiltrados.length }})
+            </label>
+            <span class="contador-seleccion">{{ seleccionStock0.size }} seleccionado(s)</span>
+            <button class="btn-eliminar-stock0" :disabled="seleccionStock0.size === 0" @click="eliminarSeleccionadosStock0">
+              🗑 Eliminar seleccionados
             </button>
           </div>
 
@@ -117,6 +126,7 @@
             <table>
               <thead>
                 <tr>
+                  <th v-if="filtroStockCero" style="width:32px"></th>
                   <th>Código</th>
                   <th>Nombre</th>
                   <th>Stock</th>
@@ -135,6 +145,9 @@
               <tbody>
                 <tr v-for="p in productosFiltrados" :key="p.id"
                   :class="{ 'fila-stock-bajo': !modoEdicion && p.stock < 5, 'fila-modificada': modoEdicion && filasModificadas.has(p.id) }">
+                  <td v-if="filtroStockCero">
+                    <input type="checkbox" :checked="seleccionStock0.has(p.id)" @change="toggleSeleccionStock0(p.id)" />
+                  </td>
                   <!-- Código -->
                   <td class="celda-codigo">
                     <template v-if="p.tiene_variantes">
@@ -1205,6 +1218,7 @@ export default {
       // Visibilidad de inactivos (solo admin)
       mostrarInactivos: false,
       filtroStockCero:  false,
+      seleccionStock0:  new Set(),
 
       // Modo edición masiva
       modoEdicion:      false,
@@ -1224,6 +1238,11 @@ export default {
     esAdmin()       { return this.usuario.rol === 'admin' },
     esVendedor()    { return this.usuario.rol === 'vendedor' },
     esGestionador() { return this.usuario.rol === 'gestionador' },
+
+    todosStock0Seleccionados() {
+      return this.productosFiltrados.length > 0 &&
+        this.productosFiltrados.every(p => this.seleccionStock0.has(p.id))
+    },
 
     precioEfectivoVariante() {
       if (!this.modalVariantes) return '0.0000'
@@ -1687,6 +1706,25 @@ export default {
       alert(`Se eliminaron ${r.data.eliminados} producto(s).`)
       this.paginaActual = 1
       this.filtroStockCero = false
+      await this.cargarProductos()
+    },
+    toggleSeleccionStock0(id) {
+      const s = new Set(this.seleccionStock0)
+      if (s.has(id)) s.delete(id); else s.add(id)
+      this.seleccionStock0 = s
+    },
+    toggleSeleccionarTodosStock0(e) {
+      if (e.target.checked) {
+        this.seleccionStock0 = new Set(this.productosFiltrados.map(p => p.id))
+      } else {
+        this.seleccionStock0 = new Set()
+      }
+    },
+    async eliminarSeleccionadosStock0() {
+      if (!this.seleccionStock0.size) return
+      if (!confirm(`¿Eliminar ${this.seleccionStock0.size} productos con stock 0?`)) return
+      await axios.post('/productos/stock-cero/eliminar-seleccionados', { ids: [...this.seleccionStock0] })
+      this.seleccionStock0 = new Set()
       await this.cargarProductos()
     },
     async cambiarEstado(producto, estado) {
