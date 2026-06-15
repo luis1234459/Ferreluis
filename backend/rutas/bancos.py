@@ -294,14 +294,27 @@ def registrar_movimiento(datos: dict, db: Session = Depends(get_db),
     if monto <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor que cero")
 
+    moneda = datos.get("moneda", "USD")
+    tasa   = float(datos.get("tasa_cambio") or 0)
+    if moneda == "Bs" and tasa > 0:
+        monto_convertido = round(monto / tasa, 4)
+    elif moneda == "Bs" and not tasa:
+        # Fallback: usar tasa BCV vigente
+        from models import TasaCambio
+        tasa_obj = db.query(TasaCambio).order_by(TasaCambio.fecha.desc()).first()
+        tasa = float(tasa_obj.tasa if tasa_obj else 1)
+        monto_convertido = round(monto / tasa, 4)
+    else:
+        monto_convertido = datos.get("monto_convertido") or None
+
     m = MovimientoBancario(
         tipo              = tipo,
         cuenta_origen_id  = datos.get("cuenta_origen_id"),
         cuenta_destino_id = datos.get("cuenta_destino_id"),
         monto             = monto,
-        moneda            = datos.get("moneda", "USD"),
-        tasa_cambio       = datos.get("tasa_cambio"),
-        monto_convertido  = datos.get("monto_convertido"),
+        moneda            = moneda,
+        tasa_cambio       = tasa if tasa > 0 else None,
+        monto_convertido  = monto_convertido,
         referencia        = datos.get("referencia"),
         concepto          = datos.get("concepto", ""),
         beneficiario      = datos.get("beneficiario"),

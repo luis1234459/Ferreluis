@@ -49,6 +49,15 @@
               </select>
             </div>
 
+            <div class="field" v-if="form.moneda === 'Bs'">
+              <label>Tasa de cambio (Bs/USD) *</label>
+              <input v-model.number="form.tasa_cambio" type="number" min="0" step="0.01"
+                placeholder="Ej: 52.40 — tasa del día del pago" />
+              <small v-if="form.monto && form.tasa_cambio > 0" style="color:#16A34A;font-size:0.8rem">
+                ≈ ${{ (form.monto / form.tasa_cambio).toFixed(2) }} USD
+              </small>
+            </div>
+
             <div class="field" v-if="form.tipo === 'pago_proveedor'">
               <label>Proveedor</label>
               <select v-model="form.proveedor_id">
@@ -154,7 +163,7 @@ export default {
         tipo: 'transferencia_interna', moneda: 'USD',
         cuenta_origen_id: '', cuenta_destino_id: '',
         proveedor_id: '', beneficiario: '',
-        monto: '', referencia: '', concepto: '',
+        monto: '', referencia: '', concepto: '', tasa_cambio: '',
       },
     }
   },
@@ -199,18 +208,23 @@ export default {
     },
     async guardar() {
       this.error = ''; this.exitoso = false; this.guardando = true
+      if (this.form.moneda === 'Bs' && !this.form.tasa_cambio) {
+        this.error = 'Ingresa la tasa de cambio para registrar un movimiento en Bs'
+        this.guardando = false; return
+      }
       try {
         const payload = {
           ...this.form,
           cuenta_origen_id:  this.form.cuenta_origen_id  || null,
           cuenta_destino_id: this.form.cuenta_destino_id || null,
           proveedor_id:      this.form.proveedor_id      || null,
+          tasa_cambio:       this.form.moneda === 'Bs' ? this.form.tasa_cambio : null,
           registrado_por:    this.usuario.usuario || 'admin',
         }
         await axios.post('/bancos/movimientos/', payload)
         await Promise.all([this.cargar(), this.cargarCuentas()])
         this.exitoso = true
-        this.form.monto = ''; this.form.referencia = ''; this.form.concepto = ''
+        this.form.monto = ''; this.form.referencia = ''; this.form.concepto = ''; this.form.tasa_cambio = ''
         setTimeout(() => this.exitoso = false, 3000)
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al registrar'
