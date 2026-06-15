@@ -249,7 +249,19 @@
                   </td>
 
                   <!-- Proveedor -->
-                  <td class="txt-muted" style="font-size:0.8rem">{{ nombreProveedor(p.proveedor_id) }}</td>
+                  <td>
+                    <template v-if="modoEdicion && borradorEdicion[p.id]">
+                      <select class="celda-input celda-select"
+                        v-model="borradorEdicion[p.id].proveedor_id"
+                        @change="marcarModificado(p.id)">
+                        <option :value="null">— sin proveedor —</option>
+                        <option v-for="pv in proveedores" :key="pv.id" :value="pv.id">{{ pv.nombre }}</option>
+                      </select>
+                    </template>
+                    <template v-else>
+                      <span class="txt-muted" style="font-size:0.8rem">{{ nombreProveedor(p.proveedor_id) }}</span>
+                    </template>
+                  </td>
 
                   <!-- Costo USD -->
                   <td>
@@ -1607,6 +1619,8 @@ export default {
           activo:          p.activo !== false,
           departamento_id: p.departamento_id || null,
           categoria_id:    p.categoria_id    || null,
+          proveedor_id:    p.proveedor_id    || null,
+          marca_id:        p.marca_id        || null,
         }
       }
       this.borradorEdicion  = borrador
@@ -1649,6 +1663,8 @@ export default {
             activo:          b.activo,
             departamento_id: b.departamento_id || null,
             categoria_id:    b.categoria_id    || null,
+            proveedor_id:    b.proveedor_id    || null,
+            marca_id:        b.marca_id        || null,
           }
         })
         const res = await axios.put('/productos/edicion-masiva', items)

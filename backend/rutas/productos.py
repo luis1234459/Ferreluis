@@ -154,7 +154,7 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
     d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_tipo, ajuste_divisa_pct))
     d["tiene_catalogo"]    = tiene_catalogo
     d["codigo_proveedor"]  = codigo_proveedor
-    d["marca_nombre"]      = marca_obj.nombre if marca_obj else None  # código del proveedor vinculado (inamovible tras 1ª compra)
+    d["marca_nombre"]      = marca_obj.nombre if marca_obj else None
     if db is not None:
         dmx = getattr(p, 'descuento_max_pct', None)
         if dmx is None and p.categoria_id:
@@ -516,7 +516,7 @@ def eliminar_oferta(
 
 
 # ============================================================================
-# Endpoints: Productos (existentes — sin cambios en lógica)
+# Endpoints: Productos
 # Registrados DESPUÉS de todas las rutas con segmentos literales
 # ============================================================================
 
@@ -613,7 +613,7 @@ def listar_productos(
         for pl in db.query(PlantillaGarantia).filter(PlantillaGarantia.id.in_(plantilla_ids)).all():
             plantillas_map[pl.id] = pl
     catalogo_ids: set = set()
-    catalogo_codigo_map: dict = {}  # producto_id -> codigo_proveedor
+    catalogo_codigo_map: dict = {}
     if ids:
         for c in db.query(CatalogoProveedor).filter(
             CatalogoProveedor.producto_id.in_(ids),
@@ -675,7 +675,6 @@ async def importar_masivo(
     contenido = await archivo.read()
     nombre = archivo.filename or ""
 
-    # Leer archivo según extensión
     try:
         if nombre.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contenido))
@@ -686,7 +685,6 @@ async def importar_masivo(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al leer el archivo: {e}")
 
-    # Normalizar nombres de columnas (minúsculas, sin espacios extra)
     df.columns = [str(c).strip().lower() for c in df.columns]
 
     COLUMNAS = ["nombre", "categoria", "departamento", "proveedor",
@@ -695,7 +693,6 @@ async def importar_masivo(
         if col not in df.columns:
             raise HTTPException(status_code=400, detail=f"Columna obligatoria ausente: '{col}'")
 
-    # Precargar departamentos y productos existentes
     departamentos = {d.nombre.lower(): d.id for d in db.query(Departamento).all()}
     nombres_existentes = {
         p.nombre.lower() for p in db.query(Producto.nombre).all()
@@ -706,7 +703,7 @@ async def importar_masivo(
     errores    = []
 
     for idx, row in df.iterrows():
-        fila = idx + 2  # fila real en Excel (1 = encabezado)
+        fila = idx + 2
 
         nombre_prod = str(row.get("nombre", "")).strip()
         if not nombre_prod:
@@ -714,13 +711,11 @@ async def importar_masivo(
             errores.append({"fila": fila, "nombre": "(vacío)", "motivo": "Nombre vacío"})
             continue
 
-        # Duplicado
         if nombre_prod.lower() in nombres_existentes:
             omitidos += 1
             errores.append({"fila": fila, "nombre": nombre_prod, "motivo": "Ya existe en inventario"})
             continue
 
-        # Departamento
         depto_nombre = str(row.get("departamento", "")).strip()
         departamento_id = None
         if depto_nombre and depto_nombre.lower() != "nan":
@@ -731,7 +726,6 @@ async def importar_masivo(
                                 "motivo": f"Departamento '{depto_nombre}' no encontrado"})
                 continue
 
-        # Valores numéricos con fallback seguro
         def _float(val, default=0.0):
             try:
                 v = float(val)
@@ -819,7 +813,6 @@ def generar_codigos_masivo(
         (Producto.codigo == None) | (Producto.codigo == "")
     ).all()
 
-    # Rastrear códigos asignados en esta ejecución para no depender de flush/identity map
     asignados_ahora: set[str] = set()
     actualizados = 0
 
@@ -827,7 +820,6 @@ def generar_codigos_masivo(
         letras  = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X')
         prefijo = letras + '-'
 
-        # Números ya en BD
         existentes = db.query(Producto.codigo).filter(
             Producto.codigo.like(f"{prefijo}%")
         ).all()
@@ -838,7 +830,6 @@ def generar_codigos_masivo(
                 if m:
                     numeros.append(int(m.group(1)))
 
-        # Números asignados en este mismo lote
         for cod in asignados_ahora:
             if cod.startswith(prefijo):
                 m = re.search(r'(\d+)$', cod)
@@ -860,13 +851,11 @@ def resetear_codigos(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    # Paso 1: borrar todos los códigos existentes
     todos = db.query(Producto).all()
     for p in todos:
         p.codigo = None
     db.flush()
 
-    # Paso 2: asignar códigos nuevos con set local para evitar duplicados
     asignados_ahora: set[str] = set()
     actualizados = 0
 
@@ -874,7 +863,6 @@ def resetear_codigos(
         letras  = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X')
         prefijo = letras + '-'
 
-        # Solo los del set local (BD ya está en None para todos)
         numeros = []
         for cod in asignados_ahora:
             if cod.startswith(prefijo):
@@ -918,7 +906,7 @@ def edicion_masiva(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id"}
+    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id", "proveedor_id", "marca_id"}
     actualizados = 0
     errores      = []
     for item in items:
@@ -976,7 +964,6 @@ def cambiar_genericidad(
     es_generico = bool(datos.get("es_generico", False))
     p.es_generico = es_generico
 
-    # Si cambia a específico y se provee código+proveedor, fijar en catálogo
     if not es_generico:
         proveedor_id    = datos.get("proveedor_id")
         codigo_prov     = (datos.get("codigo_proveedor") or "").strip()
@@ -996,7 +983,6 @@ def cambiar_genericidad(
                     precio_referencia_usd = float(p.costo_usd or 0),
                 ))
             else:
-                # Solo actualizar código si no tenía uno
                 if not existente.codigo_proveedor and codigo_prov:
                     existente.codigo_proveedor = codigo_prov
 
@@ -1065,7 +1051,6 @@ def eliminar_producto(
 
 # ============================================================================
 # Endpoints: Variantes — rutas con {producto_id} en primer segmento
-# Registrados después de /{producto_id} para no ocultar rutas literales
 # ============================================================================
 
 @router.put("/{producto_id}/esquema-variante")
@@ -1143,7 +1128,6 @@ def crear_variante(
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    # Primera variante: el padre cede stock y código — las variantes son el inventario real
     es_primera = not db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).first()
@@ -1153,7 +1137,6 @@ def crear_variante(
 
     datos_dict = datos.model_dump()
 
-    # Auto-generar código si no se proporcionó
     if not datos_dict.get("codigo"):
         prefijo = re.sub(r'[^A-Za-z]', '', p.nombre).upper()[:3].ljust(3, 'X') + '-V'
         existentes = db.query(VarianteProducto.codigo).filter(
@@ -1169,7 +1152,6 @@ def crear_variante(
         siguiente = max(numeros) + 1 if numeros else 1
         datos_dict["codigo"] = f"{prefijo}{siguiente:02d}"
 
-    # Aplicar restricciones del esquema
     esquema = p.esquema_variante or "clase"
     if esquema == "clase":
         datos_dict["color"] = None
