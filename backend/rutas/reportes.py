@@ -1349,30 +1349,17 @@ def liquidez_prudente(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    from models import RecepcionCompra, AbonoCredito
+    from models import AbonoCredito, MovimientoBancario
 
     hoy = date.today()
     DIAS_HABILES_30 = 22  # ~22 días hábiles en 30 días corridos
 
-    # ── Facturas pendientes de proveedores ──────────────────────────────────
-    recs = db.query(RecepcionCompra).filter(
-        RecepcionCompra.estado_pago.in_(["pendiente", "vencido"]),
-        RecepcionCompra.devuelta == False,
-    ).all()
+    # ── 1. Deudas a proveedores: reusar el cálculo oficial de Pagos Proveedores ─
+    from rutas.bancos import deuda_proveedores as _deuda_oficial
+    saldos_oficiales = {d["proveedor_id"]: d["saldo_pendiente"] for d in _deuda_oficial(db)}
+    deuda_total = sum(saldos_oficiales.values())
 
-    ordenes_map   = {o.id: o for o in db.query(OrdenCompra).all()}
-    proveedores_m = {p.id: p for p in db.query(Proveedor).all()}
-
-    saldo_por_prov: dict = {}
-    for r in recs:
-        orden = ordenes_map.get(r.orden_id)
-        if not orden:
-            continue
-        pid   = orden.proveedor_id
-        monto = float(r.monto_factura or r.total_recibido or 0)
-        saldo_por_prov[pid] = saldo_por_prov.get(pid, 0.0) + monto
-
-    deuda_total = sum(saldo_por_prov.values())
+    proveedores = db.query(Proveedor).filter(Proveedor.activo == True).all()
 
     # ── Proyección ventas 10 días hábiles ───────────────────────────────────
     hace_30      = datetime.utcnow() - timedelta(days=30)
@@ -1396,20 +1383,27 @@ def liquidez_prudente(
     abonos_proyectados = round(total_abonos_30d / DIAS_HABILES_30 * 10, 2)
 
     # ── Detalle y crédito por proveedor ─────────────────────────────────────
-    detalle_proveedores = []
+    deudas = []
     credito_formal_total = 0.0
     credito_real_total   = 0.0
     sum_dias_formal = 0.0
     sum_dias_real   = 0.0
     sum_saldo       = 0.0
 
-    for pid, saldo in saldo_por_prov.items():
-        prov = proveedores_m.get(pid)
-        if not prov:
+    for p in proveedores:
+        saldo = saldos_oficiales.get(p.id, 0)
+        if saldo <= 0:
             continue
 
-        dias_formal = int(prov.dias_credito or 0)
-        dias_real   = int(prov.dias_credito_real if prov.dias_credito_real is not None else dias_formal)
+        # Ritmo de abonos últimos 30 días (para capa realista)
+        pagos = db.query(MovimientoBancario).filter(
+            MovimientoBancario.proveedor_id == p.id,
+            MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
+            MovimientoBancario.estado == "registrado",
+        ).all()
+
+        dias_formal = int(p.dias_credito or 0)
+        dias_real   = int(p.dias_credito_real if p.dias_credito_real is not None else dias_formal)
 
         # Fracción de la deuda cubierta dentro de los próximos 10 días hábiles
         cred_formal = round(saldo * min(1.0, 10 / dias_formal), 2) if dias_formal > 0 else 0.0
@@ -1423,9 +1417,9 @@ def liquidez_prudente(
         sum_dias_real        += dias_real   * saldo
         sum_saldo            += saldo
 
-        detalle_proveedores.append({
-            "proveedor_id":        pid,
-            "proveedor":           prov.nombre,
+        deudas.append({
+            "proveedor_id":        p.id,
+            "proveedor":           p.nombre,
             "saldo":               round(saldo, 2),
             "dias_credito_formal": dias_formal,
             "dias_credito_real":   dias_real,
@@ -1462,7 +1456,7 @@ def liquidez_prudente(
             "dias_credito_usados":   dias_real_prom,
             "colchon":               colchon_r,
         },
-        "detalle_proveedores": sorted(detalle_proveedores, key=lambda x: x["saldo"], reverse=True),
+        "detalle_proveedores": sorted(deudas, key=lambda x: x["saldo"], reverse=True),
     }
 
 
