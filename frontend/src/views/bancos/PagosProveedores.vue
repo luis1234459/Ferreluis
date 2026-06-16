@@ -545,7 +545,7 @@ export default {
 .lp-nombre { flex:1; min-width:100px; font-weight:500; }
 .lp-saldo { min-width:60px; text-align:right; }
 .lp-dias { min-width:28px; }
-.lp-input-dias { width:48px; text-align:center; border:1px solid var(--borde); border-radius:4px; padding:2px 4px; font-size:0.8rem; background:var(--fondo-input,#fff); color:var(--texto-principal); }
+.lp-input-dias { width:64px; text-align:center; border:1px solid var(--borde); border-radius:4px; padding:3px 6px; font-size:0.85rem; background:var(--fondo-input,#fff); color:var(--texto-principal); }
 .lp-input-dias:focus { border-color:#FFCC00; outline:none; }
 .lp-abono { font-size:0.75rem; margin-left:auto; }
 .txt-verde { color:#16A34A; }
