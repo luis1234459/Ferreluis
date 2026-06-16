@@ -157,6 +157,12 @@ def inicializar_datos():
              "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS descuento_pct FLOAT DEFAULT 0"],
         )
 
+        # ── proveedores: dias_credito_real ───────────────────────────────────
+        migrar(
+            ["ALTER TABLE proveedores ADD COLUMN dias_credito_real INTEGER"],
+            ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS dias_credito_real INTEGER"],
+        )
+
         # ── productos: pricing_policy_override ───────────────────────────────
         migrar(
             ["ALTER TABLE productos ADD COLUMN pricing_policy_override TEXT"],

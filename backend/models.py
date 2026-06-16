@@ -332,6 +332,7 @@ class Proveedor(Base):
     activo           = Column(Boolean, default=True)
     fecha_registro   = Column(DateTime, default=datetime.now)
     dias_credito       = Column(Integer,  default=0)
+    dias_credito_real  = Column(Integer,  nullable=True)
     credito_disponible = Column(Float,    default=0)
     codigo             = Column(String,   nullable=True, unique=True, index=True)
     pricing_policy     = Column(String,   default="MARKET_FACTOR")   # MARKET_FACTOR | BCV_DIRECT

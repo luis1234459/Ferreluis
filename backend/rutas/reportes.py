@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
@@ -1337,3 +1337,145 @@ def rotacion_30_dias(
             "cantidad": por_dia.get(fecha_str, 0),
         })
     return resultado
+
+
+# ---------------------------------------------------------------------------
+# LIQUIDEZ PRUDENTE
+# ---------------------------------------------------------------------------
+
+@router.get("/liquidez-prudente")
+def liquidez_prudente(
+    colchon_pct: float = 0.18,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    from models import RecepcionCompra, AbonoCredito
+
+    hoy = date.today()
+    DIAS_HABILES_30 = 22  # ~22 días hábiles en 30 días corridos
+
+    # ── Facturas pendientes de proveedores ──────────────────────────────────
+    recs = db.query(RecepcionCompra).filter(
+        RecepcionCompra.estado_pago.in_(["pendiente", "vencido"]),
+        RecepcionCompra.devuelta == False,
+    ).all()
+
+    ordenes_map   = {o.id: o for o in db.query(OrdenCompra).all()}
+    proveedores_m = {p.id: p for p in db.query(Proveedor).all()}
+
+    saldo_por_prov: dict = {}
+    for r in recs:
+        orden = ordenes_map.get(r.orden_id)
+        if not orden:
+            continue
+        pid   = orden.proveedor_id
+        monto = float(r.monto_factura or r.total_recibido or 0)
+        saldo_por_prov[pid] = saldo_por_prov.get(pid, 0.0) + monto
+
+    deuda_total = sum(saldo_por_prov.values())
+
+    # ── Proyección ventas 10 días hábiles ───────────────────────────────────
+    hace_30      = datetime.utcnow() - timedelta(days=30)
+    ventas_30d   = db.query(Venta).filter(
+        Venta.fecha >= hace_30,
+        Venta.estado != 'anulada',
+    ).all()
+    total_v30 = sum(
+        float(v.total or 0) if v.moneda_venta == 'USD'
+        else float(v.total or 0) / float(v.tasa_bcv or 1)
+        for v in ventas_30d
+    )
+    proyeccion_ventas_10d = round(total_v30 / DIAS_HABILES_30 * 10, 2)
+
+    # ── Abonos proyectados 10d (para capa realista) ──────────────────────────
+    abonos_30d = db.query(AbonoCredito).filter(
+        AbonoCredito.fecha >= hace_30,
+        AbonoCredito.monto > 0,
+    ).all()
+    total_abonos_30d  = sum(float(a.monto or 0) for a in abonos_30d)
+    abonos_proyectados = round(total_abonos_30d / DIAS_HABILES_30 * 10, 2)
+
+    # ── Detalle y crédito por proveedor ─────────────────────────────────────
+    detalle_proveedores = []
+    credito_formal_total = 0.0
+    credito_real_total   = 0.0
+    sum_dias_formal = 0.0
+    sum_dias_real   = 0.0
+    sum_saldo       = 0.0
+
+    for pid, saldo in saldo_por_prov.items():
+        prov = proveedores_m.get(pid)
+        if not prov:
+            continue
+
+        dias_formal = int(prov.dias_credito or 0)
+        dias_real   = int(prov.dias_credito_real if prov.dias_credito_real is not None else dias_formal)
+
+        # Fracción de la deuda cubierta dentro de los próximos 10 días hábiles
+        cred_formal = round(saldo * min(1.0, 10 / dias_formal), 2) if dias_formal > 0 else 0.0
+        cred_real   = round(saldo * min(1.0, 10 / dias_real),   2) if dias_real   > 0 else 0.0
+
+        abono_prov  = round(abonos_proyectados * saldo / deuda_total, 2) if deuda_total > 0 else 0.0
+
+        credito_formal_total += cred_formal
+        credito_real_total   += cred_real
+        sum_dias_formal      += dias_formal * saldo
+        sum_dias_real        += dias_real   * saldo
+        sum_saldo            += saldo
+
+        detalle_proveedores.append({
+            "proveedor_id":        pid,
+            "proveedor":           prov.nombre,
+            "saldo":               round(saldo, 2),
+            "dias_credito_formal": dias_formal,
+            "dias_credito_real":   dias_real,
+            "abono_proyectado_10d": abono_prov,
+        })
+
+    dias_formal_prom = round(sum_dias_formal / sum_saldo, 1) if sum_saldo > 0 else 0
+    dias_real_prom   = round(sum_dias_real   / sum_saldo, 1) if sum_saldo > 0 else 0
+
+    # ── Calcular liquidez prudente por capa ──────────────────────────────────
+    base_c   = deuda_total + proyeccion_ventas_10d - credito_formal_total
+    colchon_c = round(max(base_c, 0) * colchon_pct, 2)
+    liquidez_c = round(max(0.0, base_c + colchon_c), 2)
+
+    base_r   = deuda_total - abonos_proyectados + proyeccion_ventas_10d - credito_real_total
+    colchon_r = round(max(base_r, 0) * colchon_pct, 2)
+    liquidez_r = round(max(0.0, base_r + colchon_r), 2)
+
+    return {
+        "conservadora": {
+            "liquidez":              liquidez_c,
+            "deuda_proveedores":     round(deuda_total, 2),
+            "proyeccion_ventas_10d": proyeccion_ventas_10d,
+            "credito_proveedores":   round(credito_formal_total, 2),
+            "dias_credito_usados":   dias_formal_prom,
+            "colchon":               colchon_c,
+        },
+        "realista": {
+            "liquidez":              liquidez_r,
+            "deuda_proveedores":     round(deuda_total, 2),
+            "abonos_proyectados":    abonos_proyectados,
+            "proyeccion_ventas_10d": proyeccion_ventas_10d,
+            "credito_proveedores":   round(credito_real_total, 2),
+            "dias_credito_usados":   dias_real_prom,
+            "colchon":               colchon_r,
+        },
+        "detalle_proveedores": sorted(detalle_proveedores, key=lambda x: x["saldo"], reverse=True),
+    }
+
+
+@router.patch("/liquidez-prudente/credito-real/{proveedor_id}")
+def actualizar_credito_real(
+    proveedor_id: int,
+    dias_credito_real: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    prov = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+    if not prov:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    prov.dias_credito_real = max(0, dias_credito_real)
+    db.commit()
+    return {"ok": True}
