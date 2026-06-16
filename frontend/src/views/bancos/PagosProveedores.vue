@@ -38,6 +38,95 @@
           </table>
         </div>
 
+        <!-- ══ WIDGET LIQUIDEZ PRUDENTE ══ -->
+        <div class="liquidez-widget" style="margin-top:1.5rem">
+          <div class="liquidez-header">
+            <h2 class="panel-titulo" style="margin:0">💧 Liquidez prudente — próximos 10 días hábiles</h2>
+            <div class="liquidez-controles">
+              <label style="font-size:0.8rem;color:var(--texto-sec)">Colchón:</label>
+              <input type="number" v-model.number="colchonPct" min="5" max="50" step="1"
+                class="liquidez-input-pct" @change="cargarLiquidez" />
+              <span style="font-size:0.8rem;color:var(--texto-sec)">%</span>
+              <button class="btn-toggle-capa"
+                :class="{ activo: capaActiva === 'conservadora' }"
+                @click="capaActiva = 'conservadora'">Conservadora</button>
+              <button class="btn-toggle-capa"
+                :class="{ activo: capaActiva === 'realista' }"
+                @click="capaActiva = 'realista'">Realista</button>
+              <button class="btn-reload-liquidez" @click="cargarLiquidez"
+                :disabled="cargandoLiquidez">↻</button>
+            </div>
+          </div>
+
+          <div v-if="cargandoLiquidez" class="liquidez-loading">Calculando...</div>
+
+          <div v-else-if="liquidez" class="liquidez-body">
+            <!-- Número principal -->
+            <div class="liquidez-principal">
+              <div class="liquidez-label">Mantener en caja ({{ capaActiva }})</div>
+              <div class="liquidez-monto">${{ fmt(liquidez[capaActiva].liquidez) }}</div>
+              <div class="liquidez-sub">
+                {{ capaActiva === 'realista' ? 'Con crédito real y abonos proyectados' : 'Con crédito formal, deuda total' }}
+              </div>
+            </div>
+
+            <!-- Desglose -->
+            <div class="liquidez-desglose">
+              <div class="liquidez-linea">
+                <span>Deuda proveedores</span>
+                <span class="txt-rojo">${{ fmt(liquidez[capaActiva].deuda_proveedores) }}</span>
+              </div>
+              <div v-if="capaActiva === 'realista' && liquidez.realista.abonos_proyectados > 0" class="liquidez-linea sub">
+                <span style="color:var(--texto-muted)">  − Abonos proyectados 10d</span>
+                <span class="txt-verde">−${{ fmt(liquidez.realista.abonos_proyectados) }}</span>
+              </div>
+              <div class="liquidez-linea">
+                <span>+ Ventas proyectadas 10d</span>
+                <span>${{ fmt(liquidez[capaActiva].proyeccion_ventas_10d) }}</span>
+              </div>
+              <div class="liquidez-linea">
+                <span>− Crédito proveedores ({{ liquidez[capaActiva].dias_credito_usados }}d prom.)</span>
+                <span class="txt-verde">−${{ fmt(liquidez[capaActiva].credito_proveedores) }}</span>
+              </div>
+              <div class="liquidez-linea colchon">
+                <span>+ Colchón {{ colchonPct }}%</span>
+                <span>${{ fmt(liquidez[capaActiva].colchon) }}</span>
+              </div>
+              <div class="liquidez-linea total">
+                <span>= Liquidez prudente</span>
+                <span>${{ fmt(liquidez[capaActiva].liquidez) }}</span>
+              </div>
+            </div>
+
+            <!-- Días de crédito real por proveedor -->
+            <div class="liquidez-creditos">
+              <div class="liquidez-creditos-titulo">
+                Días de crédito por proveedor
+                <span style="color:var(--texto-muted);font-size:0.75rem">(edita el «real» para ajustar el cálculo)</span>
+              </div>
+              <div v-for="d in liquidez.detalle_proveedores" :key="d.proveedor_id"
+                class="liquidez-prov-row">
+                <span class="lp-nombre">{{ d.proveedor }}</span>
+                <span class="lp-saldo txt-rojo">${{ fmt(d.saldo) }}</span>
+                <span class="lp-label" style="color:var(--texto-muted)">Formal:</span>
+                <span class="lp-dias">{{ d.dias_credito_formal }}d</span>
+                <span class="lp-label" style="color:var(--texto-muted)">Real:</span>
+                <input type="number" :value="d.dias_credito_real"
+                  class="lp-input-dias"
+                  min="0" max="365"
+                  @change="actualizarCreditoReal(d.proveedor_id, $event.target.value)" />
+                <span class="lp-label" style="color:var(--texto-muted)">d</span>
+                <span v-if="d.abono_proyectado_10d > 0" class="lp-abono txt-verde">
+                  −${{ fmt(d.abono_proyectado_10d) }} abono est.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="liquidez-loading" style="color:var(--texto-muted)">Sin datos suficientes para calcular</div>
+        </div>
+        <!-- fin WIDGET LIQUIDEZ -->
+
         <!-- Modal pago -->
         <div class="overlay" v-if="proveedorPago" @click.self="cerrarPago">
           <div class="modal">
@@ -246,6 +335,10 @@ export default {
       ajusteMonto:      null,
       ajusteMotivo:     '',
       ajustando:        false,
+      liquidez:         null,
+      cargandoLiquidez: false,
+      colchonPct:       18,
+      capaActiva:       'realista',
       formPago: {
         cuenta_id:       '',
         monto:           '',
@@ -280,6 +373,7 @@ export default {
   },
   async mounted() {
     await Promise.all([this.cargar(), this.cargarCuentas()])
+    this.cargarLiquidez()
   },
   methods: {
     async cargar() {
@@ -357,6 +451,30 @@ export default {
         alert(e?.response?.data?.detail || 'Error al ajustar deuda')
       } finally { this.ajustando = false }
     },
+    async cargarLiquidez() {
+      this.cargandoLiquidez = true
+      try {
+        const res = await axios.get('/reportes/liquidez-prudente', {
+          params: { colchon_pct: this.colchonPct / 100 }
+        })
+        this.liquidez = res.data
+      } catch (e) {
+        console.error('Error cargando liquidez', e)
+      } finally {
+        this.cargandoLiquidez = false
+      }
+    },
+    async actualizarCreditoReal(proveedorId, dias) {
+      try {
+        await axios.patch(`/reportes/liquidez-prudente/credito-real/${proveedorId}`, {
+          dias_credito_real: parseInt(dias) || 0
+        })
+        await this.cargarLiquidez()
+      } catch (e) {
+        console.error('Error actualizando crédito real', e)
+      }
+    },
+    fmt(v) { return Number(v || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
     formatFecha(iso) { return iso ? new Date(iso).toLocaleDateString('es-VE') : '—' },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },
@@ -400,4 +518,36 @@ export default {
 .btn-ajuste-deuda:hover { border-color: #FFCC00; background: #FFFDF0; }
 .input-field { border: 1px solid var(--borde); border-radius: 6px; padding: 0.5rem 0.65rem; font-size: 0.875rem; color: var(--texto-principal); background: var(--fondo-app, #fff); width: 100%; box-sizing: border-box; }
 .input-field:focus { outline: none; border-color: #FFCC00; }
+/* ── Widget Liquidez Prudente ── */
+.liquidez-widget { background:var(--fondo-card); border:1px solid var(--borde); border-radius:10px; padding:1.2rem 1.4rem; }
+.liquidez-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.6rem; margin-bottom:1rem; }
+.panel-titulo { font-size:1rem; font-weight:700; color:var(--texto-principal); }
+.liquidez-controles { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+.liquidez-input-pct { width:52px; text-align:center; border:1px solid var(--borde); border-radius:5px; padding:3px 5px; font-size:0.85rem; background:var(--fondo-input,#fff); color:var(--texto-principal); }
+.btn-toggle-capa { padding:4px 12px; border:1px solid var(--borde); border-radius:6px; background:var(--fondo-app,#fff); color:var(--texto-sec); cursor:pointer; font-size:0.8rem; }
+.btn-toggle-capa.activo { background:#FFCC00; color:#1A1A1A; border-color:#FFCC00; font-weight:600; }
+.btn-reload-liquidez { padding:4px 10px; border:1px solid var(--borde); border-radius:6px; background:transparent; cursor:pointer; font-size:1rem; color:var(--texto-sec); }
+.liquidez-loading { text-align:center; padding:1.5rem; color:var(--texto-muted); font-size:0.9rem; }
+.liquidez-body { display:grid; grid-template-columns:200px 1fr 1fr; gap:1.5rem; }
+@media (max-width:900px) { .liquidez-body { grid-template-columns:1fr; } }
+.liquidez-principal { background:var(--fondo-app,#fafafa); border-radius:8px; padding:1rem; text-align:center; border:1px solid var(--borde); }
+.liquidez-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--texto-muted); margin-bottom:0.4rem; }
+.liquidez-monto { font-size:2rem; font-weight:700; color:var(--texto-principal); }
+.liquidez-sub { font-size:0.75rem; color:var(--texto-muted); margin-top:0.3rem; }
+.liquidez-desglose { display:flex; flex-direction:column; gap:4px; }
+.liquidez-linea { display:flex; justify-content:space-between; font-size:0.85rem; padding:4px 0; border-bottom:0.5px solid var(--borde-suave,#eee); }
+.liquidez-linea.sub { padding-left:1rem; font-size:0.8rem; }
+.liquidez-linea.colchon { color:var(--texto-sec); border-top:1px dashed var(--borde); margin-top:4px; }
+.liquidez-linea.total { font-weight:700; font-size:0.95rem; border-top:2px solid var(--borde); margin-top:4px; padding-top:6px; }
+.liquidez-creditos { display:flex; flex-direction:column; gap:6px; }
+.liquidez-creditos-titulo { font-size:0.78rem; font-weight:600; color:var(--texto-sec); margin-bottom:4px; }
+.liquidez-prov-row { display:flex; align-items:center; gap:6px; font-size:0.8rem; flex-wrap:wrap; }
+.lp-nombre { flex:1; min-width:100px; font-weight:500; }
+.lp-saldo { min-width:60px; text-align:right; }
+.lp-dias { min-width:28px; }
+.lp-input-dias { width:48px; text-align:center; border:1px solid var(--borde); border-radius:4px; padding:2px 4px; font-size:0.8rem; background:var(--fondo-input,#fff); color:var(--texto-principal); }
+.lp-input-dias:focus { border-color:#FFCC00; outline:none; }
+.lp-abono { font-size:0.75rem; margin-left:auto; }
+.txt-verde { color:#16A34A; }
+.txt-rojo  { color:#DC2626; }
 </style>
