@@ -1482,7 +1482,7 @@ def sugerir_pareto(
     _: None = Depends(require_admin),
 ):
     """Devuelve IDs de productos que componen el top 20% de utilidad en los últimos N días.
-    Utilidad = (precio_unitario - costo_snap) * cantidad, sumado por producto."""
+    Utilidad = (precio_unitario - precio_base_snap) * cantidad, sumado por producto."""
     desde = datetime.utcnow() - timedelta(days=dias)
     detalles = db.query(DetalleVenta, Venta).join(
         Venta, DetalleVenta.venta_id == Venta.id
@@ -1497,7 +1497,7 @@ def sugerir_pareto(
         if not pid:
             continue
         precio  = float(d.precio_unitario or 0)
-        costo   = float(d.costo_snap or 0)
+        costo   = float(d.precio_base_snap or 0)
         cant    = float(d.cantidad or 0)
         utilidad = (precio - costo) * cant
         utilidad_por_prod[pid] = utilidad_por_prod.get(pid, 0) + utilidad
