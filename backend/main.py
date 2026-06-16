@@ -132,6 +132,7 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS descuento_compuesto_pct FLOAT DEFAULT 0",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS comision_pct FLOAT DEFAULT 0",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS comision_push FLOAT",
+             "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_delicado BOOLEAN DEFAULT FALSE",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo TEXT",
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria_id INTEGER",

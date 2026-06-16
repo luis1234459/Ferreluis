@@ -1473,3 +1473,46 @@ def actualizar_credito_real(
     prov.dias_credito_real = max(0, dias_credito_real)
     db.commit()
     return {"ok": True}
+
+
+@router.get("/sugerir-pareto")
+def sugerir_pareto(
+    dias: int = 90,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Devuelve IDs de productos que componen el top 20% de utilidad en los últimos N días.
+    Utilidad = (precio_unitario - costo_snap) * cantidad, sumado por producto."""
+    desde = datetime.utcnow() - timedelta(days=dias)
+    detalles = db.query(DetalleVenta, Venta).join(
+        Venta, DetalleVenta.venta_id == Venta.id
+    ).filter(
+        Venta.fecha >= desde,
+        Venta.estado != "anulada",
+    ).all()
+
+    utilidad_por_prod = {}
+    for d, v in detalles:
+        pid = d.producto_id
+        if not pid:
+            continue
+        precio  = float(d.precio_unitario or 0)
+        costo   = float(d.costo_snap or 0)
+        cant    = float(d.cantidad or 0)
+        utilidad = (precio - costo) * cant
+        utilidad_por_prod[pid] = utilidad_por_prod.get(pid, 0) + utilidad
+
+    if not utilidad_por_prod:
+        return {"ids": [], "total_evaluados": 0, "umbral_utilidad": 0}
+
+    # Ordenar y cortar al top 20%
+    ordenados = sorted(utilidad_por_prod.items(), key=lambda x: x[1], reverse=True)
+    corte = max(1, int(len(ordenados) * 0.20))
+    top = ordenados[:corte]
+
+    return {
+        "ids":                [pid for pid, _ in top],
+        "total_evaluados":    len(ordenados),
+        "umbral_utilidad":    round(top[-1][1], 2) if top else 0,
+        "dias_evaluados":     dias,
+    }

@@ -75,6 +75,7 @@ class Producto(Base):
     categoria_id            = Column(Integer, nullable=True)   # FK → Categoria
     proveedor_id            = Column(Integer, nullable=True)   # FK → Proveedor
     es_producto_clave       = Column(Boolean, default=False)   # producto Pareto
+    es_delicado             = Column(Boolean, default=False)   # producto delicado — prioridad alta en auditorías
     es_producto_compuesto   = Column(Boolean, default=False)
     descuento_compuesto_pct = Column(Float,   default=0)       # % dto solo admin
     comision_pct            = Column(Float,   default=0.0)     # % comisión al vendedor por este producto

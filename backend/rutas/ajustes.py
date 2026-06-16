@@ -171,6 +171,7 @@ def listar_productos_ajuste(
             "precio_base_usd":    precio_base,
             "stock":              stock_real,
             "es_producto_clave":  p.es_producto_clave,
+            "es_delicado":        p.es_delicado,
             "tiene_variantes":    n_variantes > 0,
             "variantes_count":    n_variantes,
         })

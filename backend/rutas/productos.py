@@ -906,7 +906,7 @@ def edicion_masiva(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id", "proveedor_id", "marca_id"}
+    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id", "proveedor_id", "marca_id", "es_producto_clave", "es_delicado", "plantilla_garantia_id", "unidad_medida", "unidades_por_paquete", "nombre_paquete"}
     actualizados = 0
     errores      = []
     for item in items:

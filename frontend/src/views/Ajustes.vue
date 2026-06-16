@@ -514,6 +514,9 @@
               :disabled="gestionCargando">
               {{ gestionCargando ? 'Cargando...' : 'Cargar productos' }}
             </button>
+            <button class="btn-sugerir-pareto" @click="sugerirPareto" :disabled="cargandoSugerencia">
+              {{ cargandoSugerencia ? 'Calculando...' : '🤖 Sugerir Pareto auto' }}
+            </button>
           </div>
 
           <!-- Panel mover departamento/proveedor -->
@@ -573,6 +576,8 @@
                   <th>Departamento</th>
                   <th>Categoría</th>
                   <th>Marca</th>
+                  <th>⭐ Pareto</th>
+                  <th>🎯 Delicado</th>
                   <th>Stock</th>
                   <th>Acciones</th>
                 </tr>
@@ -589,6 +594,14 @@
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td class="txt-muted">{{ p.categoria_nombre }}</td>
                   <td class="txt-muted">{{ p.marca_nombre }}</td>
+                  <td style="text-align:center">
+                    <input type="checkbox" :checked="p.es_producto_clave"
+                      @change="togglePareto(p.id, $event.target.checked)" />
+                  </td>
+                  <td style="text-align:center">
+                    <input type="checkbox" :checked="p.es_delicado"
+                      @change="toggleDelicado(p.id, $event.target.checked)" />
+                  </td>
                   <td>{{ p.stock }}</td>
                   <td>
                     <button class="btn-editar-nombre" @click="abrirEditarNombre(p)">
@@ -987,6 +1000,7 @@ export default {
 
       // ── Tab Gestión ──────────────────────────────────────────────────────
       gestionFiltroTipo:        'todos',
+      cargandoSugerencia:       false,
       gestionFiltroId:          '',
       gestionFiltroCategoria:   '',
       gestionCategoriasOpc:     [],
@@ -1545,6 +1559,54 @@ export default {
     },
 
     // ── Gestión: cargar productos ──────────────────────────────────────────
+    async togglePareto(productoId, valor) {
+      try {
+        await axios.put('/productos/edicion-masiva',
+          [{ id: productoId, es_producto_clave: valor }],
+          { headers: this._headers() })
+        const p = this.gestionProductos.find(x => x.id === productoId)
+        if (p) p.es_producto_clave = valor
+      } catch (e) {
+        alert('Error al actualizar Pareto: ' + (e?.response?.data?.detail || e.message))
+      }
+    },
+    async toggleDelicado(productoId, valor) {
+      try {
+        await axios.put('/productos/edicion-masiva',
+          [{ id: productoId, es_delicado: valor }],
+          { headers: this._headers() })
+        const p = this.gestionProductos.find(x => x.id === productoId)
+        if (p) p.es_delicado = valor
+      } catch (e) {
+        alert('Error al actualizar Delicado: ' + (e?.response?.data?.detail || e.message))
+      }
+    },
+    async sugerirPareto() {
+      if (this.gestionProductos.length === 0) {
+        alert('Primero carga productos en la tabla')
+        return
+      }
+      this.cargandoSugerencia = true
+      try {
+        const res = await axios.get('/reportes/sugerir-pareto', { headers: this._headers() })
+        const idsTop = new Set(res.data.ids)
+        const enTabla = this.gestionProductos.filter(p => idsTop.has(p.id))
+        if (enTabla.length === 0) {
+          alert(`Top Pareto calculado (${res.data.ids.length} productos), pero ninguno aparece en la tabla actual. Carga más productos o cambia el filtro.`)
+          return
+        }
+        if (!confirm(`Marcar como Pareto los ${enTabla.length} productos del top 20% de utilidad que aparecen en la tabla?`)) return
+
+        const cambios = enTabla.map(p => ({ id: p.id, es_producto_clave: true }))
+        await axios.put('/productos/edicion-masiva', cambios, { headers: this._headers() })
+        enTabla.forEach(p => p.es_producto_clave = true)
+        alert(`✓ ${enTabla.length} productos marcados como Pareto`)
+      } catch (e) {
+        alert('Error: ' + (e?.response?.data?.detail || e.message))
+      } finally {
+        this.cargandoSugerencia = false
+      }
+    },
     async cargarProductosGestion() {
       this.gestionCargando = true
       this.gestionSeleccion = []
