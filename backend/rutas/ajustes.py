@@ -10,7 +10,7 @@ import io
 from database import get_db
 from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
-    Departamento, Categoria, Proveedor, TasaCambio, Marca,
+    Departamento, Categoria, Proveedor, TasaCambio, Marca, ConteoPrioritario,
 )
 from rutas.usuarios import require_admin, require_admin_o_gestionador
 from pydantic import BaseModel
@@ -817,3 +817,167 @@ def trazabilidad_producto(
     if tipo:
         movimientos = [m for m in movimientos if m["tipo"] == tipo]
     return movimientos
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEO PRIORITARIO
+# ─────────────────────────────────────────────────────────────────────────────
+
+class EnvioConteoItem(BaseModel):
+    producto_id: int
+    nota: Optional[str] = None
+    prioridad: str = "manual"
+
+class EnvioConteoPayload(BaseModel):
+    items: list[EnvioConteoItem]
+    enviado_por: str
+
+@router.post("/conteo-prioritario/enviar")
+def enviar_a_conteo_prioritario(payload: EnvioConteoPayload, db: Session = Depends(get_db),
+                                 _: None = Depends(require_admin)):
+    """Admin envía productos a la cola de conteo prioritario.
+    Si un producto ya está en cola pendiente, no lo duplica."""
+    agregados = 0
+    duplicados = 0
+    for item in payload.items:
+        ya_en_cola = db.query(ConteoPrioritario).filter(
+            ConteoPrioritario.producto_id == item.producto_id,
+            ConteoPrioritario.estado == "pendiente",
+        ).first()
+        if ya_en_cola:
+            duplicados += 1
+            continue
+        c = ConteoPrioritario(
+            producto_id = item.producto_id,
+            enviado_por = payload.enviado_por,
+            nota        = item.nota,
+            prioridad   = item.prioridad,
+        )
+        db.add(c)
+        agregados += 1
+    db.commit()
+    return {"agregados": agregados, "duplicados": duplicados}
+
+@router.get("/conteo-prioritario/pendientes")
+def listar_cola_conteo(db: Session = Depends(get_db),
+                       _: None = Depends(require_admin_o_gestionador)):
+    """Lista productos en cola, ordenados por prioridad."""
+    ORDEN = {"delicado": 1, "compra_entrante": 2, "manual": 3, "top_vendidos": 4}
+    items = db.query(ConteoPrioritario).filter(
+        ConteoPrioritario.estado == "pendiente"
+    ).all()
+    resultado = []
+    for c in items:
+        p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+        if not p:
+            continue
+        resultado.append({
+            "id":             c.id,
+            "producto_id":    p.id,
+            "nombre":         p.nombre,
+            "codigo":         p.codigo,
+            "stock_actual":   p.stock,
+            "enviado_por":    c.enviado_por,
+            "fecha_envio":    c.fecha_envio.isoformat() if c.fecha_envio else None,
+            "nota":           c.nota,
+            "prioridad":      c.prioridad,
+            "es_delicado":    p.es_delicado,
+            "es_pareto":      p.es_producto_clave,
+        })
+    resultado.sort(key=lambda x: ORDEN.get(x["prioridad"], 99))
+    return resultado
+
+class ConteoRealizado(BaseModel):
+    stock_real: int
+
+@router.post("/conteo-prioritario/{conteo_id}/contar")
+def registrar_conteo_prioritario(conteo_id: int, datos: ConteoRealizado,
+                                  db: Session = Depends(get_db),
+                                  _: None = Depends(require_admin_o_gestionador),
+                                  x_usuario: str = Header(None)):
+    """Gestionador registra el conteo. Queda pendiente de aprobación admin
+    si hay diferencia. Si no hay diferencia, se cierra automáticamente."""
+    c = db.query(ConteoPrioritario).filter(ConteoPrioritario.id == conteo_id).first()
+    if not c or c.estado != "pendiente":
+        raise HTTPException(status_code=404, detail="Conteo no encontrado o ya cerrado")
+    p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    c.stock_sistema   = p.stock
+    c.stock_real      = datos.stock_real
+    c.diferencia      = datos.stock_real - p.stock
+    c.fecha_conteo    = datetime.utcnow()
+    c.contado_por     = x_usuario or "gestionador"
+
+    if c.diferencia == 0:
+        c.estado          = "contado"
+        c.aprobado_admin  = True
+        c.fecha_aprobacion= datetime.utcnow()
+        p.auditado        = True
+        p.fecha_auditoria = datetime.utcnow()
+    else:
+        c.estado = "contado"
+
+    db.commit()
+    return {"ok": True, "diferencia": c.diferencia,
+            "requiere_aprobacion": c.diferencia != 0}
+
+@router.get("/conteo-prioritario/discrepancias")
+def listar_discrepancias_pendientes(db: Session = Depends(get_db),
+                                     _: None = Depends(require_admin)):
+    """Lista conteos con discrepancia pendientes de aprobación admin."""
+    items = db.query(ConteoPrioritario).filter(
+        ConteoPrioritario.estado == "contado",
+        ConteoPrioritario.aprobado_admin.is_(None),
+    ).all()
+    resultado = []
+    for c in items:
+        p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+        if not p: continue
+        resultado.append({
+            "id":             c.id,
+            "producto_id":    p.id,
+            "nombre":         p.nombre,
+            "stock_sistema":  c.stock_sistema,
+            "stock_real":     c.stock_real,
+            "diferencia":     c.diferencia,
+            "contado_por":    c.contado_por,
+            "fecha_conteo":   c.fecha_conteo.isoformat() if c.fecha_conteo else None,
+            "nota":           c.nota,
+        })
+    return resultado
+
+@router.post("/conteo-prioritario/{conteo_id}/aprobar")
+def aprobar_discrepancia(conteo_id: int, aprobar: bool = True,
+                          db: Session = Depends(get_db),
+                          _: None = Depends(require_admin)):
+    """Admin aprueba o rechaza la discrepancia. Si aprueba, ajusta el stock."""
+    c = db.query(ConteoPrioritario).filter(ConteoPrioritario.id == conteo_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Conteo no encontrado")
+    p = db.query(Producto).filter(Producto.id == c.producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    c.aprobado_admin   = aprobar
+    c.fecha_aprobacion = datetime.utcnow()
+
+    if aprobar:
+        p.stock = c.stock_real
+        p.auditado = True
+        p.fecha_auditoria = datetime.utcnow()
+        h = HistorialAjuste(
+            producto_id     = p.id,
+            tipo            = "conteo_prioritario",
+            cantidad_antes  = c.stock_sistema,
+            cantidad_despues= c.stock_real,
+            diferencia      = c.diferencia,
+            motivo          = f"Conteo prioritario aprobado. {c.nota or ''}",
+            usuario         = "admin",
+            fecha           = datetime.utcnow(),
+        )
+        db.add(h)
+
+    db.commit()
+    return {"ok": True}

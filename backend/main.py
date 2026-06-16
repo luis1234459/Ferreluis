@@ -485,6 +485,48 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS marca_id INTEGER REFERENCES marcas(id)"],
         )
 
+        # ── conteo_prioritario ───────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS conteo_prioritario (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                producto_id INTEGER,
+                variante_id INTEGER,
+                enviado_por TEXT,
+                fecha_envio DATETIME DEFAULT CURRENT_TIMESTAMP,
+                nota TEXT,
+                prioridad TEXT DEFAULT 'manual',
+                estado TEXT DEFAULT 'pendiente',
+                fecha_conteo DATETIME,
+                contado_por TEXT,
+                stock_sistema INTEGER,
+                stock_real INTEGER,
+                diferencia INTEGER,
+                aprobado_admin BOOLEAN,
+                fecha_aprobacion DATETIME
+            )""",
+             "CREATE INDEX IF NOT EXISTS ix_conteo_prio_estado ON conteo_prioritario(estado)",
+             "CREATE INDEX IF NOT EXISTS ix_conteo_prio_prod ON conteo_prioritario(producto_id)"],
+            ["""CREATE TABLE IF NOT EXISTS conteo_prioritario (
+                id SERIAL PRIMARY KEY,
+                producto_id INTEGER,
+                variante_id INTEGER,
+                enviado_por TEXT,
+                fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                nota TEXT,
+                prioridad TEXT DEFAULT 'manual',
+                estado TEXT DEFAULT 'pendiente',
+                fecha_conteo TIMESTAMP,
+                contado_por TEXT,
+                stock_sistema INTEGER,
+                stock_real INTEGER,
+                diferencia INTEGER,
+                aprobado_admin BOOLEAN,
+                fecha_aprobacion TIMESTAMP
+             )""",
+             "CREATE INDEX IF NOT EXISTS ix_conteo_prio_estado ON conteo_prioritario(estado)",
+             "CREATE INDEX IF NOT EXISTS ix_conteo_prio_prod ON conteo_prioritario(producto_id)"],
+        )
+
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True

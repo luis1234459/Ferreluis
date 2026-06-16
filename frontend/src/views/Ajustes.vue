@@ -517,6 +517,10 @@
             <button class="btn-sugerir-pareto" @click="sugerirPareto" :disabled="cargandoSugerencia">
               {{ cargandoSugerencia ? 'Calculando...' : '🤖 Sugerir Pareto auto' }}
             </button>
+            <button class="btn-enviar-conteo" @click="abrirModalEnviarConteo"
+              :disabled="seleccionados.size === 0">
+              📋 Enviar a conteo ({{ seleccionados.size }})
+            </button>
           </div>
 
           <!-- Panel mover departamento/proveedor -->
@@ -575,6 +579,10 @@
                   <th>Nombre</th>
                   <th>Departamento</th>
                   <th>Categoría</th>
+                  <th style="width:30px">
+                    <input type="checkbox" :checked="todosSeleccionados"
+                      @change="toggleSeleccionarTodos" />
+                  </th>
                   <th>Marca</th>
                   <th>⭐ Pareto</th>
                   <th>🎯 Delicado</th>
@@ -593,6 +601,10 @@
                   <td style="font-weight:600">{{ p.nombre }}</td>
                   <td class="txt-muted">{{ p.departamento_nombre }}</td>
                   <td class="txt-muted">{{ p.categoria_nombre }}</td>
+                  <td style="text-align:center">
+                    <input type="checkbox" :checked="seleccionados.has(p.id)"
+                      @change="toggleSeleccion(p.id)" />
+                  </td>
                   <td class="txt-muted">{{ p.marca_nombre }}</td>
                   <td style="text-align:center">
                     <input type="checkbox" :checked="p.es_producto_clave"
@@ -927,6 +939,32 @@
 
       </div><!-- /contenido-inner -->
     </main>
+
+    <div v-if="modalEnviarConteo" class="overlay" @click.self="modalEnviarConteo = false">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <h2>📋 Enviar a conteo prioritario</h2>
+          <button class="btn-cerrar-modal" @click="modalEnviarConteo = false">✕</button>
+        </div>
+        <div style="padding:1rem">
+          <p style="margin-bottom:1rem">
+            Vas a enviar <strong>{{ seleccionados.size }}</strong> productos a la cola de conteo.
+            El gestionador los verá priorizados.
+          </p>
+          <div class="field">
+            <label>Nota opcional (para el gestionador)</label>
+            <textarea v-model="notaConteo" rows="3"
+              placeholder="Ej: posible discrepancia detectada en ventas"></textarea>
+          </div>
+          <div class="form-botones">
+            <button class="btn-cancelar" @click="modalEnviarConteo = false">Cancelar</button>
+            <button class="btn-guardar" @click="confirmarEnvioConteo" :disabled="enviandoConteo">
+              {{ enviandoConteo ? 'Enviando...' : 'Confirmar envío' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1001,6 +1039,10 @@ export default {
       // ── Tab Gestión ──────────────────────────────────────────────────────
       gestionFiltroTipo:        'todos',
       cargandoSugerencia:       false,
+      seleccionados:            new Set(),
+      modalEnviarConteo:        false,
+      notaConteo:               '',
+      enviandoConteo:           false,
       gestionFiltroId:          '',
       gestionFiltroCategoria:   '',
       gestionCategoriasOpc:     [],
@@ -1053,6 +1095,10 @@ export default {
   },
 
   computed: {
+    todosSeleccionados() {
+      return this.gestionProductos.length > 0 &&
+             this.gestionProductos.every(p => this.seleccionados.has(p.id))
+    },
     esAdmin() { return this.usuario.rol === 'admin' },
     tienePermiso() {
       return (modulo) => {
@@ -1605,6 +1651,46 @@ export default {
         alert('Error: ' + (e?.response?.data?.detail || e.message))
       } finally {
         this.cargandoSugerencia = false
+      }
+    },
+    toggleSeleccion(productoId) {
+      if (this.seleccionados.has(productoId)) this.seleccionados.delete(productoId)
+      else this.seleccionados.add(productoId)
+      this.seleccionados = new Set(this.seleccionados)
+    },
+    toggleSeleccionarTodos() {
+      if (this.todosSeleccionados) {
+        this.seleccionados = new Set()
+      } else {
+        this.seleccionados = new Set(this.gestionProductos.map(p => p.id))
+      }
+    },
+    abrirModalEnviarConteo() {
+      if (this.seleccionados.size === 0) return
+      this.notaConteo = ''
+      this.modalEnviarConteo = true
+    },
+    async confirmarEnvioConteo() {
+      this.enviandoConteo = true
+      try {
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}')
+        const items = Array.from(this.seleccionados).map(id => ({
+          producto_id: id,
+          nota:        this.notaConteo || null,
+          prioridad:   'manual',
+        }))
+        const res = await axios.post('/ajustes/conteo-prioritario/enviar', {
+          items,
+          enviado_por: usuario.usuario || usuario.nombre || 'admin',
+        }, { headers: this._headers() })
+        alert(`✓ ${res.data.agregados} productos enviados a conteo` +
+              (res.data.duplicados ? ` (${res.data.duplicados} ya estaban en cola)` : ''))
+        this.seleccionados = new Set()
+        this.modalEnviarConteo = false
+      } catch (e) {
+        alert('Error: ' + (e?.response?.data?.detail || e.message))
+      } finally {
+        this.enviandoConteo = false
       }
     },
     async cargarProductosGestion() {

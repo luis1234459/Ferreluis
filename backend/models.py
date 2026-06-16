@@ -887,3 +887,25 @@ class DemandaRegistro(Base):
     fecha              = Column(DateTime, default=datetime.now)
     visto_por_admin    = Column(Boolean,  default=False)
     observacion        = Column(String,   nullable=True)
+
+
+class ConteoPrioritario(Base):
+    """Cola de productos enviados a auditar/contar por admin.
+    El gestionador ve esta cola priorizada en su panel de Conteo."""
+    __tablename__ = "conteo_prioritario"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    producto_id     = Column(Integer, index=True)
+    variante_id     = Column(Integer, nullable=True)
+    enviado_por     = Column(String)                            # usuario admin que envió
+    fecha_envio     = Column(DateTime, default=datetime.utcnow)
+    nota            = Column(String, nullable=True)             # nota opcional del admin
+    prioridad       = Column(String, default="manual")          # delicado | compra_entrante | manual | top_vendidos
+    estado          = Column(String, default="pendiente")       # pendiente | contado | descartado
+    fecha_conteo    = Column(DateTime, nullable=True)
+    contado_por     = Column(String, nullable=True)             # usuario gestionador
+    stock_sistema   = Column(Integer, nullable=True)            # snapshot del stock al momento del conteo
+    stock_real      = Column(Integer, nullable=True)            # lo que contó el gestionador
+    diferencia      = Column(Integer, nullable=True)
+    aprobado_admin  = Column(Boolean, nullable=True)            # null=pendiente | true=aprobado | false=rechazado
+    fecha_aprobacion= Column(DateTime, nullable=True)
