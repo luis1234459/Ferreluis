@@ -132,6 +132,53 @@
       </table>
     </div>
 
+    <!-- Vista de impresión -->
+    <div v-if="vistaImpresion" class="vista-impresion-overlay">
+      <div class="vista-impresion-toolbar">
+        <button class="btn-volver-impresion"
+          @click="vistaImpresion = false">
+          ← Volver
+        </button>
+        <button class="btn-imprimir-ahora"
+          @click="imprimirPagina">
+          🖨 Imprimir
+        </button>
+      </div>
+
+      <div class="hoja-etiquetas">
+        <div v-for="(e, i) in etiquetasParaImprimir" :key="i"
+          :class="['etiqueta-card',
+            e.tipo === 'exhibicion' ? 'etiqueta-exhibicion' : 'etiqueta-deposito']">
+
+          <!-- ETIQUETA EXHIBICIÓN -->
+          <template v-if="e.tipo === 'exhibicion'">
+            <div class="etq-nombre">{{ e.nombre }}</div>
+
+            <div v-if="e.usarAmazon" class="etq-precio-amazon">
+              <span class="etq-precio-antes">
+                Antes: <s>${{ Number(e.precio_referencial_usd).toFixed(2) }}</s>
+              </span>
+              <span class="etq-precio-ahora">
+                ${{ Number(e.precio_oferta_usd).toFixed(2) }}
+              </span>
+            </div>
+            <div v-else class="etq-precio-basico">
+              ${{ Number(e.precio_referencial_usd || 0).toFixed(2) }}
+            </div>
+
+            <div class="etq-codigo">{{ e.codigo || '—' }}</div>
+          </template>
+
+          <!-- ETIQUETA DEPÓSITO -->
+          <template v-else>
+            <div class="etq-codigo-grande">{{ e.codigo || '—' }}</div>
+            <div class="etq-nombre-pequeno">{{ e.nombre }}</div>
+          </template>
+
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -258,6 +305,7 @@ export default {
       this.modalGenerar = false
       this.vistaImpresion = true
     },
+    imprimirPagina() { window.print() },
     toggleTodos() {
       if (this.todosSeleccionados) {
         this.seleccionados = this.seleccionados.filter(
@@ -379,4 +427,89 @@ export default {
   font-size: 0.9rem; font-weight: 700;
 }
 .btn-guardar:hover { background: #333; }
+
+/* ── Vista de impresión ── */
+.vista-impresion-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: #F5F5F0; overflow-y: auto;
+  padding: 0;
+}
+.vista-impresion-toolbar {
+  display: flex; gap: 0.75rem; align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: #1A1A1A; position: sticky; top: 0; z-index: 10;
+}
+.btn-volver-impresion {
+  background: transparent; border: 1px solid #FFCC00;
+  color: #FFCC00; border-radius: 6px;
+  padding: 0.4rem 0.9rem; font-weight: 700;
+  font-size: 0.85rem; cursor: pointer;
+}
+.btn-volver-impresion:hover { background: #FFCC0033; }
+.btn-imprimir-ahora {
+  background: #FFCC00; color: #1A1A1A; border: none;
+  border-radius: 6px; padding: 0.4rem 1rem;
+  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+.btn-imprimir-ahora:hover { background: #e6b800; }
+
+/* Grid de etiquetas */
+.hoja-etiquetas {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  padding: 1.25rem;
+}
+.etiqueta-card {
+  border: 1px solid #1A1A1A; border-radius: 6px;
+  background: #FFFFFF; overflow: hidden;
+  page-break-inside: avoid; break-inside: avoid;
+  display: flex; flex-direction: column;
+}
+
+/* Exhibición: 8 × 5 cm aprox */
+.etiqueta-exhibicion {
+  width: 220px; min-height: 120px;
+  padding: 0.5rem 0.75rem; justify-content: space-between;
+}
+.etq-nombre {
+  font-size: 0.78rem; font-weight: 700;
+  color: #1A1A1A; line-height: 1.2;
+  margin-bottom: 0.35rem;
+}
+.etq-precio-basico {
+  font-size: 1.6rem; font-weight: 800; color: #1A1A1A;
+}
+.etq-precio-amazon {
+  display: flex; flex-direction: column; gap: 0.1rem;
+}
+.etq-precio-antes {
+  font-size: 0.72rem; color: #888;
+}
+.etq-precio-ahora {
+  font-size: 1.6rem; font-weight: 800; color: #DC2626;
+}
+.etq-codigo {
+  font-size: 0.65rem; color: #888; margin-top: 0.3rem;
+  border-top: 1px solid #EEE; padding-top: 0.25rem;
+}
+
+/* Depósito: 6 × 3.5 cm aprox */
+.etiqueta-deposito {
+  width: 160px; min-height: 80px;
+  padding: 0.5rem 0.6rem; justify-content: center;
+  align-items: center; text-align: center; gap: 0.2rem;
+}
+.etq-codigo-grande {
+  font-size: 1.1rem; font-weight: 800;
+  color: #1A1A1A; letter-spacing: 0.04em;
+}
+.etq-nombre-pequeno {
+  font-size: 0.65rem; color: #555;
+  line-height: 1.2; margin-top: 0.2rem;
+}
+
+@media print {
+  .vista-impresion-toolbar { display: none !important; }
+  .vista-impresion-overlay { position: static; background: white; }
+  .hoja-etiquetas { padding: 0; }
+}
 </style>
