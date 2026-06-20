@@ -40,6 +40,63 @@
       </label>
     </div>
 
+    <div class="etiquetas-generar-bar"
+      v-if="seleccionados.length > 0">
+      <span class="generar-count">
+        {{ seleccionados.length }} producto(s) seleccionado(s)
+      </span>
+      <button class="btn-generar-tipo1"
+        @click="abrirModalGenerar('exhibicion')">
+        🏷 Etiqueta exhibición
+      </button>
+      <button class="btn-generar-tipo2"
+        @click="abrirModalGenerar('deposito')">
+        📦 Etiqueta depósito
+      </button>
+    </div>
+
+    <!-- Modal configuración -->
+    <div v-if="modalGenerar" class="overlay"
+      @click.self="modalGenerar = false">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h2>Generar etiquetas —
+            {{ tipoEtiqueta === 'exhibicion' ? 'Exhibición' : 'Depósito' }}
+          </h2>
+          <button class="btn-cerrar-modal"
+            @click="modalGenerar = false">✕</button>
+        </div>
+        <div style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem">
+
+          <div v-if="tipoEtiqueta === 'exhibicion'" class="field">
+            <label>Formato</label>
+            <select v-model="formatoExhibicion">
+              <option value="auto">Automático (oferta = Amazon)</option>
+              <option value="amazon">Forzar estilo Amazon</option>
+              <option value="basico">Básico (sin precio anterior)</option>
+            </select>
+            <small class="txt-muted">
+              "Automático" usa formato Amazon solo en
+              productos con oferta activa
+            </small>
+          </div>
+
+          <p style="font-size:0.85rem;color:var(--texto-muted)">
+            Se generarán {{ seleccionados.length }} etiquetas
+            listas para imprimir.
+          </p>
+        </div>
+        <div class="form-botones">
+          <button class="btn-cancelar"
+            @click="modalGenerar = false">Cancelar</button>
+          <button class="btn-guardar"
+            @click="generarEtiquetas">
+            Generar
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="etiquetas-tabla-wrap">
       <table class="etiquetas-tabla">
         <thead>
@@ -93,7 +150,12 @@ export default {
       filtroMarca:     '',
       filtroDepto:     '',
       filtroCategoria: '',
-      seleccionados:   [],
+      seleccionados:         [],
+      modalGenerar:          false,
+      tipoEtiqueta:          '',
+      formatoExhibicion:     'auto',
+      vistaImpresion:        false,
+      etiquetasParaImprimir: [],
     }
   },
   computed: {
@@ -172,6 +234,30 @@ export default {
       if (idx >= 0) this.seleccionados.splice(idx, 1)
       else this.seleccionados.push(id)
     },
+    abrirModalGenerar(tipo) {
+      this.tipoEtiqueta = tipo
+      this.modalGenerar = true
+    },
+    generarEtiquetas() {
+      const seleccionadosObjs = this.productos.filter(
+        p => this.seleccionados.includes(p.id)
+      )
+      this.etiquetasParaImprimir = seleccionadosObjs.map(p => {
+        const tieneOferta = p.oferta_activa
+        let usarAmazon = false
+        if (this.tipoEtiqueta === 'exhibicion') {
+          if (this.formatoExhibicion === 'amazon') usarAmazon = true
+          else if (this.formatoExhibicion === 'auto') usarAmazon = tieneOferta
+        }
+        return {
+          ...p,
+          tipo: this.tipoEtiqueta,
+          usarAmazon,
+        }
+      })
+      this.modalGenerar = false
+      this.vistaImpresion = true
+    },
     toggleTodos() {
       if (this.todosSeleccionados) {
         this.seleccionados = this.seleccionados.filter(
@@ -230,4 +316,67 @@ export default {
   border-radius: 4px; font-size: 0.78rem;
 }
 .sin-datos { text-align: center; padding: 2rem; color: var(--texto-muted); }
+
+.etiquetas-generar-bar {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: #FFFDF0; border: 1px solid #FFCC00;
+  border-radius: 8px; padding: 0.6rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.generar-count {
+  font-size: 0.85rem; font-weight: 700;
+  color: var(--texto-principal);
+}
+.btn-generar-tipo1, .btn-generar-tipo2 {
+  background: #1A1A1A; color: #FFCC00;
+  border: none; border-radius: 6px;
+  padding: 0.45rem 0.85rem; font-weight: 700;
+  font-size: 0.82rem; cursor: pointer;
+}
+.btn-generar-tipo1:hover, .btn-generar-tipo2:hover { background: #333; }
+
+/* Modal — reutiliza clases globales del proyecto */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 500; display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal {
+  background: #FAFAF7; border-radius: 14px;
+  width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.2);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--borde);
+  background: #FFFFFF; border-radius: 14px 14px 0 0;
+}
+.modal-header h2 { margin: 0; font-size: 1rem; font-weight: 700; color: #1A1A1A; }
+.btn-cerrar-modal {
+  background: transparent; border: none; font-size: 1.1rem;
+  cursor: pointer; color: var(--texto-muted); padding: 0.2rem 0.45rem;
+}
+.btn-cerrar-modal:hover { background: #F3F4F6; color: #1A1A1A; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; }
+.field label { font-size: 0.82rem; font-weight: 600; color: var(--texto-sec); }
+.field select {
+  padding: 0.5rem 0.7rem; border: 1px solid #CCCCCC;
+  border-radius: 7px; background: #FFFFFF; font-size: 0.88rem;
+}
+.form-botones {
+  display: flex; justify-content: flex-end; gap: 0.6rem;
+  padding: 1rem 1.25rem; border-top: 1px solid var(--borde);
+}
+.btn-cancelar {
+  padding: 0.55rem 1.1rem; background: transparent;
+  border: 1px solid var(--borde); color: var(--texto-sec);
+  border-radius: 8px; cursor: pointer; font-size: 0.88rem;
+}
+.btn-cancelar:hover { border-color: #DC2626; color: #DC2626; }
+.btn-guardar {
+  padding: 0.55rem 1.2rem; background: #1A1A1A; color: #FFCC00;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-size: 0.9rem; font-weight: 700;
+}
+.btn-guardar:hover { background: #333; }
 </style>
