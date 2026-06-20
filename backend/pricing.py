@@ -24,27 +24,29 @@ def calcular_precios(
         precio_bs   = precio_base × binance
 
     BCV_DIRECT (proveedor paga en Bs al BCV):
-        precio_ref  = costo × (1 + margen)       ← precio real de venta
-        precio_base = precio_ref × (bcv / binance) ← factor invertido, más bajo
+        precio_ref  = costo × (1 + margen)              ← precio cobrado en Bs a tasa BCV
+        precio_base = precio_ref × (2 − binance/bcv)    ← descuento por pagar en divisa directa
         precio_bs   = precio_ref × bcv
     """
     factor_normal    = round(tasa_binance / tasa_bcv,    6) if tasa_bcv     > 0 else 1.0
     factor_invertido = round(tasa_bcv    / tasa_binance, 6) if tasa_binance > 0 else 1.0
 
-    precio_base = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
+    precio_base_calc = round(float(costo_usd or 0) * (1 + float(margen or 0)), 4)
 
     if policy == POLICY_BCV_DIRECT:
+        precio_referencial = precio_base_calc
         if ajuste_tipo == "sistema":
-            # Sin factor Binance/BCV: el cliente paga precio_base × tasa_bcv en Bs
-            precio_ref = precio_base
-            precio_bs  = round(precio_base * float(tasa_bcv), 2)
+            # factor = binance/bcv; precio_base = precio_ref × (2 - factor)
+            precio_base = round(precio_referencial * (2 - factor_normal), 4)
         else:
-            # Ajuste manual: recargo fijo % sobre precio_base
-            precio_ref = round(precio_base * (1 + float(ajuste_divisa_pct or 0)), 4)
-            precio_bs  = round(precio_ref * float(tasa_bcv), 2)
+            # Ajuste manual: descuento fijo % sobre precio_referencial
+            precio_base = round(precio_referencial * (1 - float(ajuste_divisa_pct or 0)), 4)
+        precio_ref = precio_referencial
+        precio_bs  = round(precio_referencial * float(tasa_bcv), 2)
     else:  # MARKET_FACTOR
-        precio_ref = round(precio_base * factor_normal, 4)
-        precio_bs  = round(precio_base * float(tasa_binance), 2)
+        precio_base = precio_base_calc
+        precio_ref  = round(precio_base * factor_normal, 4)
+        precio_bs   = round(precio_base * float(tasa_binance), 2)
 
     precio_divisa_usd = round(precio_base * (1 + float(ajuste_divisa_pct or 0)), 4)
 
