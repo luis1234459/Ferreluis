@@ -143,6 +143,12 @@
           @click="imprimirPagina">
           🖨 Imprimir
         </button>
+        <button v-if="tipoEtiqueta === 'exhibicion'"
+          class="btn-imprimir-zebra"
+          @click="imprimirEnZebra"
+          :disabled="imprimiendoZebra">
+          🏷️ {{ imprimiendoZebra ? 'Imprimiendo...' : 'Imprimir en Zebra' }}
+        </button>
       </div>
 
       <div class="hoja-etiquetas">
@@ -184,6 +190,7 @@
 
 <script>
 import axios from 'axios'
+import { imprimirEtiqueta } from '@/utils/zebra'
 export default {
   name: 'Etiquetas',
   data() {
@@ -203,6 +210,8 @@ export default {
       formatoExhibicion:     'auto',
       vistaImpresion:        false,
       etiquetasParaImprimir: [],
+      imprimiendoZebra:      false,
+      tasaBcv:               null,
     }
   },
   computed: {
@@ -225,6 +234,10 @@ export default {
       this.cargarDepartamentos(),
       this.cargarProductos(),
     ])
+    try {
+      const res = await axios.get('/tasa/')
+      this.tasaBcv = res.data.tasa
+    } catch {}
   },
   methods: {
     async cargarMarcas() {
@@ -306,6 +319,32 @@ export default {
       this.vistaImpresion = true
     },
     imprimirPagina() { window.print() },
+    async imprimirEnZebra() {
+      if (!this.tasaBcv) {
+        alert('No hay tasa BCV disponible. Verifica la conexión.')
+        return
+      }
+      this.imprimiendoZebra = true
+      try {
+        for (const e of this.etiquetasParaImprimir) {
+          const precioUsd = e.usarAmazon
+            ? e.precio_oferta_usd
+            : e.precio_referencial_usd
+          const precioBs = precioUsd * this.tasaBcv
+          await imprimirEtiqueta({
+            nombre: e.nombre,
+            codigo: e.codigo || '',
+            precioUsd,
+            precioBs,
+          })
+        }
+        alert('Etiquetas enviadas a la impresora Zebra.')
+      } catch (err) {
+        alert('Error al imprimir en Zebra: ' + (err.message || err))
+      } finally {
+        this.imprimiendoZebra = false
+      }
+    },
     toggleTodos() {
       if (this.todosSeleccionados) {
         this.seleccionados = this.seleccionados.filter(
@@ -452,6 +491,13 @@ export default {
   font-weight: 700; font-size: 0.85rem; cursor: pointer;
 }
 .btn-imprimir-ahora:hover { background: #e6b800; }
+.btn-imprimir-zebra {
+  background: #0066CC; color: #FFFFFF; border: none;
+  border-radius: 6px; padding: 0.4rem 1rem;
+  font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+.btn-imprimir-zebra:hover:not(:disabled) { background: #0052A3; }
+.btn-imprimir-zebra:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Grid de etiquetas */
 .hoja-etiquetas {
