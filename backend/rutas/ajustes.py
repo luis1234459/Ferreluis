@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func as sqlfunc
+from sqlalchemy import func as sqlfunc, or_
 from datetime import datetime, date
 from typing import Optional, List
 import json
@@ -10,8 +10,9 @@ import io
 from database import get_db
 from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
-    Departamento, Categoria, Proveedor, TasaCambio, Marca, ConteoPrioritario,
+    Departamento, Categoria, Proveedor, TasaCambio, Marca, ConteoPrioritario, Oferta,
 )
+from rutas.productos import _precios_computados
 from rutas.usuarios import require_admin, require_admin_o_gestionador
 from pydantic import BaseModel
 
@@ -145,40 +146,72 @@ def listar_productos_ajuste(
     marcas_map  = {m.id: m for m in db.query(Marca).all()}
     cats_map    = {c.id: c for c in db.query(Categoria).all()}
 
+    hoy = date.today()
+    _ofertas = db.query(Oferta).filter(
+        Oferta.activo == True,
+        Oferta.fecha_inicio <= hoy,
+        or_(Oferta.fecha_fin == None,       Oferta.fecha_fin    >= hoy),
+        or_(Oferta.cantidad_limite == None, Oferta.cantidad_usada < Oferta.cantidad_limite),
+    ).all()
+    ofertas_map = {o.producto_id: o for o in _ofertas}
+
     result = []
     for p in productos:
-        precio_base     = round(float(p.costo_usd or 0) * (1 + float(p.margen or 0)), 4)
         depto           = deptos_map.get(p.departamento_id)
         prov            = provs_map.get(p.proveedor_id)
         marca           = marcas_map.get(p.marca_id) if p.marca_id else None
         cat             = cats_map.get(p.categoria_id) if p.categoria_id else None
         n_variantes     = _tiene_variantes(p.id, db)
         stock_real      = _stock_real(p, db)
+
+        # pricing — resuelve policy sin queries adicionales usando provs_map
+        if p.pricing_policy_override:
+            pol, at, ap = p.pricing_policy_override, "manual", 0.0
+        elif prov and prov.pricing_policy:
+            pol = prov.pricing_policy
+            at  = getattr(prov, 'ajuste_tipo', 'manual') or 'manual'
+            ap  = float(prov.ajuste_divisa_pct or 0.0)
+        else:
+            pol, at, ap = "MARKET_FACTOR", "manual", 0.0
+        precios = _precios_computados(p, bcv, binance, pol, at, ap)
+
+        # oferta activa
+        oferta = ofertas_map.get(p.id)
+        if oferta:
+            precio_oferta = round(precios["precio_base_usd"] * (1 - oferta.valor / 100), 4) \
+                            if oferta.tipo_precio == "porcentaje" else oferta.valor
+        else:
+            precio_oferta = None
+
         result.append({
-            "id":                 p.id,
-            "nombre":             p.nombre,
-            "departamento_id":    p.departamento_id,
-            "departamento_nombre":depto.nombre  if depto  else "—",
-            "categoria_id":       p.categoria_id,
-            "categoria_nombre":   cat.nombre    if cat    else "—",
-            "proveedor_id":       p.proveedor_id,
-            "proveedor_nombre":   prov.nombre   if prov   else "—",
-            "marca_id":           p.marca_id,
-            "marca_nombre":       marca.nombre  if marca  else "—",
-            "costo_usd":          float(p.costo_usd    or 0),
-            "margen":             float(p.margen        or 0),
-            "comision_pct":       float(p.comision_pct  or 0),
-            "precio_base_usd":    precio_base,
-            "stock":              stock_real,
-            "es_producto_clave":  p.es_producto_clave,
-            "es_delicado":        p.es_delicado,
-            "tiene_variantes":    n_variantes > 0,
-            "variantes_count":    n_variantes,
-            "auditado":           bool(p.auditado),
-            "auditoria_pendiente":bool(p.auditoria_pendiente),
-            "fecha_auditoria":    p.fecha_auditoria.strftime('%d/%m/%Y') if p.fecha_auditoria else None,
-            "conteo_pendiente":   p.conteo_pendiente,
+            "id":                   p.id,
+            "codigo":               p.codigo,
+            "nombre":               p.nombre,
+            "departamento_id":      p.departamento_id,
+            "departamento_nombre":  depto.nombre  if depto  else "—",
+            "categoria_id":         p.categoria_id,
+            "categoria_nombre":     cat.nombre    if cat    else "—",
+            "proveedor_id":         p.proveedor_id,
+            "proveedor_nombre":     prov.nombre   if prov   else "—",
+            "marca_id":             p.marca_id,
+            "marca_nombre":         marca.nombre  if marca  else "—",
+            "costo_usd":            float(p.costo_usd    or 0),
+            "margen":               float(p.margen        or 0),
+            "comision_pct":         float(p.comision_pct  or 0),
+            "precio_base_usd":      precios["precio_base_usd"],
+            "precio_referencial_usd": precios["precio_referencial_usd"],
+            "stock":                stock_real,
+            "es_producto_clave":    p.es_producto_clave,
+            "es_delicado":          p.es_delicado,
+            "tiene_variantes":      n_variantes > 0,
+            "variantes_count":      n_variantes,
+            "auditado":             bool(p.auditado),
+            "auditoria_pendiente":  bool(p.auditoria_pendiente),
+            "fecha_auditoria":      p.fecha_auditoria.strftime('%d/%m/%Y') if p.fecha_auditoria else None,
+            "conteo_pendiente":     p.conteo_pendiente,
             "diferencia_pendiente": p.diferencia_pendiente,
+            "oferta_activa":        oferta is not None,
+            "precio_oferta_usd":    precio_oferta,
         })
     return result
 
