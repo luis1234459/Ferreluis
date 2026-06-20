@@ -174,6 +174,11 @@ def listar_productos_ajuste(
             "es_delicado":        p.es_delicado,
             "tiene_variantes":    n_variantes > 0,
             "variantes_count":    n_variantes,
+            "auditado":           bool(p.auditado),
+            "auditoria_pendiente":bool(p.auditoria_pendiente),
+            "fecha_auditoria":    p.fecha_auditoria.isoformat() if p.fecha_auditoria else None,
+            "conteo_pendiente":   p.conteo_pendiente,
+            "diferencia_pendiente": p.diferencia_pendiente,
         })
     return result
 
