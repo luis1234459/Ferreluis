@@ -73,6 +73,7 @@ const routes = [
   { path: '/inventario',           name: 'Inventario',          component: Inventario,          meta: { soloAdminOGestionadorOVendedor: true } },
   { path: '/inventario/importar',  name: 'ImportarInventario',  component: ImportarInventario,  meta: { soloAdmin: true } },
   { path: '/ajustes',              name: 'Ajustes',             component: Ajustes,             meta: { soloAdminOGestionador: true } },
+  { path: '/etiquetas',            name: 'Etiquetas',           component: () => import('../views/Etiquetas.vue'), meta: { soloAdminOGestionador: true } },
   { path: '/vendedores',           name: 'Vendedores',          component: Vendedores,          meta: { soloAdmin: true } },
   { path: '/bancos/cuentas',       name: 'CuentasBancarias',    component: CuentasBancarias,    meta: { soloAdmin: true } },
   { path: '/bancos/movimientos',   name: 'MovimientosBancarios',component: MovimientosBancarios,meta: { soloAdmin: true } },
