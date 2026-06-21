@@ -12,3 +12,6 @@ dist/
 
 # Railway
 .railway/
+
+# Claude Code
+.claude/
