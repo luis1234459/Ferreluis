@@ -584,11 +584,11 @@ export default {
   align-items: center; text-align: center; gap: 0.2rem;
 }
 .etq-codigo-grande {
-  font-size: 1.1rem; font-weight: 800;
+  font-size: 1.65rem; font-weight: 800;
   color: #1A1A1A; letter-spacing: 0.04em;
 }
 .etq-nombre-pequeno {
-  font-size: 0.65rem; color: #555;
+  font-size: 0.975rem; font-weight: 800; color: #555;
   line-height: 1.2; margin-top: 0.2rem;
 }
 
