@@ -160,17 +160,37 @@
           <template v-if="e.tipo === 'exhibicion'">
             <div class="etq-nombre">{{ e.nombre }}</div>
 
-            <div v-if="e.usarAmazon" class="etq-precio-amazon">
-              <span class="etq-precio-antes">
-                Antes: <s>${{ Number(e.precio_referencial_usd).toFixed(2) }}</s>
-              </span>
-              <span class="etq-precio-ahora">
-                ${{ Number(e.precio_oferta_usd).toFixed(2) }}
-              </span>
-            </div>
-            <div v-else class="etq-precio-basico">
-              ${{ Number(e.precio_referencial_usd || 0).toFixed(2) }}
-            </div>
+            <template v-if="e.usarAmazon">
+              <div class="etq-precio-editable no-print">
+                <label>Antes:</label>
+                <input type="number" step="0.01"
+                  v-model.number="e.precio_referencial_usd"
+                  class="input-precio-etq" />
+                <label>Ahora:</label>
+                <input type="number" step="0.01"
+                  v-model.number="e.precio_oferta_usd"
+                  class="input-precio-etq" />
+              </div>
+              <div class="etq-precio-amazon print-only">
+                <span class="etq-precio-antes">
+                  Antes: <s>${{ Number(e.precio_referencial_usd).toFixed(2) }}</s>
+                </span>
+                <span class="etq-precio-ahora">
+                  ${{ Number(e.precio_oferta_usd).toFixed(2) }}
+                </span>
+              </div>
+            </template>
+            <template v-else>
+              <div class="etq-precio-editable no-print">
+                <label>Precio:</label>
+                <input type="number" step="0.01"
+                  v-model.number="e.precio_referencial_usd"
+                  class="input-precio-etq" />
+              </div>
+              <div class="etq-precio-basico print-only">
+                ${{ Number(e.precio_referencial_usd || 0).toFixed(2) }}
+              </div>
+            </template>
 
             <div class="etq-codigo">{{ e.codigo || '—' }}</div>
           </template>
@@ -537,6 +557,25 @@ export default {
   font-size: 0.65rem; color: #888; margin-top: 0.3rem;
   border-top: 1px solid #EEE; padding-top: 0.25rem;
 }
+.etq-precio-editable {
+  display: flex; align-items: center;
+  gap: 0.3rem; flex-wrap: wrap;
+  padding: 0.3rem 0;
+}
+.etq-precio-editable label {
+  font-size: 0.68rem; color: var(--texto-muted);
+  font-weight: 600;
+}
+.input-precio-etq {
+  width: 65px; padding: 0.2rem 0.35rem;
+  border: 1px solid #FFCC00; border-radius: 4px;
+  font-size: 0.78rem; text-align: right;
+}
+.input-precio-etq:focus {
+  outline: none; border-color: #FF9900;
+  background: #FFFDF0;
+}
+.print-only { display: none; }
 
 /* Depósito: 6 × 3.5 cm aprox */
 .etiqueta-deposito {
@@ -574,5 +613,7 @@ export default {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
 }
 </style>
