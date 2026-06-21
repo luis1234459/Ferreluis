@@ -833,6 +833,11 @@
               Faltantes pendientes
               <span v-if="conteoPendientes.length" class="badge-alerta">{{ conteoPendientes.length }}</span>
             </button>
+            <button class="subtab-btn" :class="{ 'subtab-activo': tabConteo === 'prioritaria' }"
+              @click="tabConteo = 'prioritaria'; cargarColaPrioritaria()">
+              Cola prioritaria
+              <span v-if="colaPrioritaria.length" class="badge-alerta">{{ colaPrioritaria.length }}</span>
+            </button>
           </div>
 
           <!-- Sub-tab: Registrar conteo -->
@@ -934,6 +939,52 @@
               </table>
             </div>
             <p v-else class="sin-datos-tab">No hay faltantes pendientes de autorización.</p>
+          </div>
+
+          <!-- Sub-tab: Cola prioritaria -->
+          <div v-show="tabConteo === 'prioritaria'">
+            <p v-if="colaCargando" class="sin-datos-tab">Cargando...</p>
+            <div v-else-if="colaPrioritaria.length">
+              <table class="tabla-ajuste">
+                <thead>
+                  <tr>
+                    <th>Prioridad</th>
+                    <th>Producto</th>
+                    <th>Stock sistema</th>
+                    <th>Enviado por</th>
+                    <th>Fecha envío</th>
+                    <th>Nota</th>
+                    <th>Cantidad real</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="c in colaPrioritaria" :key="c.id">
+                    <td>
+                      <span class="badge-prioridad" :class="'badge-prioridad-' + c.prioridad">
+                        {{ etiquetaPrioridad(c.prioridad) }}
+                      </span>
+                    </td>
+                    <td>{{ c.nombre }} <span class="txt-muted">({{ c.codigo || '—' }})</span></td>
+                    <td>{{ c.stock_actual }}</td>
+                    <td>{{ c.enviado_por }}</td>
+                    <td>{{ c.fecha_envio ? new Date(c.fecha_envio).toLocaleString() : '—' }}</td>
+                    <td>{{ c.nota || '—' }}</td>
+                    <td>
+                      <input class="input-conteo" type="number" min="0"
+                        v-model.number="c._stockReal" placeholder="Ingresar" />
+                    </td>
+                    <td>
+                      <button class="btn-autorizar" :disabled="registrandoColaId === c.id"
+                        @click="registrarConteoPrioritario(c)">
+                        {{ registrandoColaId === c.id ? '...' : 'Registrar' }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else class="sin-datos-tab">No hay productos en cola prioritaria.</p>
           </div>
 
         </div><!-- /tab conteo -->
@@ -1092,6 +1143,9 @@ export default {
       pendientesCargando: false,
       tabConteo:          'registrar',
       autorizando:        null,
+      colaPrioritaria:    [],
+      colaCargando:       false,
+      registrandoColaId:  null,
     }
   },
 
@@ -1968,6 +2022,42 @@ export default {
         this.pendientesCargando = false
       }
     },
+    etiquetaPrioridad(prioridad) {
+      const MAPA = {
+        delicado:         '🔴 Delicado',
+        compra_entrante:  '🟡 Compra entrante',
+        manual:           '🔵 Manual',
+        top_vendidos:     '⚪ Top vendidos',
+      }
+      return MAPA[prioridad] || prioridad
+    },
+    async cargarColaPrioritaria() {
+      this.colaCargando = true
+      try {
+        const res = await axios.get('/ajustes/conteo-prioritario/pendientes', { headers: this._headers() })
+        this.colaPrioritaria = res.data.map(c => ({ ...c, _stockReal: '' }))
+      } catch {
+        this.colaPrioritaria = []
+      } finally {
+        this.colaCargando = false
+      }
+    },
+    async registrarConteoPrioritario(c) {
+      if (c._stockReal === '' || c._stockReal === null) {
+        alert('Ingresa la cantidad real contada.')
+        return
+      }
+      this.registrandoColaId = c.id
+      try {
+        await axios.post(`/ajustes/conteo-prioritario/${c.id}/contar`,
+          { stock_real: c._stockReal }, { headers: this._headers() })
+        await this.cargarColaPrioritaria()
+      } catch (e) {
+        alert(e.response?.data?.detail || 'Error al registrar el conteo.')
+      } finally {
+        this.registrandoColaId = null
+      }
+    },
     async autorizarFaltante(productoId) {
       this.autorizando = productoId
       try {
@@ -2192,5 +2282,10 @@ export default {
 .conteo-footer { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 1rem; }
 .btn-autorizar { background: #DC2626; color: #fff; border: none; padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 .btn-autorizar:disabled { opacity: 0.5; cursor: not-allowed; }
+.badge-prioridad { font-size: 0.78rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 10px; white-space: nowrap; }
+.badge-prioridad-delicado { background: #FEE2E2; color: #DC2626; }
+.badge-prioridad-compra_entrante { background: #FEF3C7; color: #92400E; }
+.badge-prioridad-manual { background: #DBEAFE; color: #1D4ED8; }
+.badge-prioridad-top_vendidos { background: #F3F4F6; color: #6B7280; }
 .btn-autorizar:not(:disabled):hover { background: #B91C1C; }
 </style>

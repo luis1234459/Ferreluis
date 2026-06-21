@@ -932,7 +932,7 @@ class ConteoRealizado(BaseModel):
 def registrar_conteo_prioritario(conteo_id: int, datos: ConteoRealizado,
                                   db: Session = Depends(get_db),
                                   _: None = Depends(require_admin_o_gestionador),
-                                  x_usuario: str = Header(None)):
+                                  x_usuario_nombre: str = Header(None)):
     """Gestionador registra el conteo. Queda pendiente de aprobación admin
     si hay diferencia. Si no hay diferencia, se cierra automáticamente."""
     c = db.query(ConteoPrioritario).filter(ConteoPrioritario.id == conteo_id).first()
@@ -946,7 +946,7 @@ def registrar_conteo_prioritario(conteo_id: int, datos: ConteoRealizado,
     c.stock_real      = datos.stock_real
     c.diferencia      = datos.stock_real - p.stock
     c.fecha_conteo    = datetime.utcnow()
-    c.contado_por     = x_usuario or "gestionador"
+    c.contado_por     = x_usuario_nombre or "gestionador"
 
     if c.diferencia == 0:
         c.estado          = "contado"
