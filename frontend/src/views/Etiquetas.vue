@@ -554,8 +554,25 @@ export default {
 }
 
 @media print {
-  .vista-impresion-toolbar { display: none !important; }
-  .vista-impresion-overlay { position: static; background: white; }
-  .hoja-etiquetas { padding: 0; }
+  .page-header,
+  .etiquetas-filtros,
+  .etiquetas-acciones-top,
+  .etiquetas-generar-bar,
+  .etiquetas-tabla-wrap,
+  .vista-impresion-toolbar {
+    display: none !important;
+  }
+  .vista-impresion-overlay {
+    position: static !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+  .hoja-etiquetas {
+    padding: 0 !important;
+  }
+  .etiqueta-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 </style>
