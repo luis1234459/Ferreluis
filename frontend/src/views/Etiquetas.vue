@@ -162,14 +162,18 @@
 
             <template v-if="e.usarAmazon">
               <div class="etq-precio-editable no-print">
-                <label>Antes:</label>
-                <input type="number" step="0.01"
-                  v-model.number="e.precio_referencial_usd"
-                  class="input-precio-etq" />
-                <label>Ahora:</label>
-                <input type="number" step="0.01"
-                  v-model.number="e.precio_oferta_usd"
-                  class="input-precio-etq" />
+                <div class="fila-antes">
+                  <label>Antes:</label>
+                  <input type="number" step="0.01"
+                    v-model.number="e.precio_referencial_usd"
+                    class="input-precio-etq" />
+                </div>
+                <div class="fila-ahora">
+                  <label>Ahora:</label>
+                  <input type="number" step="0.01"
+                    v-model.number="e.precio_oferta_usd"
+                    class="input-precio-etq input-precio-ahora-grande" />
+                </div>
               </div>
               <div class="etq-precio-amazon print-only">
                 <span class="etq-precio-antes">
@@ -545,22 +549,27 @@ export default {
   font-size: 1.6rem; font-weight: 800; color: #1A1A1A;
 }
 .etq-precio-amazon {
-  display: flex; flex-direction: column; gap: 0.1rem;
+  display: flex; flex-direction: column; gap: 0.2rem;
 }
 .etq-precio-antes {
   font-size: 0.72rem; color: #888;
 }
 .etq-precio-ahora {
-  font-size: 1.6rem; font-weight: 800; color: #DC2626;
+  font-size: 1.8rem; font-weight: 800; color: #DC2626;
+  display: block;
 }
 .etq-codigo {
   font-size: 0.65rem; color: #888; margin-top: 0.3rem;
   border-top: 1px solid #EEE; padding-top: 0.25rem;
 }
 .etq-precio-editable {
-  display: flex; align-items: center;
-  gap: 0.3rem; flex-wrap: wrap;
+  display: flex; flex-direction: column;
+  gap: 0.3rem;
   padding: 0.3rem 0;
+}
+.etq-precio-editable .fila-antes,
+.etq-precio-editable .fila-ahora {
+  display: flex; align-items: center; gap: 0.3rem;
 }
 .etq-precio-editable label {
   font-size: 0.68rem; color: var(--texto-muted);
@@ -574,6 +583,12 @@ export default {
 .input-precio-etq:focus {
   outline: none; border-color: #FF9900;
   background: #FFFDF0;
+}
+.input-precio-ahora-grande {
+  font-size: 1.8rem !important;
+  font-weight: 800;
+  width: 90px !important;
+  padding: 0.3rem 0.4rem !important;
 }
 .print-only { display: none; }
 
