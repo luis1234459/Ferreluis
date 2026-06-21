@@ -81,6 +81,15 @@
             </small>
           </div>
 
+          <div class="field">
+            <label>Tamaño de etiqueta</label>
+            <select v-model="tamanoEtiqueta">
+              <option value="pequena">Pequeña</option>
+              <option value="mediana">Mediana (default)</option>
+              <option value="grande">Grande</option>
+            </select>
+          </div>
+
           <p style="font-size:0.85rem;color:var(--texto-muted)">
             Se generarán {{ seleccionados.length }} etiquetas
             listas para imprimir.
@@ -154,7 +163,8 @@
       <div class="hoja-etiquetas">
         <div v-for="(e, i) in etiquetasParaImprimir" :key="i"
           :class="['etiqueta-card',
-            e.tipo === 'exhibicion' ? 'etiqueta-exhibicion' : 'etiqueta-deposito']">
+            e.tipo === 'exhibicion' ? 'etiqueta-exhibicion' : 'etiqueta-deposito',
+            'tam-' + e.tamano]">
 
           <!-- ETIQUETA EXHIBICIÓN -->
           <template v-if="e.tipo === 'exhibicion'">
@@ -232,6 +242,7 @@ export default {
       modalGenerar:          false,
       tipoEtiqueta:          '',
       formatoExhibicion:     'auto',
+      tamanoEtiqueta:        'mediana',
       vistaImpresion:        false,
       etiquetasParaImprimir: [],
       imprimiendoZebra:      false,
@@ -337,6 +348,7 @@ export default {
           ...p,
           tipo: this.tipoEtiqueta,
           usarAmazon,
+          tamano: this.tamanoEtiqueta,
         }
       })
       this.modalGenerar = false
@@ -534,32 +546,35 @@ export default {
   page-break-inside: avoid; break-inside: avoid;
   display: flex; flex-direction: column;
 }
+.tam-pequena { font-size: 0.7em; }
+.tam-mediana { font-size: 1em; }
+.tam-grande  { font-size: 1.4em; }
 
 /* Exhibición: 8 × 5 cm aprox */
 .etiqueta-exhibicion {
-  width: 220px; min-height: 120px;
+  min-width: 220px; min-height: 120px;
   padding: 0.5rem 0.75rem; justify-content: space-between;
 }
 .etq-nombre {
-  font-size: 0.78rem; font-weight: 700;
+  font-size: 0.78em; font-weight: 700;
   color: #1A1A1A; line-height: 1.2;
   margin-bottom: 0.35rem;
 }
 .etq-precio-basico {
-  font-size: 1.6rem; font-weight: 800; color: #1A1A1A;
+  font-size: 1.6em; font-weight: 800; color: #1A1A1A;
 }
 .etq-precio-amazon {
   display: flex; flex-direction: column; gap: 0.2rem;
 }
 .etq-precio-antes {
-  font-size: 0.72rem; color: #888;
+  font-size: 0.72em; color: #888;
 }
 .etq-precio-ahora {
-  font-size: 4.8rem; font-weight: 800; color: #DC2626;
+  font-size: 4.8em; font-weight: 800; color: #DC2626;
   display: block;
 }
 .etq-codigo {
-  font-size: 0.65rem; color: #888; margin-top: 0.3rem;
+  font-size: 0.65em; color: #888; margin-top: 0.3rem;
   border-top: 1px solid #EEE; padding-top: 0.25rem;
 }
 .etq-precio-editable {
@@ -572,20 +587,20 @@ export default {
   display: flex; align-items: center; gap: 0.3rem;
 }
 .etq-precio-editable label {
-  font-size: 0.68rem; color: var(--texto-muted);
+  font-size: 0.68em; color: var(--texto-muted);
   font-weight: 600;
 }
 .input-precio-etq {
   width: 65px; padding: 0.2rem 0.35rem;
   border: 1px solid #FFCC00; border-radius: 4px;
-  font-size: 0.78rem; text-align: right;
+  font-size: 0.78em; text-align: right;
 }
 .input-precio-etq:focus {
   outline: none; border-color: #FF9900;
   background: #FFFDF0;
 }
 .input-precio-ahora-grande {
-  font-size: 4.8rem !important;
+  font-size: 4.8em !important;
   font-weight: 800;
   width: 160px !important;
   padding: 0.3rem 0.6rem !important;
@@ -594,16 +609,16 @@ export default {
 
 /* Depósito: 6 × 3.5 cm aprox */
 .etiqueta-deposito {
-  width: 160px; min-height: 80px;
+  min-width: 160px; min-height: 80px;
   padding: 0.5rem 0.6rem; justify-content: center;
   align-items: center; text-align: center; gap: 0.2rem;
 }
 .etq-codigo-grande {
-  font-size: 1.65rem; font-weight: 800;
+  font-size: 1.65em; font-weight: 800;
   color: #1A1A1A; letter-spacing: 0.04em;
 }
 .etq-nombre-pequeno {
-  font-size: 0.975rem; font-weight: 800; color: #555;
+  font-size: 0.975em; font-weight: 800; color: #555;
   line-height: 1.2; margin-top: 0.2rem;
 }
 
