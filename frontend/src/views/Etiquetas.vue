@@ -555,7 +555,7 @@ export default {
   font-size: 0.72rem; color: #888;
 }
 .etq-precio-ahora {
-  font-size: 1.8rem; font-weight: 800; color: #DC2626;
+  font-size: 4.8rem; font-weight: 800; color: #DC2626;
   display: block;
 }
 .etq-codigo {
@@ -585,10 +585,10 @@ export default {
   background: #FFFDF0;
 }
 .input-precio-ahora-grande {
-  font-size: 1.8rem !important;
+  font-size: 4.8rem !important;
   font-weight: 800;
-  width: 90px !important;
-  padding: 0.3rem 0.4rem !important;
+  width: 160px !important;
+  padding: 0.3rem 0.6rem !important;
 }
 .print-only { display: none; }
 
