@@ -587,17 +587,19 @@ export default {
   display: flex; flex-direction: column;
   gap: 0.3rem;
   padding: 0.3rem 0;
+  width: 100%;
 }
 .etq-precio-editable .fila-antes,
 .etq-precio-editable .fila-ahora {
-  display: flex; align-items: center; gap: 0.3rem;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.15rem;
+  width: 100%;
 }
 .etq-precio-editable label {
   font-size: 0.68em; color: var(--texto-muted);
   font-weight: 600;
 }
 .input-precio-etq {
-  width: 65px; padding: 0.2rem 0.35rem;
+  width: 100%; box-sizing: border-box; padding: 0.2rem 0.35rem;
   border: 1px solid #FFCC00; border-radius: 4px;
   font-size: 0.78em; text-align: right;
 }
@@ -608,7 +610,8 @@ export default {
 .input-precio-ahora-grande {
   font-size: 4.8em !important;
   font-weight: 800;
-  width: 160px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   padding: 0.3rem 0.6rem !important;
 }
 .print-only { display: none; }
