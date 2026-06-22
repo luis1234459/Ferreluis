@@ -247,6 +247,7 @@ export default {
       etiquetasParaImprimir: [],
       imprimiendoZebra:      false,
       tasaBcv:               null,
+      _requestId:            0,
     }
   },
   computed: {
@@ -308,6 +309,7 @@ export default {
       }
     },
     async cargarProductos() {
+      const miId = ++this._requestId
       try {
         // /ajustes/productos usa filtro_tipo + filtro_id, no nombre de campo directo.
         // Prioridad: departamento > marca > todos. busqueda se aplica client-side.
@@ -321,8 +323,12 @@ export default {
           params.filtro_id   = this.filtroMarca
         }
         const res = await axios.get('/ajustes/productos', { params, headers: this._headers() })
+        // Ignora respuestas desactualizadas (request anterior más lenta)
+        if (miId !== this._requestId) return
         this.productos = res.data
-      } catch { this.productos = [] }
+      } catch {
+        if (miId === this._requestId) this.productos = []
+      }
     },
     toggleSeleccion(id) {
       const idx = this.seleccionados.indexOf(id)
