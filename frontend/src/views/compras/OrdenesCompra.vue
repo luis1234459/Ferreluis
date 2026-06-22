@@ -792,9 +792,17 @@ export default {
 .oc-item-clasif { display: flex; gap: 4px; margin-top: 3px; }
 .oc-sel-mini { font-size: 0.72rem; height: 24px; flex: 1; min-width: 0; }
 .oc-item-nums { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
-.oc-input-cant { width: 44px; text-align: center; font-size: 0.8rem; height: 26px; padding: 0; }
+.oc-input-cant {
+  width: 55px; min-width: 55px; text-align: center; font-size: 0.8rem; height: 26px;
+  padding: 0 !important;
+  border: 1px solid var(--borde) !important;
+}
 .oc-item-x { font-size: 0.72rem; color: var(--texto-sec); }
-.oc-input-precio { width: 60px; text-align: right; font-size: 0.8rem; height: 26px; padding: 0 4px; }
+.oc-input-precio {
+  width: 80px; min-width: 80px; text-align: right; font-size: 0.8rem; height: 26px;
+  padding: 0 4px !important;
+  border: 1px solid var(--borde) !important;
+}
 .oc-item-sub { font-size: 0.82rem; font-weight: 500; margin-left: auto; white-space: nowrap; }
 .oc-btn-del { background: transparent; border: none; color: #DC2626; cursor: pointer; padding: 2px; flex-shrink: 0; }
 .oc-orden-vacia { padding: 2rem 0; text-align: center; color: var(--texto-sec); font-size: 0.8rem; }
