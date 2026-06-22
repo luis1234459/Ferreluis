@@ -354,12 +354,15 @@ def resumen_bancario(db: Session = Depends(get_db), _: None = Depends(require_ad
         else:
             total_bs += saldo
 
-    # Deuda a proveedores
+    # Deuda a proveedores — misma lógica que /proveedores/deuda/ (solo proveedores activos)
+    proveedores_activos_ids = [p.id for p in db.query(Proveedor.id).filter(Proveedor.activo == True).all()]
     ordenes_recibidas = db.query(OrdenCompra).filter(
+        OrdenCompra.proveedor_id.in_(proveedores_activos_ids),
         OrdenCompra.estado.in_(["recibida_parcial", "cerrada"])
     ).all()
     pagos_todos = db.query(MovimientoBancario).filter(
-        MovimientoBancario.tipo == "pago_proveedor",
+        MovimientoBancario.proveedor_id.in_(proveedores_activos_ids),
+        MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
         MovimientoBancario.estado == "registrado",
     ).all()
     pagado_a_proveedores = sum(
