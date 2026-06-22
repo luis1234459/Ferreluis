@@ -199,7 +199,7 @@
                 <label>Precio:</label>
                 <input type="number" step="0.01"
                   v-model.number="e.precio_referencial_usd"
-                  class="input-precio-etq" />
+                  class="input-precio-etq input-precio-ahora-grande" />
               </div>
               <div class="etq-precio-basico print-only">
                 ${{ Number(e.precio_referencial_usd || 0).toFixed(2) }}
@@ -567,7 +567,7 @@ export default {
   margin-bottom: 0.35rem;
 }
 .etq-precio-basico {
-  font-size: 1.6em; font-weight: 800; color: #1A1A1A;
+  font-size: 4.8em; font-weight: 800; color: #1A1A1A;
 }
 .etq-precio-amazon {
   display: flex; flex-direction: column; gap: 0.2rem;
