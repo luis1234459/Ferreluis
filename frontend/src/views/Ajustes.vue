@@ -36,7 +36,7 @@
             Gestión
           </button>
           <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'conteo' }"
-            @click="tabActivo = 'conteo'; cargarPendientes()">
+            @click="tabActivo = 'conteo'; cargarPendientes(); cargarColaPrioritaria()">
             Conteo
           </button>
         </div>
@@ -833,15 +833,58 @@
               Faltantes pendientes
               <span v-if="conteoPendientes.length" class="badge-alerta">{{ conteoPendientes.length }}</span>
             </button>
-            <button class="subtab-btn" :class="{ 'subtab-activo': tabConteo === 'prioritaria' }"
-              @click="tabConteo = 'prioritaria'; cargarColaPrioritaria()">
-              Cola prioritaria
-              <span v-if="colaPrioritaria.length" class="badge-alerta">{{ colaPrioritaria.length }}</span>
-            </button>
           </div>
 
           <!-- Sub-tab: Registrar conteo -->
           <div v-show="tabConteo === 'registrar'">
+
+            <!-- Prioritarios solicitados por admin — siempre visibles -->
+            <div v-if="colaCargando" class="sin-datos-tab">Cargando solicitudes...</div>
+            <div v-else-if="colaPrioritaria.length" class="seccion-prioritarios">
+              <div class="seccion-titulo">
+                🔴 Conteos solicitados por administración
+                <span class="badge-alerta">{{ colaPrioritaria.length }}</span>
+              </div>
+              <table class="tabla-ajuste">
+                <thead>
+                  <tr>
+                    <th>Prioridad</th>
+                    <th>Producto</th>
+                    <th>Stock sistema</th>
+                    <th>Nota</th>
+                    <th>Conteo físico</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="c in colaPrioritaria" :key="'prio-'+c.id" class="fila-prioritaria">
+                    <td>
+                      <span class="badge-prioridad" :class="'badge-prioridad-'+c.prioridad">
+                        {{ etiquetaPrioridad(c.prioridad) }}
+                      </span>
+                    </td>
+                    <td><strong>{{ c.nombre }}</strong> <span class="txt-muted">({{ c.codigo || '—' }})</span></td>
+                    <td>{{ c.stock_actual }}</td>
+                    <td class="txt-muted">{{ c.nota || '—' }}</td>
+                    <td>
+                      <input class="input-conteo" type="number" min="0"
+                        v-model.number="c._stockReal" placeholder="Ingresar" />
+                    </td>
+                    <td>
+                      <button class="btn-registrar-prio" :disabled="registrandoColaId === c.id"
+                        @click="registrarConteoPrioritario(c)">
+                        {{ registrandoColaId === c.id ? '...' : 'Registrar' }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Separador -->
+            <div class="separador-conteo">Conteo general</div>
+
+            <!-- Filtros conteo general -->
             <div class="filtros-bar">
               <select v-model="conteoFiltroTipo"
                 @change="conteoFiltroId = ''; conteoFiltroCategoria = ''; conteoCategoriasDisponibles = []; conteoProductos = []">
@@ -939,52 +982,6 @@
               </table>
             </div>
             <p v-else class="sin-datos-tab">No hay faltantes pendientes de autorización.</p>
-          </div>
-
-          <!-- Sub-tab: Cola prioritaria -->
-          <div v-show="tabConteo === 'prioritaria'">
-            <p v-if="colaCargando" class="sin-datos-tab">Cargando...</p>
-            <div v-else-if="colaPrioritaria.length">
-              <table class="tabla-ajuste">
-                <thead>
-                  <tr>
-                    <th>Prioridad</th>
-                    <th>Producto</th>
-                    <th>Stock sistema</th>
-                    <th>Enviado por</th>
-                    <th>Fecha envío</th>
-                    <th>Nota</th>
-                    <th>Cantidad real</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="c in colaPrioritaria" :key="c.id">
-                    <td>
-                      <span class="badge-prioridad" :class="'badge-prioridad-' + c.prioridad">
-                        {{ etiquetaPrioridad(c.prioridad) }}
-                      </span>
-                    </td>
-                    <td>{{ c.nombre }} <span class="txt-muted">({{ c.codigo || '—' }})</span></td>
-                    <td>{{ c.stock_actual }}</td>
-                    <td>{{ c.enviado_por }}</td>
-                    <td>{{ c.fecha_envio ? new Date(c.fecha_envio).toLocaleString() : '—' }}</td>
-                    <td>{{ c.nota || '—' }}</td>
-                    <td>
-                      <input class="input-conteo" type="number" min="0"
-                        v-model.number="c._stockReal" placeholder="Ingresar" />
-                    </td>
-                    <td>
-                      <button class="btn-autorizar" :disabled="registrandoColaId === c.id"
-                        @click="registrarConteoPrioritario(c)">
-                        {{ registrandoColaId === c.id ? '...' : 'Registrar' }}
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-else class="sin-datos-tab">No hay productos en cola prioritaria.</p>
           </div>
 
         </div><!-- /tab conteo -->
@@ -2288,4 +2285,45 @@ export default {
 .badge-prioridad-manual { background: #DBEAFE; color: #1D4ED8; }
 .badge-prioridad-top_vendidos { background: #F3F4F6; color: #6B7280; }
 .btn-autorizar:not(:disabled):hover { background: #B91C1C; }
+
+/* ── Conteo unificado ── */
+.seccion-prioritarios {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.seccion-titulo {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #DC2626;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.separador-conteo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--texto-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0 0.4rem;
+  border-top: 1px solid var(--borde);
+  margin: 0.5rem 0 0.75rem;
+}
+.fila-prioritaria td { background: #FFF7F7 !important; }
+.btn-registrar-prio {
+  background: #DC2626;
+  color: #fff;
+  border: none;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-registrar-prio:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-registrar-prio:not(:disabled):hover { background: #B91C1C; }
 </style>
