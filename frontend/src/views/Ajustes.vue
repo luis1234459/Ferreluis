@@ -36,7 +36,7 @@
             Gestión
           </button>
           <button class="tab-btn" :class="{ 'tab-activo': tabActivo === 'conteo' }"
-            @click="tabActivo = 'conteo'; cargarPendientes(); cargarColaPrioritaria()">
+            @click="tabActivo = 'conteo'; cargarPendientes(); cargarColaPrioritaria(); cargarDiscrepanciasPrio()">
             Conteo
           </button>
         </div>
@@ -871,7 +871,12 @@
                         v-model.number="c._stockReal" placeholder="Ingresar" />
                     </td>
                     <td>
-                      <button class="btn-registrar-prio" :disabled="registrandoColaId === c.id"
+                      <div v-if="c._registrado">
+                        <span :class="c._resultadoTipo === 'ok' ? 'badge-resultado-ok' : 'badge-resultado-pend'">
+                          {{ c._resultado }}
+                        </span>
+                      </div>
+                      <button v-else class="btn-registrar-prio" :disabled="registrandoColaId === c.id"
                         @click="registrarConteoPrioritario(c)">
                         {{ registrandoColaId === c.id ? '...' : 'Registrar' }}
                       </button>
@@ -945,12 +950,90 @@
                   {{ conteoGuardando ? 'Guardando...' : 'Registrar conteo' }}
                 </button>
               </div>
+
+              <!-- Panel resultados del conteo -->
+              <div v-if="mostrarResultados && resultadosConteo.length" class="panel-resultados-conteo">
+                <div class="resultados-titulo">Resultado del conteo registrado</div>
+                <table class="tabla-ajuste">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Stock sistema</th>
+                      <th>Contado</th>
+                      <th>Diferencia</th>
+                      <th>Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in resultadosConteo" :key="r.producto_id"
+                      :class="r.estado === 'pendiente' ? 'fila-faltante' : 'fila-auditada'">
+                      <td><strong>{{ r.nombre }}</strong></td>
+                      <td>{{ r.stock_anterior ?? r.stock_sistema }}</td>
+                      <td>{{ r.stock_nuevo ?? r.conteo }}</td>
+                      <td :class="(r.diferencia || 0) < 0 ? 'txt-danger' : 'txt-verde'">
+                        {{ (r.diferencia || 0) >= 0 ? '+' : '' }}{{ r.diferencia || 0 }}
+                      </td>
+                      <td>
+                        <span v-if="r.estado === 'auditado'" class="badge-resultado-ok">✅ Aplicado directo</span>
+                        <span v-else class="badge-resultado-pend">⏳ Pendiente admin</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <p v-else class="sin-datos-tab">Carga los productos para comenzar el conteo físico.</p>
           </div>
 
           <!-- Sub-tab: Faltantes pendientes -->
           <div v-show="tabConteo === 'pendientes'">
+
+            <!-- Discrepancias de conteos prioritarios — solo admin -->
+            <div v-if="esAdmin">
+              <div v-if="cargandoDiscrepancias" class="sin-datos-tab">Cargando discrepancias...</div>
+              <div v-else-if="discrepanciasPrio.length" class="seccion-prioritarios" style="margin-bottom:1.25rem">
+                <div class="seccion-titulo">
+                  🔵 Discrepancias de conteos prioritarios — pendientes de aprobación
+                  <span class="badge-alerta">{{ discrepanciasPrio.length }}</span>
+                </div>
+                <table class="tabla-ajuste">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Stock sistema</th>
+                      <th>Contado por</th>
+                      <th>Conteo real</th>
+                      <th>Diferencia</th>
+                      <th>Nota</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="d in discrepanciasPrio" :key="d.id" class="fila-faltante">
+                      <td><strong>{{ d.nombre }}</strong></td>
+                      <td>{{ d.stock_sistema }}</td>
+                      <td class="txt-muted">{{ d.contado_por }}</td>
+                      <td>{{ d.stock_real }}</td>
+                      <td class="txt-danger">{{ d.diferencia }}</td>
+                      <td class="txt-muted">{{ d.nota || '—' }}</td>
+                      <td style="display:flex;gap:0.4rem">
+                        <button class="btn-autorizar" @click="aprobarDiscrepancia(d.id, true)">
+                          ✓ Aprobar
+                        </button>
+                        <button class="btn-rechazar" @click="aprobarDiscrepancia(d.id, false)">
+                          ✕ Rechazar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Faltantes de conteo general -->
+            <div class="separador-conteo" v-if="esAdmin && discrepanciasPrio.length">
+              Faltantes de conteo general
+            </div>
             <p v-if="pendientesCargando" class="sin-datos-tab">Cargando...</p>
             <div v-else-if="conteoPendientes.length">
               <table class="tabla-ajuste">
@@ -981,7 +1064,9 @@
                 </tbody>
               </table>
             </div>
-            <p v-else class="sin-datos-tab">No hay faltantes pendientes de autorización.</p>
+            <p v-else-if="!pendientesCargando && !discrepanciasPrio.length" class="sin-datos-tab">
+              No hay faltantes pendientes de autorización.
+            </p>
           </div>
 
         </div><!-- /tab conteo -->
@@ -1140,9 +1225,13 @@ export default {
       pendientesCargando: false,
       tabConteo:          'registrar',
       autorizando:        null,
-      colaPrioritaria:    [],
-      colaCargando:       false,
-      registrandoColaId:  null,
+      colaPrioritaria:      [],
+      colaCargando:         false,
+      registrandoColaId:    null,
+      resultadosConteo:     [],
+      mostrarResultados:    false,
+      discrepanciasPrio:    [],
+      cargandoDiscrepancias: false,
     }
   },
 
@@ -1981,11 +2070,15 @@ export default {
         .filter(p => p._contado !== '' && p._contado !== null && p._contado !== undefined)
         .map(p => ({ producto_id: p.id, cantidad_contada: parseInt(p._contado) }))
       if (!items.length) { this.msgConteo = 'No hay conteos ingresados.'; return }
-      this.conteoGuardando = true
-      this.msgConteo       = ''
+      this.conteoGuardando  = true
+      this.msgConteo        = ''
+      this.mostrarResultados = false
+      this.resultadosConteo  = []
       try {
-        await axios.post('/ajustes/conteo/registrar', { items }, { headers: this._headers() })
-        this.msgConteo = `Conteo registrado para ${items.length} producto(s).`
+        const res = await axios.post('/ajustes/conteo/registrar', { items }, { headers: this._headers() })
+        this.resultadosConteo  = res.data.cambios || []
+        this.mostrarResultados = true
+        this.msgConteo = ''
         await this.cargarProductosConteo()
         await this.cargarPendientes()
       } catch (e) {
@@ -2046,13 +2139,45 @@ export default {
       }
       this.registrandoColaId = c.id
       try {
-        await axios.post(`/ajustes/conteo-prioritario/${c.id}/contar`,
+        const res = await axios.post(`/ajustes/conteo-prioritario/${c.id}/contar`,
           { stock_real: c._stockReal }, { headers: this._headers() })
-        await this.cargarColaPrioritaria()
+        const requiere = res.data.requiere_aprobacion
+        const diferencia = res.data.diferencia
+        if (requiere) {
+          c._resultado = `⏳ Pendiente admin — diferencia: ${diferencia}`
+          c._resultadoTipo = 'pendiente'
+        } else {
+          c._resultado = '✅ Aplicado directo — existencia igual o mayor'
+          c._resultadoTipo = 'ok'
+        }
+        c._registrado = true
+        await this.cargarPendientes()
       } catch (e) {
         alert(e.response?.data?.detail || 'Error al registrar el conteo.')
       } finally {
         this.registrandoColaId = null
+      }
+    },
+    async cargarDiscrepanciasPrio() {
+      this.cargandoDiscrepancias = true
+      try {
+        const res = await axios.get('/ajustes/conteo-prioritario/discrepancias', { headers: this._headers() })
+        this.discrepanciasPrio = res.data
+      } catch {
+        this.discrepanciasPrio = []
+      } finally {
+        this.cargandoDiscrepancias = false
+      }
+    },
+    async aprobarDiscrepancia(conteoId, aprobar) {
+      try {
+        await axios.post(`/ajustes/conteo-prioritario/${conteoId}/aprobar`,
+          null,
+          { params: { aprobar }, headers: this._headers() })
+        await this.cargarDiscrepanciasPrio()
+        await this.cargarPendientes()
+      } catch (e) {
+        alert(e.response?.data?.detail || 'Error al procesar.')
       }
     },
     async autorizarFaltante(productoId) {
@@ -2326,4 +2451,48 @@ export default {
 }
 .btn-registrar-prio:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-registrar-prio:not(:disabled):hover { background: #B91C1C; }
+
+/* ── Resultados conteo ── */
+.panel-resultados-conteo {
+  margin-top: 1.25rem;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+.resultados-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #15803D;
+  margin-bottom: 0.75rem;
+}
+.badge-resultado-ok {
+  background: #DCFCE7;
+  color: #15803D;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.badge-resultado-pend {
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.btn-rechazar {
+  background: #F3F4F6;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-rechazar:hover { background: #FEE2E2; }
 </style>
