@@ -1005,17 +1005,17 @@ def aprobar_discrepancia(conteo_id: int, aprobar: bool = True,
         p.stock = c.stock_real
         p.auditado = True
         p.fecha_auditoria = datetime.utcnow()
-        h = HistorialAjuste(
-            producto_id     = p.id,
-            tipo            = "conteo_prioritario",
-            cantidad_antes  = c.stock_sistema,
-            cantidad_despues= c.stock_real,
-            diferencia      = c.diferencia,
-            motivo          = f"Conteo prioritario aprobado. {c.nota or ''}",
-            usuario         = "admin",
-            fecha           = datetime.utcnow(),
-        )
-        db.add(h)
 
     db.commit()
+
+    if aprobar:
+        _guardar_historial(
+            db, "admin", "conteo_prioritario",
+            f"Conteo prioritario aprobado: '{p.nombre}' "
+            f"({c.stock_sistema} → {c.stock_real}, diferencia {c.diferencia}). {c.nota or ''}",
+            [{"producto_id": p.id, "nombre": p.nombre,
+              "stock_anterior": c.stock_sistema, "stock_nuevo": c.stock_real,
+              "diferencia": c.diferencia}],
+        )
+
     return {"ok": True}
