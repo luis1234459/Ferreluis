@@ -2171,9 +2171,11 @@ export default {
     },
     async aprobarDiscrepancia(conteoId, aprobar) {
       try {
-        await axios.post(`/ajustes/conteo-prioritario/${conteoId}/aprobar`,
-          null,
-          { params: { aprobar }, headers: this._headers() })
+        await axios.post(
+          `/ajustes/conteo-prioritario/${conteoId}/aprobar?aprobar=${aprobar}`,
+          {},
+          { headers: this._headers() }
+        )
         await this.cargarDiscrepanciasPrio()
         await this.cargarPendientes()
       } catch (e) {
