@@ -663,7 +663,7 @@ def reporte_inventario(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    productos  = db.query(Producto).all()
+    productos  = db.query(Producto).order_by(Producto.nombre).all()
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
@@ -711,7 +711,7 @@ def inventario_por_departamento(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    productos     = db.query(Producto).all()
+    productos     = db.query(Producto).order_by(Producto.nombre).all()
     departamentos = {d.id: d for d in db.query(Departamento).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -758,7 +758,7 @@ def inventario_por_proveedor(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    productos   = db.query(Producto).all()
+    productos   = db.query(Producto).order_by(Producto.nombre).all()
     proveedores = {p.id: p for p in db.query(Proveedor).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -802,7 +802,7 @@ def inventario_pareto(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    productos_clave = db.query(Producto).filter(Producto.es_producto_clave == True).all()
+    productos_clave = db.query(Producto).filter(Producto.es_producto_clave == True).order_by(Producto.nombre).all()
 
     detalles = _detalles_en_periodo(db, desde, hasta)
     ventas_por_prod: dict = {}
@@ -835,7 +835,7 @@ def inventario_rotacion(
     _: None = Depends(require_admin),
 ):
     dias_periodo  = _calcular_dias_periodo(desde, hasta)
-    productos     = db.query(Producto).all()
+    productos     = db.query(Producto).order_by(Producto.nombre).all()
     departamentos = {d.id: d for d in db.query(Departamento).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -899,7 +899,7 @@ def valorizacion_inventario(
     productos = db.query(Producto).filter(
         Producto.activo == True,
         Producto.stock > 0,
-    ).all()
+    ).order_by(Producto.nombre).all()
 
     deptos = {d.id: d.nombre for d in db.query(Departamento).all()}
     cats   = {c.id: c.nombre for c in db.query(Categoria).all()}
