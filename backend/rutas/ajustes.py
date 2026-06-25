@@ -94,7 +94,7 @@ def _filtrar_productos(db: Session, filtro_tipo: str, filtro_id: Optional[int] =
         q = q.filter(Producto.marca_id == filtro_id)
     elif filtro_tipo == "pareto":
         q = q.filter(Producto.es_producto_clave == True)
-    return q.all()
+    return q.order_by(Producto.nombre).all()
 
 
 def _stock_real(producto: Producto, db: Session) -> int:
