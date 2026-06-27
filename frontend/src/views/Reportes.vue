@@ -85,7 +85,7 @@
                 <tr>
                   <th>Hora</th><th>Venta</th><th>Producto</th><th>Cant.</th>
                   <th>Precio unit.</th><th>Subtotal</th><th>USD</th><th>Vendedor</th>
-                  <th>Costo</th><th>Margen</th><th>Ganancia</th><th>Stock</th><th>Auditoría</th>
+                  <th v-if="esAdmin">Costo</th><th v-if="esAdmin">Margen</th><th v-if="esAdmin">Ganancia</th><th>Stock</th><th v-if="esAdmin">Auditoría</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,13 +105,13 @@
                   </td>
                   <td class="txt-verde">${{ l.subtotal_usd.toFixed(2) }}</td>
                   <td class="txt-muted">{{ l.vendedor }}</td>
-                  <td class="txt-muted" style="font-size:0.8rem">${{ Number(l.costo_usd || 0).toFixed(2) }}</td>
-                  <td style="font-size:0.8rem">
+                  <td v-if="esAdmin" class="txt-muted" style="font-size:0.8rem">${{ Number(l.costo_usd || 0).toFixed(2) }}</td>
+                  <td v-if="esAdmin" style="font-size:0.8rem">
                     <span :class="l.margen_pct >= 20 ? 'txt-verde' : l.margen_pct >= 10 ? 'txt-amarillo' : 'txt-danger'">
                       {{ l.margen_pct }}%
                     </span>
                   </td>
-                  <td style="font-size:0.8rem;font-weight:600"
+                  <td v-if="esAdmin" style="font-size:0.8rem;font-weight:600"
                     :class="l.ganancia_usd > 0 ? 'txt-verde' : 'txt-danger'">
                     ${{ Number(l.ganancia_usd || 0).toFixed(2) }}
                   </td>
@@ -125,7 +125,7 @@
                       <span class="dias-cob" v-if="l.dias_cobertura < 999">{{ l.dias_cobertura }}d</span>
                     </div>
                   </td>
-                  <td>
+                  <td v-if="esAdmin">
                     <span v-if="l.auditoria_pendiente" class="badge-audit-pendiente"
                       title="Faltante pendiente de autorización admin">
                       ⚠ Pendiente
@@ -981,7 +981,7 @@ export default {
       agrupacion:         'departamento',
       desdeDia: '',
       hastaDia: '',
-      MAIN_TABS: [
+      MAIN_TABS_TODOS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
         { key: 'inventario', label: 'Inventario' },
@@ -1006,7 +1006,14 @@ export default {
       const dia = String(parseInt(this.hastaDia)).padStart(2, '0')
       return `${this.anioActual}-${this.mesActual}-${dia}`
     },
-    esAdmin()  { return this.usuario.rol === 'admin' },
+    esAdmin()    { return this.usuario.rol === 'admin' },
+    esVendedor() { return this.usuario.rol === 'vendedor' },
+    MAIN_TABS() {
+      if (this.esVendedor) {
+        return this.MAIN_TABS_TODOS.filter(t => t.key === 'ventas')
+      }
+      return this.MAIN_TABS_TODOS
+    },
     tienePermiso() {
       return (modulo) => {
         if (this.usuario.rol === 'admin') return true
@@ -1016,7 +1023,14 @@ export default {
       }
     },
     tabKey()           { return `${this.tabMain}-${this.tabSub}` },
-    subTabsActuales()  { return SUBTABS[this.tabMain] || [] },
+    subTabsActuales() {
+      const tabs = SUBTABS[this.tabMain] || []
+      if (this.esVendedor) {
+        const permitidas = ['resumen_dia', 'departamento', 'vendedor', 'top']
+        return tabs.filter(t => permitidas.includes(t.key))
+      }
+      return tabs
+    },
     tieneFiltros()     { return CON_FILTROS.has(this.tabKey) },
     totalInventarioDept() {
       if (this.tabMain !== 'inventario' || this.tabSub !== 'departamento' || !this.datos) return 0
@@ -1028,6 +1042,10 @@ export default {
     },
   },
   async mounted() {
+    if (this.esVendedor) {
+      this.tabMain = 'ventas'
+      this.tabSub  = 'resumen_dia'
+    }
     await this.cargar()
   },
   methods: {

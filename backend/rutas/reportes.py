@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Body, HTTPException
+from fastapi import APIRouter, Depends, Body, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
@@ -10,8 +10,15 @@ from models import (
     Area, Pasillo, Estante, UbicacionProducto, CuentaBancaria,
 )
 from datetime import datetime, timedelta, date
-from rutas.usuarios import require_admin
+from rutas.usuarios import require_admin, require_admin_o_gestionador
 from typing import Optional
+
+def require_admin_o_vendedor(
+    x_usuario_rol: Optional[str] = Header(None),
+):
+    if x_usuario_rol not in ("admin", "gestionador", "vendedor"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Sin permiso")
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
 
@@ -133,7 +140,7 @@ def ventas_por_departamento(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_vendedor),
 ):
     detalles      = _detalles_en_periodo(db, desde, hasta)
     productos     = {p.id: p for p in db.query(Producto).all()}
@@ -272,7 +279,9 @@ def ventas_por_vendedor(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_vendedor),
+    x_usuario_rol: Optional[str] = Header(None),
+    x_usuario_nombre: Optional[str] = Header(None),
 ):
     q = db.query(ComisionVenta)
     if desde or hasta:
@@ -305,13 +314,16 @@ def ventas_por_vendedor(
     resultado = []
     for g in sorted(grupos.values(), key=lambda x: x["total_usd"], reverse=True):
         resultado.append({
-            "vendedor_id":          g["vendedor_id"],
-            "vendedor_nombre":      g["vendedor_nombre"],
-            "cantidad_ventas":      len(g["ventas_ids"]),
-            "total_usd":            round(g["total_usd"], 2),
-            "total_comision":       round(g["total_comision"], 2),
+            "vendedor_id":           g["vendedor_id"],
+            "vendedor_nombre":       g["vendedor_nombre"],
+            "cantidad_ventas":       len(g["ventas_ids"]),
+            "total_usd":             round(g["total_usd"], 2),
+            "total_comision":        round(g["total_comision"], 2),
             "pct_comision_promedio": round(g["total_comision"] / g["total_usd"] * 100, 2) if g["total_usd"] > 0 else 0,
         })
+    # Vendedor solo ve sus propias comisiones
+    if x_usuario_rol == "vendedor" and x_usuario_nombre:
+        resultado = [r for r in resultado if r["vendedor_nombre"] == x_usuario_nombre]
     return resultado
 
 
@@ -320,7 +332,9 @@ def ventas_resumen_dia(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_vendedor),
+    x_usuario_rol: Optional[str] = Header(None),
+    x_usuario_nombre: Optional[str] = Header(None),
 ):
     desde, hasta = _normalizar_fechas(desde, hasta)
     q = db.query(Venta)
@@ -478,7 +492,8 @@ def ventas_resumen_dia(
                 semaforo = 'amarillo'
             else:
                 semaforo = 'verde'
-            lineas_productos.append({
+            es_solo_vendedor = x_usuario_rol == "vendedor"
+            linea = {
                 "hora":            v.fecha.strftime('%H:%M') if v.fecha else '—',
                 "venta_id":        v.id,
                 "producto_id":     d.producto_id,
@@ -491,9 +506,6 @@ def ventas_resumen_dia(
                 "tasa_bcv":        round(tasa, 2) if moneda_display == "Bs" else None,
                 "precio_libre":    False,
                 "vendedor":        v.usuario or "—",
-                "costo_usd":       round(costo_unit, 4),
-                "margen_pct":      margen_pct,
-                "ganancia_usd":    ganancia_usd,
                 "stock_actual":    stock_actual,
                 "stock_minimo":    stock_min,
                 "vendidos_30d":    vendidos_30d,
@@ -503,7 +515,12 @@ def ventas_resumen_dia(
                 "auditado":            bool(prod.auditado) if prod else False,
                 "auditoria_pendiente": bool(prod.auditoria_pendiente) if prod else False,
                 "fecha_auditoria":     prod.fecha_auditoria.strftime('%d/%m/%Y') if prod and prod.fecha_auditoria else None,
-            })
+            }
+            if not es_solo_vendedor:
+                linea["costo_usd"]    = round(costo_unit, 4)
+                linea["margen_pct"]   = margen_pct
+                linea["ganancia_usd"] = ganancia_usd
+            lineas_productos.append(linea)
 
     # ── Facturas agrupadas por venta ─────────────────────────────────────────
     # Incluir anuladas también (filtro solo excluye anuladas del resumen)
@@ -590,13 +607,23 @@ def ventas_resumen_dia(
             "productos":   productos_factura,
         })
 
+    es_solo_vendedor = x_usuario_rol == "vendedor"
+
+    # Vendedor solo ve sus propias líneas y facturas
+    if es_solo_vendedor and x_usuario_nombre:
+        lineas_productos = [l for l in lineas_productos if l["vendedor"] == x_usuario_nombre]
+        facturas = [f for f in facturas if f["usuario"] == x_usuario_nombre]
+        por_vendedor_filtrado = {k: v for k, v in por_vendedor.items() if k == x_usuario_nombre}
+    else:
+        por_vendedor_filtrado = por_vendedor
+
     return {
         "cantidad_ventas":   len(ventas),
         "total_usd":         round(total_usd,      2),
         "total_bs":          round(total_bs,        2),
         "total_usd_equiv":   round(total_usd_equiv, 2),
-        "por_metodo_cuenta": sorted(por_metodo.values(),   key=lambda x: x["monto_usd"],   reverse=True),
-        "por_vendedor":      sorted(por_vendedor.values(), key=lambda x: x["subtotal_usd"], reverse=True),
+        "por_metodo_cuenta": [] if es_solo_vendedor else sorted(por_metodo.values(), key=lambda x: x["monto_usd"], reverse=True),
+        "por_vendedor":      sorted(por_vendedor_filtrado.values(), key=lambda x: x["subtotal_usd"], reverse=True),
         "lineas_productos":  lineas_productos,
         "facturas":          facturas,
     }
@@ -612,7 +639,7 @@ def top_productos(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_admin_o_vendedor),
 ):
     q = db.query(
         DetalleVenta.producto_id,
