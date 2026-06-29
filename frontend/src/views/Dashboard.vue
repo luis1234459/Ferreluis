@@ -198,40 +198,6 @@
             </div>
           </div>
 
-          <!-- Facturas de proveedores -->
-          <div v-if="d.facturas_pendientes && d.facturas_pendientes.length > 0"
-            class="seccion-facturas" style="margin-top:1.5rem">
-            <h2 class="panel-titulo">Facturas de proveedores pendientes</h2>
-            <div class="tabla-container">
-              <table>
-                <thead>
-                  <tr><th>Proveedor</th><th>Factura</th><th>Orden</th><th>Monto</th><th>Vencimiento</th><th>Días</th><th></th></tr>
-                </thead>
-                <tbody>
-                  <tr v-for="f in d.facturas_pendientes" :key="f.recepcion_id"
-                    :class="'fila-' + f.alerta">
-                    <td style="font-weight:600">{{ f.proveedor }}</td>
-                    <td>{{ f.numero_factura }}</td>
-                    <td class="txt-muted">{{ f.orden }}</td>
-                    <td>${{ fmt(f.monto_factura) }}</td>
-                    <td>{{ f.fecha_vencimiento || '—' }}</td>
-                    <td>
-                      <span :class="'badge-dias badge-dias-' + f.alerta">
-                        {{ f.dias_restantes === null ? '—' : (f.dias_restantes < 0 ? Math.abs(f.dias_restantes) + 'd vencida' : f.dias_restantes + 'd') }}
-                      </span>
-                    </td>
-                    <td>
-                      <button class="btn-pagar-factura" @click="marcarPagada(f.recepcion_id)"
-                        :disabled="marcandoPago === f.recepcion_id">
-                        {{ marcandoPago === f.recepcion_id ? '...' : 'Marcar pagada' }}
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           <!-- ══ WIDGET LIQUIDEZ PRUDENTE ══ -->
           <div class="liquidez-widget" style="margin-top:1.5rem">
             <div class="liquidez-header">
