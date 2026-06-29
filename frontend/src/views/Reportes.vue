@@ -1007,7 +1007,7 @@ export default {
       return `${this.anioActual}-${this.mesActual}-${dia}`
     },
     esAdmin()    { return this.usuario.rol === 'admin' },
-    esVendedor() { return this.usuario.rol === 'vendedor' },
+    esVendedor() { return this.usuario.rol === 'vendedor' || this.usuario.rol === 'gestionador' },
     MAIN_TABS() {
       if (this.esVendedor) {
         return this.MAIN_TABS_TODOS.filter(t => t.key === 'ventas')
