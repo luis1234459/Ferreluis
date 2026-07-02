@@ -621,9 +621,14 @@
                     <span v-else-if="p.auditado" class="badge-audit-ok">✓ {{ p.fecha_auditoria || 'OK' }}</span>
                     <span v-else class="badge-audit-sin">Sin auditar</span>
                   </td>
-                  <td>
+                  <td style="display:flex;gap:0.4rem;align-items:center">
                     <button class="btn-editar-nombre" @click="abrirEditarNombre(p)">
                       ✏️ Nombre
+                    </button>
+                    <button v-if="esAdmin && p.stock === 0"
+                      class="btn-eliminar-prod"
+                      @click="eliminarProducto(p)">
+                      🗑
                     </button>
                   </td>
                 </tr>
@@ -2016,6 +2021,16 @@ export default {
     },
 
     // ── Gestión: editar nombre ─────────────────────────────────────────────
+    async eliminarProducto(prod) {
+      if (!confirm(`¿Eliminar "${prod.nombre}"?\nEsta acción no se puede deshacer.`)) return
+      try {
+        await axios.delete(`/productos/${prod.id}`, { headers: this._headers() })
+        this.gestionProductos = this.gestionProductos.filter(p => p.id !== prod.id)
+        this.msgGestion = `✓ Producto "${prod.nombre}" eliminado`
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al eliminar producto')
+      }
+    },
     abrirEditarNombre(prod) {
       this.prodEditandoNombre = prod
       this.nuevoNombreProd    = prod.nombre
@@ -2319,6 +2334,17 @@ export default {
   transition: all 0.12s;
 }
 .btn-editar-nombre:hover { background: #FFCC0033; border-color: #FFCC00; }
+.btn-eliminar-prod {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 5px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: #DC2626;
+  transition: all 0.12s;
+}
+.btn-eliminar-prod:hover { background: #DC2626; color: #fff; border-color: #DC2626; }
 .fila-seleccionada td { background: #FFCC0015 !important; }
 .badge-audit-ok       { background: #DCFCE7; color: #15803D; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; white-space: nowrap; }
 .badge-audit-pendiente{ background: #FEF3C7; color: #92400E; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; white-space: nowrap; }

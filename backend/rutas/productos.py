@@ -1044,6 +1044,8 @@ def eliminar_producto(
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if int(p.stock or 0) > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: el producto tiene {p.stock} unidades en stock")
     db.delete(p)
     db.commit()
     return {"mensaje": "Producto eliminado"}
