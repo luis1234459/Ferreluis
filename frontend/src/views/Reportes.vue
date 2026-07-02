@@ -853,8 +853,9 @@
                     type="number" min="1"
                     placeholder="Cant."
                     class="input-repos-cant"
+                    @change="_guardarLista()"
                   />
-                  <button class="btn-quitar-repos" @click="listaReposicion.splice(i, 1)">✕</button>
+                  <button class="btn-quitar-repos" @click="listaReposicion.splice(i, 1); _guardarLista()">✕</button>
                 </div>
               </div>
 
@@ -868,7 +869,7 @@
               <div class="repos-acciones">
                 <button class="btn-copiar-repos" @click="copiarListaReposicion">📋 Copiar lista</button>
                 <button class="btn-whatsapp-repos" @click="enviarReposicionWhatsApp">💬 Enviar por WhatsApp</button>
-                <button class="btn-limpiar-repos" @click="listaReposicion = []">🗑 Limpiar lista</button>
+                <button class="btn-limpiar-repos" @click="listaReposicion = []; _guardarLista()">🗑 Limpiar lista</button>
               </div>
             </div>
 
@@ -1046,6 +1047,10 @@ export default {
       this.tabMain = 'ventas'
       this.tabSub  = 'resumen_dia'
     }
+    const guardada = localStorage.getItem('ferreutil_lista_reposicion')
+    if (guardada) {
+      try { this.listaReposicion = JSON.parse(guardada) } catch {}
+    }
     await this.cargar()
   },
   methods: {
@@ -1158,6 +1163,9 @@ export default {
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     },
+    _guardarLista() {
+      localStorage.setItem('ferreutil_lista_reposicion', JSON.stringify(this.listaReposicion))
+    },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
     async abrirPanelProducto(l) {
       this.panelProducto = l
@@ -1183,6 +1191,7 @@ export default {
         dias:           l.dias_cobertura,
         cantidad_pedir: null,
       })
+      this._guardarLista()
       this.verListaReposicion = true
     },
     cerrarPanel() {
