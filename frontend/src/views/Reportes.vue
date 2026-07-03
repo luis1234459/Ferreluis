@@ -27,28 +27,30 @@
         <div class="barra-acciones">
           <div class="filtros" v-if="tieneFiltros">
             <div class="field-inline">
-              <label>Desde (día)</label>
-              <input
-                v-model.number="desdeDia"
-                type="number" min="1" max="31"
-                placeholder="ej: 1"
-                style="width:80px"
-              />
-              <small v-if="fechaDesde" class="fecha-preview">
-                {{ formatFechaPreview(fechaDesde) }}
-              </small>
+              <label>Desde</label>
+              <div class="fecha-grupo">
+                <input v-model.number="desdeDia" type="number" min="1" max="31"
+                  placeholder="Día" class="input-fecha-dia" />
+                <select v-model.number="desdeMes" class="input-fecha-mes">
+                  <option v-for="(m, i) in MESES" :key="i+1" :value="i+1">{{ m }}</option>
+                </select>
+                <input v-model.number="desdeAnio" type="number" min="2024" max="2099"
+                  class="input-fecha-anio" />
+              </div>
+              <small v-if="fechaDesde" class="fecha-preview">{{ formatFechaPreview(fechaDesde) }}</small>
             </div>
             <div class="field-inline">
-              <label>Hasta (día)</label>
-              <input
-                v-model.number="hastaDia"
-                type="number" min="1" max="31"
-                placeholder="ej: 31"
-                style="width:80px"
-              />
-              <small v-if="fechaHasta" class="fecha-preview">
-                {{ formatFechaPreview(fechaHasta) }}
-              </small>
+              <label>Hasta</label>
+              <div class="fecha-grupo">
+                <input v-model.number="hastaDia" type="number" min="1" max="31"
+                  placeholder="Día" class="input-fecha-dia" />
+                <select v-model.number="hastaMes" class="input-fecha-mes">
+                  <option v-for="(m, i) in MESES" :key="i+1" :value="i+1">{{ m }}</option>
+                </select>
+                <input v-model.number="hastaAnio" type="number" min="2024" max="2099"
+                  class="input-fecha-anio" />
+              </div>
+              <small v-if="fechaHasta" class="fecha-preview">{{ formatFechaPreview(fechaHasta) }}</small>
             </div>
             <button class="btn-filtrar" @click="cargar">Filtrar</button>
             <button class="btn-rapido" @click="setHoy">Hoy</button>
@@ -890,6 +892,8 @@
 import AppSidebar from '../components/AppSidebar.vue'
 import axios from 'axios'
 
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
 const LABELS_METODO = {
   efectivo_usd: 'Efectivo $', zelle: 'Zelle', binance: 'Binance',
   efectivo_bs: 'Efectivo Bs', transferencia_bs: 'Transferencia Bs',
@@ -980,8 +984,13 @@ export default {
       imprimirHasta:      '',
       departamentosVal:   [],
       agrupacion:         'departamento',
-      desdeDia: '',
-      hastaDia: '',
+      desdeDia:  '',
+      hastaDia:  '',
+      desdeMes:  new Date().getMonth() + 1,
+      desdeAnio: new Date().getFullYear(),
+      hastaMes:  new Date().getMonth() + 1,
+      hastaAnio: new Date().getFullYear(),
+      MESES,
       MAIN_TABS_TODOS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
@@ -991,21 +1000,17 @@ export default {
     }
   },
   computed: {
-    mesActual() {
-      return String(new Date().getMonth() + 1).padStart(2, '0')
-    },
-    anioActual() {
-      return new Date().getFullYear()
-    },
     fechaDesde() {
       if (!this.desdeDia) return ''
       const dia = String(parseInt(this.desdeDia)).padStart(2, '0')
-      return `${this.anioActual}-${this.mesActual}-${dia}`
+      const mes = String(parseInt(this.desdeMes)).padStart(2, '0')
+      return `${this.desdeAnio}-${mes}-${dia}`
     },
     fechaHasta() {
       if (!this.hastaDia) return ''
       const dia = String(parseInt(this.hastaDia)).padStart(2, '0')
-      return `${this.anioActual}-${this.mesActual}-${dia}`
+      const mes = String(parseInt(this.hastaMes)).padStart(2, '0')
+      return `${this.hastaAnio}-${mes}-${dia}`
     },
     esAdmin()    { return this.usuario.rol === 'admin' },
     esVendedor() { return this.usuario.rol === 'vendedor' || this.usuario.rol === 'gestionador' },
@@ -1094,38 +1099,46 @@ export default {
         this.cargando = false
       }
     },
-    limpiarFiltros() { this.desdeDia = ''; this.hastaDia = ''; this.cargar() },
+    _setFecha(d1, d2) {
+      this.desdeDia  = d1.getDate()
+      this.desdeMes  = d1.getMonth() + 1
+      this.desdeAnio = d1.getFullYear()
+      this.hastaDia  = d2.getDate()
+      this.hastaMes  = d2.getMonth() + 1
+      this.hastaAnio = d2.getFullYear()
+      this.cargar()
+    },
+    limpiarFiltros() {
+      const hoy = new Date()
+      this.desdeDia = ''; this.hastaDia = ''
+      this.desdeMes  = hoy.getMonth() + 1; this.hastaMes  = hoy.getMonth() + 1
+      this.desdeAnio = hoy.getFullYear();  this.hastaAnio = hoy.getFullYear()
+      this.cargar()
+    },
     setHoy() {
-      const d = new Date().getDate()
-      this.desdeDia = d; this.hastaDia = d; this.cargar()
+      const h = new Date(); this._setFecha(h, h)
     },
     setAyer() {
-      const d = new Date()
-      d.setDate(d.getDate() - 1)
-      this.desdeDia = d.getDate(); this.hastaDia = d.getDate(); this.cargar()
+      const d = new Date(); d.setDate(d.getDate() - 1); this._setFecha(d, d)
     },
     setHace2Dias() {
-      const d = new Date()
-      d.setDate(d.getDate() - 2)
-      this.desdeDia = d.getDate(); this.hastaDia = d.getDate(); this.cargar()
+      const d = new Date(); d.setDate(d.getDate() - 2); this._setFecha(d, d)
     },
     setSemana() {
       const hoy = new Date()
       const lunes = new Date(hoy)
       lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7))
-      this.desdeDia = lunes.getDate()
-      this.hastaDia = hoy.getDate()
-      this.cargar()
+      this._setFecha(lunes, hoy)
     },
     setMes() {
-      this.desdeDia = 1
-      this.hastaDia = new Date().getDate()
-      this.cargar()
+      const hoy = new Date()
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+      this._setFecha(inicio, hoy)
     },
     setAnio() {
-      this.desdeDia = 1
-      this.hastaDia = new Date().getDate()
-      this.cargar()
+      const hoy = new Date()
+      const inicio = new Date(hoy.getFullYear(), 0, 1)
+      this._setFecha(inicio, hoy)
     },
     exportar() { alert('Función disponible próximamente') },
     labelMetodo(m) { return LABELS_METODO[m] || m },
@@ -1261,6 +1274,10 @@ export default {
 .btn-rapido:hover { color: var(--texto-principal); }
 .btn-exportar { margin-left: auto; background: transparent; color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
 .btn-exportar:hover { background: var(--fondo-sidebar); }
+.fecha-grupo { display: flex; gap: 0.3rem; align-items: center; }
+.input-fecha-dia  { width: 52px; padding: 0.45rem 0.4rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; text-align: center; }
+.input-fecha-mes  { padding: 0.45rem 0.4rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; background: #fff; }
+.input-fecha-anio { width: 68px; padding: 0.45rem 0.4rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; text-align: center; }
 
 /* KPI */
 .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
