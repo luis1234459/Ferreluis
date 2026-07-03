@@ -62,6 +62,18 @@
             <button class="btn-limpiar" @click="limpiarFiltros">Limpiar</button>
           </div>
           <button class="btn-exportar" @click="exportar">⬇ Exportar Excel</button>
+          <div v-if="esAdmin" class="ejecutivo-wrap">
+            <select v-model.number="diasEjecutivo" class="sel-dias-ejecutivo">
+              <option :value="30">30 días</option>
+              <option :value="60">60 días</option>
+              <option :value="90">90 días</option>
+              <option :value="180">6 meses</option>
+              <option :value="365">1 año</option>
+            </select>
+            <button class="btn-ejecutivo" @click="descargarEjecutivo" :disabled="descargandoEjecutivo">
+              {{ descargandoEjecutivo ? 'Generando...' : '📊 Reporte Ejecutivo PDF' }}
+            </button>
+          </div>
         </div>
 
         <!-- Cargando -->
@@ -991,6 +1003,8 @@ export default {
       hastaMes:  new Date().getMonth() + 1,
       hastaAnio: new Date().getFullYear(),
       MESES,
+      diasEjecutivo:        90,
+      descargandoEjecutivo: false,
       MAIN_TABS_TODOS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
@@ -1176,6 +1190,25 @@ export default {
     formatFechaPreview(iso) {
       return new Date(iso + 'T00:00:00').toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     },
+    async descargarEjecutivo() {
+      this.descargandoEjecutivo = true
+      try {
+        const res = await axios.get('/reportes/ejecutivo/pdf', {
+          params:       { dias: this.diasEjecutivo },
+          responseType: 'blob',
+        })
+        const url  = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+        const a    = document.createElement('a')
+        a.href     = url
+        a.download = `ferreutil_ejecutivo_${this.diasEjecutivo}d.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch {
+        alert('Error al generar el reporte ejecutivo')
+      } finally {
+        this.descargandoEjecutivo = false
+      }
+    },
     _guardarLista() {
       localStorage.setItem('ferreutil_lista_reposicion', JSON.stringify(this.listaReposicion))
     },
@@ -1274,6 +1307,19 @@ export default {
 .btn-rapido:hover { color: var(--texto-principal); }
 .btn-exportar { margin-left: auto; background: transparent; color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
 .btn-exportar:hover { background: var(--fondo-sidebar); }
+.ejecutivo-wrap { display: flex; gap: 0.4rem; align-items: center; }
+.sel-dias-ejecutivo {
+  padding: 0.45rem 0.5rem; border: 1px solid var(--borde);
+  border-radius: 6px; font-size: 0.82rem; background: #fff;
+}
+.btn-ejecutivo {
+  background: #1A1A1A; color: #FFCC00; border: none;
+  padding: 0.45rem 1rem; border-radius: 6px;
+  cursor: pointer; font-size: 0.82rem; font-weight: 700;
+  white-space: nowrap;
+}
+.btn-ejecutivo:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ejecutivo:not(:disabled):hover { background: #333; }
 .fecha-grupo { display: flex; gap: 0.3rem; align-items: center; }
 .input-fecha-dia  { width: 52px; padding: 0.45rem 0.4rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; text-align: center; }
 .input-fecha-mes  { padding: 0.45rem 0.4rem; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.85rem; background: #fff; }

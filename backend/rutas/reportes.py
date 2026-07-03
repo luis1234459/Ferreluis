@@ -1502,6 +1502,228 @@ def actualizar_credito_real(
     return {"ok": True}
 
 
+@router.get("/ejecutivo/pdf")
+def reporte_ejecutivo_pdf(
+    dias: int = 90,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from fastapi.responses import StreamingResponse
+    from datetime import timedelta
+    import io
+
+    AMARILLO  = colors.HexColor("#FFCC00")
+    NEGRO     = colors.HexColor("#1A1A1A")
+    VERDE     = colors.HexColor("#16A34A")
+    GRIS      = colors.HexColor("#F5F5F0")
+    GRIS_MED  = colors.HexColor("#888888")
+
+    hoy    = datetime.utcnow()
+    desde  = hoy - timedelta(days=dias)
+    desde_str = desde.strftime('%d/%m/%Y')
+    hasta_str = hoy.strftime('%d/%m/%Y')
+    fecha_gen = hoy.strftime('%d/%m/%Y %H:%M')
+
+    styles = getSampleStyleSheet()
+    titulo_style = ParagraphStyle('titulo', fontSize=20, fontName='Helvetica-Bold',
+                                   textColor=NEGRO, spaceAfter=2)
+    sub_style    = ParagraphStyle('sub', fontSize=9, fontName='Helvetica',
+                                   textColor=GRIS_MED, spaceAfter=12)
+    seccion_style= ParagraphStyle('sec', fontSize=11, fontName='Helvetica-Bold',
+                                   textColor=NEGRO, spaceBefore=16, spaceAfter=6)
+    normal_style = ParagraphStyle('norm', fontSize=8, fontName='Helvetica',
+                                   textColor=NEGRO)
+
+    def tabla(data, col_widths, header_color=NEGRO, header_text=AMARILLO):
+        t = Table(data, colWidths=col_widths)
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,0), header_color),
+            ('TEXTCOLOR',     (0,0), (-1,0), header_text),
+            ('FONTNAME',      (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE',      (0,0), (-1,0), 8),
+            ('FONTSIZE',      (0,1), (-1,-1), 7.5),
+            ('ROWBACKGROUNDS',(0,1), (-1,-1), [colors.white, GRIS]),
+            ('GRID',          (0,0), (-1,-1), 0.3, colors.HexColor('#DDDDDD')),
+            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING',    (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING',   (0,0), (-1,-1), 6),
+            ('RIGHTPADDING',  (0,0), (-1,-1), 6),
+        ]))
+        return t
+
+    elements = []
+
+    # ── Encabezado ────────────────────────────────────────────────────────
+    elements.append(Paragraph("FERREUTIL", titulo_style))
+    elements.append(Paragraph(
+        f"Reporte Ejecutivo de Expansión · Período: {desde_str} → {hasta_str} ({dias} días) · Generado: {fecha_gen}",
+        sub_style))
+    elements.append(HRFlowable(width="100%", thickness=2, color=AMARILLO, spaceAfter=12))
+
+    # ── 1. KPIs generales ─────────────────────────────────────────────────
+    ventas = db.query(Venta).filter(
+        Venta.fecha >= desde,
+        Venta.estado != 'anulada',
+    ).all()
+    total_usd = sum(float(v.total or 0) for v in ventas if v.moneda_venta == 'USD')
+    total_bs  = sum(float(v.total or 0) for v in ventas if v.moneda_venta != 'USD')
+    tasa_prom = 0.0
+    ventas_bs = [v for v in ventas if v.moneda_venta != 'USD' and v.tasa_bcv]
+    if ventas_bs:
+        tasa_prom = sum(float(v.tasa_bcv) for v in ventas_bs) / len(ventas_bs)
+    total_equiv = total_usd + (total_bs / tasa_prom if tasa_prom > 0 else 0)
+    ticket_prom = total_equiv / len(ventas) if ventas else 0
+    unidades = db.query(func.sum(DetalleVenta.cantidad)).join(
+        Venta, Venta.id == DetalleVenta.venta_id
+    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada').scalar() or 0
+
+    elements.append(Paragraph("1. Resumen General", seccion_style))
+    kpi_data = [
+        ['Métrica', 'Valor'],
+        ['Total ventas (período)', str(len(ventas))],
+        ['Total facturado USD equiv.', f'${total_equiv:,.2f}'],
+        ['Promedio diario USD', f'${total_equiv/dias:,.2f}'],
+        ['Ticket promedio USD', f'${ticket_prom:,.2f}'],
+        ['Unidades vendidas', f'{int(unidades):,}'],
+        ['Ventas por día hábil (est.)', f'{len(ventas)/dias*22/30:.1f}'],
+    ]
+    elements.append(tabla(kpi_data, [3.5*inch, 3.5*inch]))
+    elements.append(Spacer(1, 8))
+
+    # ── 2. Ventas por departamento ─────────────────────────────────────────
+    elements.append(Paragraph("2. Ventas por Departamento", seccion_style))
+    detalles  = db.query(DetalleVenta).join(
+        Venta, Venta.id == DetalleVenta.venta_id
+    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada').all()
+    productos_map = {p.id: p for p in db.query(Producto).all()}
+    deptos_map    = {d.id: d.nombre for d in db.query(Departamento).all()}
+
+    grupos_dept: dict = {}
+    for d in detalles:
+        prod    = productos_map.get(d.producto_id)
+        dept_id = prod.departamento_id if prod else None
+        if dept_id not in grupos_dept:
+            grupos_dept[dept_id] = {'nombre': deptos_map.get(dept_id, 'Sin depto'), 'usd': 0.0, 'unidades': 0}
+        grupos_dept[dept_id]['usd']      += float(d.precio_unitario or 0) * int(d.cantidad or 0)
+        grupos_dept[dept_id]['unidades'] += int(d.cantidad or 0)
+
+    total_dept = sum(g['usd'] for g in grupos_dept.values())
+    dept_sorted = sorted(grupos_dept.values(), key=lambda x: x['usd'], reverse=True)
+
+    dept_data = [['Departamento', 'Total USD', '% del total', 'Unidades']]
+    for g in dept_sorted:
+        pct = g['usd'] / total_dept * 100 if total_dept > 0 else 0
+        dept_data.append([
+            g['nombre'],
+            f'${g["usd"]:,.2f}',
+            f'{pct:.1f}%',
+            f'{g["unidades"]:,}',
+        ])
+    elements.append(tabla(dept_data, [2.8*inch, 1.5*inch, 1.2*inch, 1.2*inch]))
+    elements.append(Spacer(1, 8))
+
+    # ── 3. Top 20 productos ────────────────────────────────────────────────
+    elements.append(Paragraph("3. Top 20 Productos por Facturación", seccion_style))
+    grupos_prod: dict = {}
+    for d in detalles:
+        pid = d.producto_id
+        if pid not in grupos_prod:
+            prod = productos_map.get(pid)
+            grupos_prod[pid] = {'nombre': prod.nombre if prod else f'ID {pid}', 'usd': 0.0, 'unidades': 0}
+        grupos_prod[pid]['usd']      += float(d.precio_unitario or 0) * int(d.cantidad or 0)
+        grupos_prod[pid]['unidades'] += int(d.cantidad or 0)
+
+    top20 = sorted(grupos_prod.values(), key=lambda x: x['usd'], reverse=True)[:20]
+    total_top20 = sum(g['usd'] for g in top20)
+    pct_top20   = total_top20 / total_dept * 100 if total_dept > 0 else 0
+
+    prod_data = [['#', 'Producto', 'Total USD', 'Unidades']]
+    for i, g in enumerate(top20, 1):
+        prod_data.append([str(i), g['nombre'][:45], f'${g["usd"]:,.2f}', f'{g["unidades"]:,}'])
+    elements.append(tabla(prod_data, [0.3*inch, 3.8*inch, 1.4*inch, 1.2*inch]))
+    elements.append(Paragraph(
+        f"Los top 20 productos representan ${total_top20:,.2f} USD ({pct_top20:.1f}% del total facturado en el período).",
+        ParagraphStyle('nota', fontSize=7.5, textColor=GRIS_MED, spaceBefore=4)))
+    elements.append(Spacer(1, 8))
+
+    # ── 4. Análisis Pareto ────────────────────────────────────────────────
+    elements.append(Paragraph("4. Análisis Pareto (Productos Clave)", seccion_style))
+    prods_pareto = [p for p in productos_map.values() if p.es_producto_clave]
+    usd_pareto   = sum(grupos_prod.get(p.id, {}).get('usd', 0) for p in prods_pareto)
+    pct_pareto   = usd_pareto / total_dept * 100 if total_dept > 0 else 0
+
+    pareto_data = [['Métrica', 'Valor'],
+        ['Productos marcados como Pareto', str(len(prods_pareto))],
+        ['Total productos en catálogo',    str(len(productos_map))],
+        ['% del catálogo que es Pareto',   f'{len(prods_pareto)/len(productos_map)*100:.1f}%' if productos_map else '—'],
+        ['Facturación productos Pareto',   f'${usd_pareto:,.2f}'],
+        ['% del total que generan',        f'{pct_pareto:.1f}%'],
+    ]
+    elements.append(tabla(pareto_data, [3.5*inch, 3.5*inch]))
+    elements.append(Spacer(1, 8))
+
+    # ── 5. Ventas por vendedor ─────────────────────────────────────────────
+    elements.append(Paragraph("5. Desempeño por Vendedor", seccion_style))
+    grupos_vend: dict = {}
+    for v in ventas:
+        u = v.usuario or 'Sin usuario'
+        if u not in grupos_vend:
+            grupos_vend[u] = {'ventas': 0, 'usd': 0.0}
+        grupos_vend[u]['ventas'] += 1
+        if v.moneda_venta == 'USD':
+            grupos_vend[u]['usd'] += float(v.total or 0)
+        elif v.tasa_bcv:
+            grupos_vend[u]['usd'] += float(v.total or 0) / float(v.tasa_bcv)
+
+    vend_data = [['Vendedor', 'Ventas', 'Total USD', 'Ticket prom.']]
+    for nombre, g in sorted(grupos_vend.items(), key=lambda x: x[1]['usd'], reverse=True):
+        ticket = g['usd'] / g['ventas'] if g['ventas'] > 0 else 0
+        vend_data.append([nombre, str(g['ventas']), f'${g["usd"]:,.2f}', f'${ticket:,.2f}'])
+    elements.append(tabla(vend_data, [2.5*inch, 1*inch, 1.8*inch, 1.4*inch]))
+    elements.append(Spacer(1, 8))
+
+    # ── 6. Inventario snapshot ────────────────────────────────────────────
+    elements.append(Paragraph("6. Snapshot de Inventario", seccion_style))
+    todos_prods = list(productos_map.values())
+    valor_inv   = sum(float(p.costo_usd or 0) * int(p.stock or 0) for p in todos_prods)
+    sin_stock   = sum(1 for p in todos_prods if (p.stock or 0) <= 0)
+    bajo_stock  = sum(1 for p in todos_prods if 0 < (p.stock or 0) <= 5)
+
+    inv_data = [['Métrica', 'Valor'],
+        ['Total SKUs activos',       f'{len(todos_prods):,}'],
+        ['Valor inventario (costo)', f'${valor_inv:,.2f}'],
+        ['SKUs sin stock',           str(sin_stock)],
+        ['SKUs stock bajo (≤5)',     str(bajo_stock)],
+        ['SKUs Pareto sin stock',    str(sum(1 for p in prods_pareto if (p.stock or 0) <= 0))],
+    ]
+    elements.append(tabla(inv_data, [3.5*inch, 3.5*inch]))
+
+    # ── Pie ───────────────────────────────────────────────────────────────
+    elements.append(Spacer(1, 20))
+    elements.append(HRFlowable(width="100%", thickness=1, color=AMARILLO))
+    elements.append(Paragraph(
+        f"Ferreutil · Sistema administrativo · Reporte generado el {fecha_gen} · Confidencial",
+        ParagraphStyle('pie', fontSize=7, textColor=GRIS_MED, spaceBefore=6, alignment=TA_CENTER)))
+
+    # ── Generar PDF ───────────────────────────────────────────────────────
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+        topMargin=0.6*inch, bottomMargin=0.6*inch,
+        leftMargin=0.75*inch, rightMargin=0.75*inch)
+    doc.build(elements)
+    buffer.seek(0)
+    nombre_archivo = f"ferreutil_ejecutivo_{dias}d_{hoy.strftime('%Y%m%d')}.pdf"
+    return StreamingResponse(buffer, media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"})
+
+
 @router.get("/sugerir-pareto")
 def sugerir_pareto(
     dias: int = 90,
