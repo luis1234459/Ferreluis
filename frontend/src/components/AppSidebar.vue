@@ -257,7 +257,7 @@ const GRUPOS = [
     nombre: 'Reportes',
     rutas: ['/reportes'],
     items: [
-      { ruta: '/reportes', label: 'Reportes', soloAdmin: true },
+      { ruta: '/reportes', label: 'Reportes', soloAdminOGestionadorOVendedor: true },
     ],
   },
   {
