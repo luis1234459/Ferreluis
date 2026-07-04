@@ -87,6 +87,13 @@ const routes = [
   { path: '/mapa',        name: 'MapaDepartamentos', component: () => import('../views/MapaDepartamentos.vue'), meta: { requiresAuth: true } },
   { path: '/apartados',   name: 'Apartados',  component: () => import('../views/Apartados.vue'),  meta: { requiresAuth: true } },
   { path: '/radar-demanda', name: 'RadarDemanda',  component: RadarDemanda, meta: { soloAdmin: true } },
+  {
+    path: '/orden-despacho/:id',
+    name: 'OrdenDespacho',
+    component: () => import('../views/OrdenDespacho.vue'),
+    props: true,
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
