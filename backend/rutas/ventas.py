@@ -35,7 +35,7 @@ from models import (
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
-from rutas.usuarios import require_admin
+from rutas.usuarios import require_admin, get_current_user
 
 router = APIRouter()
 
@@ -712,3 +712,28 @@ def cambiar_estado_venta(venta_id: int, datos: dict, db: Session = Depends(get_d
     venta.estado = nuevo_estado
     db.commit()
     return {"id": venta_id, "estado": venta.estado}
+
+
+@router.patch("/ventas/{venta_id}/despacho")
+def marcar_despacho(
+    venta_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    tipo = payload.get("despachado_por")
+    if tipo not in ("vendedor", "despachador"):
+        raise HTTPException(status_code=400,
+                            detail="despachado_por debe ser 'vendedor' o 'despachador'")
+
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    # Bloqueo: si ya está marcado, solo admin puede reescribir
+    if venta.despachado_por and current_user.get("rol") != "admin":
+        raise HTTPException(status_code=409, detail="El despacho ya está registrado")
+
+    venta.despachado_por = tipo
+    db.commit()
+    return {"ok": True, "despachado_por": tipo}

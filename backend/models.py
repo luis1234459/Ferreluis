@@ -184,6 +184,7 @@ class Venta(Base):
     exceso           = Column(Float,  default=0)
     estado           = Column(String, default="pagado")
     observacion      = Column(String, nullable=True)
+    despachado_por   = Column(String, nullable=True)  # 'vendedor' | 'despachador' | null
 
 
 class PagoVenta(Base):

@@ -470,6 +470,12 @@ def inicializar_datos():
              "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS saldo_a_favor FLOAT DEFAULT 0"],
         )
 
+        # ── ventas: despacho ──────────────────────────────────────────────────
+        migrar(
+            ["ALTER TABLE ventas ADD COLUMN despachado_por TEXT"],
+            ["ALTER TABLE ventas ADD COLUMN IF NOT EXISTS despachado_por TEXT"],
+        )
+
         # ── marcas ───────────────────────────────────────────────────────────
         migrar(
             ["""CREATE TABLE IF NOT EXISTS marcas (
