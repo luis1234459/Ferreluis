@@ -1056,6 +1056,48 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal despacho: quién retira la venta -->
+  <div v-if="mostrarModalDespacho" class="cobro-modal-overlay">
+    <div class="modal-despacho">
+      <h2>¿Quién despacha esta venta?</h2>
+      <p class="venta-info">
+        Venta #{{ ventaRecienCerrada?.venta_id }} ·
+        {{ ventaRecienCerrada?.total_items }} productos
+      </p>
+
+      <div class="opciones-despacho">
+        <button class="btn-vendedor" @click="despachaVendedor">
+          <span class="icono">🧑‍🔧</span>
+          <span class="label">Vendedor</span>
+          <span class="sublabel">Entrega directa desde tienda</span>
+        </button>
+        <button class="btn-despachador" @click="despachaDespachador">
+          <span class="icono">📦</span>
+          <span class="label">Despachador</span>
+          <span class="sublabel">Retiro desde depósito · imprime orden</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal despacho: preguntar si imprime (solo cuando despacha el vendedor) -->
+  <div v-if="mostrarModalImprimir" class="cobro-modal-overlay">
+    <div class="modal-despacho">
+      <h2>¿Imprimir orden de despacho?</h2>
+      <p class="venta-info">
+        Útil como lista de picking para buscar productos en depósito
+      </p>
+      <div class="opciones-despacho horizontal">
+        <button class="btn-no" @click="cerrarSinImprimir">
+          No, gracias
+        </button>
+        <button class="btn-si" @click="imprimirOrden">
+          🖨 Sí, imprimir
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -1203,6 +1245,11 @@ export default {
       modalGarantia:       false,
       itemsGarantia:       [],
       garantiasPendientes: [],  // se llena al confirmar el modal
+
+      // Modal despacho (post-cierre de venta)
+      mostrarModalDespacho: false,
+      mostrarModalImprimir: false,
+      ventaRecienCerrada:   null,   // { venta_id, total_items }
 
       // Modal modo venta (unidad vs paquete)
       modoVentaModal:    false,
@@ -2051,14 +2098,11 @@ export default {
         const snapshotTotalBs = this.subtotalUSD * (this.tasaBcv || 1)
         const snapshotVentaId = res.data.venta_id
 
-
-        this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
-        this.observacion = ''
-        this.clienteSeleccionado = null; this.nuevoMonto = ''
-        this.garantiasPendientes = []; this.itemsGarantia = []
-
-        setTimeout(() => { this.exitoso = false }, 5000)
-        await this.cargarProductos()
+        // Capturar datos de despacho ANTES de limpiar el carrito
+        this.ventaRecienCerrada = {
+          venta_id:    res.data.venta_id,
+          total_items: this.carrito.length,
+        }
 
         if (accion === 'whatsapp') {
           const nombre  = snapshotCliente ? snapshotCliente.nombre : 'Consumidor Final'
@@ -2093,11 +2137,71 @@ export default {
           this.notaImpresion = null
         }
 
+        this.mostrarModalDespacho = true
+        // El reset del carrito y el refresco de productos se disparan al
+        // cerrar el flujo de despacho, desde _resetearDespuesDeCobrar()
+
       } catch (e) {
         this.error = e?.response?.data?.detail || 'Error al registrar la venta'
       } finally {
         this.cargando = false
       }
+    },
+
+    _resetearDespuesDeCobrar() {
+      this.carrito = []; this.pagos = []; this.descuentoGlobal = 0
+      this.observacion = ''
+      this.clienteSeleccionado = null; this.nuevoMonto = ''
+      this.garantiasPendientes = []; this.itemsGarantia = []
+      this.ventaRecienCerrada = null
+
+      setTimeout(() => { this.exitoso = false }, 5000)
+      this.cargarProductos()
+    },
+
+    async despachaVendedor() {
+      await this._marcarDespacho('vendedor')
+      this.mostrarModalDespacho = false
+      this.mostrarModalImprimir = true
+    },
+
+    async despachaDespachador() {
+      await this._marcarDespacho('despachador')
+      this.mostrarModalDespacho = false
+      this._imprimirYCerrar()
+    },
+
+    async _marcarDespacho(tipo) {
+      try {
+        await axios.patch(
+          `/ventas/${this.ventaRecienCerrada.venta_id}/despacho`,
+          { despachado_por: tipo }
+        )
+      } catch (e) {
+        console.error('Error marcando despacho:', e)
+        // No bloqueamos el flujo si falla, la venta ya está cerrada
+      }
+    },
+
+    imprimirOrden() {
+      this._imprimirYCerrar()
+    },
+
+    _imprimirYCerrar() {
+      const url = `/orden-despacho/${this.ventaRecienCerrada.venta_id}`
+      const win = window.open(url, '_blank', 'width=400,height=700')
+      if (win) {
+        win.onload = () => {
+          setTimeout(() => win.print(), 500)
+        }
+      }
+      this.mostrarModalImprimir = false
+      this._resetearDespuesDeCobrar()
+    },
+
+    cerrarSinImprimir() {
+      this.mostrarModalImprimir = false
+      this._resetearDespuesDeCobrar()
     },
 
     formatMonto(valor, moneda) {
@@ -3123,4 +3227,101 @@ export default {
 .chuito-flotante-burbuja-v { font-weight: 700; padding: 0.3rem 0.6rem; border-radius: 10px; margin-top: 0.3rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .aviso-overlay-ventas { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
 .aviso-card-ventas { background: #1A1A1A; border-radius: 20px; width: 100%; max-width: 400px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.5); animation: entradaAvisoV 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); border: 1px solid #333; margin: 1rem; }
+
+/* ── Modal despacho ── */
+.modal-despacho {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.modal-despacho h2 {
+  color: #1A1A1A;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.venta-info {
+  color: #666;
+  text-align: center;
+  font-size: 0.9rem;
+  margin: 0 0 1.5rem 0;
+}
+
+.opciones-despacho {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.opciones-despacho.horizontal {
+  flex-direction: row;
+}
+
+.opciones-despacho button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.2rem;
+  border: 2px solid #E5E5E5;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.opciones-despacho.horizontal button {
+  flex: 1;
+  padding: 1rem;
+}
+
+.opciones-despacho button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+.btn-vendedor:hover {
+  border-color: #FFCC00;
+  background: #FFFBEB;
+}
+
+.btn-despachador:hover {
+  border-color: #16A34A;
+  background: #F0FDF4;
+}
+
+.btn-si:hover {
+  border-color: #16A34A;
+  background: #16A34A;
+  color: #fff;
+}
+
+.btn-no:hover {
+  border-color: #DC2626;
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.opciones-despacho .icono {
+  font-size: 2rem;
+  margin-bottom: 0.3rem;
+}
+
+.opciones-despacho .label {
+  font-weight: 700;
+  color: #1A1A1A;
+  font-size: 1rem;
+}
+
+.opciones-despacho .sublabel {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 0.3rem;
+  text-align: center;
+}
 </style>
