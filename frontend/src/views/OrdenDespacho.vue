@@ -109,7 +109,7 @@ export default {
 
 <style scoped>
 .orden-despacho {
-  width: 76mm;
+  width: 80mm;
   padding: 3mm;
   font-family: 'Courier New', monospace;
   font-size: 10pt;
@@ -193,7 +193,7 @@ export default {
 
 @media print {
   @page {
-    size: 76mm auto;
+    size: 80mm auto;
     margin: 0;
   }
   body {
@@ -201,6 +201,11 @@ export default {
   }
   .orden-despacho {
     padding: 2mm;
+  }
+  .orden-despacho::after {
+    content: "";
+    display: block;
+    height: 15mm;
   }
 }
 </style>
