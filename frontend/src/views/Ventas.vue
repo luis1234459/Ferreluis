@@ -1459,6 +1459,22 @@ export default {
     clearInterval(this._timerHora)
     clearInterval(this._burbujaVTimer)
     window.removeEventListener('popstate', this._onPopState)
+
+    // Si el componente se destruye con el modal de despacho abierto
+    // (cierre de pestaña, logout, etc.), asegurar reset del carrito.
+    // La venta ya está guardada en BD; solo queda sin despachado_por.
+    if (this.mostrarModalDespacho || this.mostrarModalImprimir) {
+      this._resetearDespuesDeCobrar()
+    }
+  },
+  beforeRouteLeave(to, from, next) {
+    if (this.mostrarModalDespacho || this.mostrarModalImprimir) {
+      // Modal de despacho abierto: resetear en silencio antes de salir
+      this._resetearDespuesDeCobrar()
+      this.mostrarModalDespacho = false
+      this.mostrarModalImprimir = false
+    }
+    next()
   },
   async mounted() {
     history.pushState(null, '', window.location.href)
