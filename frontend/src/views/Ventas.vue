@@ -1454,6 +1454,21 @@ export default {
       clearTimeout(this._busquedaTimer)
       this._busquedaTimer = setTimeout(() => this.cargarProductos(), 400)
     },
+    monedaVenta(nuevo) {
+      // BCV_DIRECT: si se cambia la moneda de liquidación directamente
+      // (botones USD/Bs, sin pasar por cambiarTipoPrecio), resincronizar
+      // el precio de esos ítems. MARKET_FACTOR no se toca — la identidad
+      // referencial × tasa_bcv ya funciona igual sin importar la moneda.
+      this.carrito.forEach(item => {
+        if (item.precio_libre) return   // no pisar un precio editado a mano
+        if (item.pricing_policy !== 'BCV_DIRECT') return
+        const precio = nuevo === 'USD' && item.precio_divisa_usd
+          ? Number(item.precio_divisa_usd)
+          : Number(item.precio_referencial_usd || 0)
+        item.precio_original = precio
+        item.precio_unitario = precio
+      })
+    },
   },
   beforeUnmount() {
     clearInterval(this._timerHora)
@@ -1679,12 +1694,18 @@ export default {
       const precioBase = variante
         ? Number(variante.precio_base_usd        ?? p.precio_base_usd        ?? 0)
         : Number(p.precio_base_usd        ?? 0)
-      // Para BCV_DIRECT usar precio_divisa_usd como precio referencial
-      const precioRef = p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd
+      // Valor referencial "crudo" (el que calcula el backend) — se conserva
+      // siempre en el carrito sin sustituir, para que precio_bs = ref × BCV
+      // se pueda recalcular correctamente si cambia moneda/tier más adelante.
+      const refCrudo = variante
+        ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
+        : Number(p.precio_referencial_usd ?? 0)
+      // BCV_DIRECT: el monto a cobrar en la ventana "referencial" depende de
+      // en qué moneda se liquida — USD cobra precio_divisa (descuento por
+      // pago en dólar real), Bs cobra el referencial completo (× tasa BCV).
+      const precioRef = p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd && this.monedaVenta === 'USD'
         ? Number(p.precio_divisa_usd)
-        : variante
-          ? Number(variante.precio_referencial_usd ?? p.precio_referencial_usd ?? 0)
-          : Number(p.precio_referencial_usd ?? 0)
+        : refCrudo
 
       let precio = this.tipoPrecio === 'base' ? precioBase : precioRef
       let nombrePaquete = ''
@@ -1713,7 +1734,7 @@ export default {
         stock:                  variante?.stock  ?? p.stock,
         costo_usd:              variante?.costo_efectivo ?? p.costo_usd,
         precio_base_usd:        esPaquete ? precio : precioBase,
-        precio_referencial_usd: esPaquete ? precio : precioRef,
+        precio_referencial_usd: esPaquete ? precio : refCrudo,
         cantidad:               1,
         precio_original:        precio,
         precio_unitario:        precio,
@@ -1739,7 +1760,7 @@ export default {
     },
     precioRefProducto(p) {
       if (!p) return 0
-      return p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd
+      return p.pricing_policy === 'BCV_DIRECT' && p.precio_divisa_usd && this.monedaVenta === 'USD'
         ? Number(p.precio_divisa_usd)
         : Number(p.precio_referencial_usd ?? 0)
     },
