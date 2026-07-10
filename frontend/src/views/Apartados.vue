@@ -255,9 +255,9 @@ export default {
 .apt-lista { display: flex; flex-direction: column; gap: 1rem; }
 .apt-card { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; }
 
-.apt-card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: var(--fondo-sidebar); border-bottom: 1px solid var(--borde); }
+.apt-card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: #1A1A1A; border-bottom: 1px solid var(--borde); }
 .apt-header-izq { display: flex; align-items: center; gap: 0.6rem; }
-.apt-numero { font-weight: 800; font-size: 0.95rem; color: var(--texto-principal); }
+.apt-numero { font-weight: 800; font-size: 0.95rem; color: #FFCC00; }
 .apt-estado-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px; }
 .estado-activo { background: #DBEAFE; color: #1E40AF; }
 .estado-pagado { background: #DCFCE7; color: #15803D; }

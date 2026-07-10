@@ -1431,25 +1431,25 @@ export default {
 .metodo-resumen-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 0.6rem 0.9rem; border-radius: 8px; margin-bottom: 0.5rem;
-  background: var(--fondo-sidebar); border: 1px solid var(--borde);
+  background: #1A1A1A; border: 1px solid var(--borde);
 }
 .metodo-resumen-info    { display: flex; flex-direction: column; gap: 0.1rem; }
-.metodo-resumen-label   { font-weight: 600; font-size: 0.88rem; color: var(--texto-principal); }
+.metodo-resumen-label   { font-weight: 600; font-size: 0.88rem; color: #FFFFFF; }
 .metodo-resumen-cuenta  { font-size: 0.76rem; color: var(--texto-muted); }
 .metodo-resumen-montos  { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
-.metodo-resumen-orig    { font-size: 0.95rem; font-weight: 700; color: var(--texto-principal); }
+.metodo-resumen-orig    { font-size: 0.95rem; font-weight: 700; color: #FFCC00; }
 .metodo-resumen-usd     { font-size: 0.78rem; color: #16A34A; }
 .metodo-resumen-cant    { font-size: 0.75rem; color: var(--texto-muted); }
 
 .vendedor-resumen-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 0.6rem 0.9rem; border-radius: 8px; margin-bottom: 0.5rem;
-  background: var(--fondo-sidebar); border: 1px solid var(--borde);
+  background: #1A1A1A; border: 1px solid var(--borde);
 }
-.vendedor-resumen-nombre { font-weight: 600; font-size: 0.88rem; color: var(--texto-principal); }
+.vendedor-resumen-nombre { font-weight: 600; font-size: 0.88rem; color: #FFFFFF; }
 .vendedor-resumen-stats  { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
 .vendedor-resumen-ventas { font-size: 0.78rem; color: var(--texto-muted); }
-.vendedor-resumen-usd    { font-size: 0.95rem; font-weight: 700; }
+.vendedor-resumen-usd    { font-size: 0.95rem; font-weight: 700; color: #FFCC00; }
 
 .fila-precio-libre td  { background: #FFFDF0; }
 .badge-precio-libre    { font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7; cursor: default; }
@@ -1510,9 +1510,9 @@ export default {
 .panel-cerrar { background: transparent; border: 1px solid var(--borde); border-radius: 6px; padding: 0.2rem 0.6rem; cursor: pointer; font-size: 0.9rem; color: var(--texto-sec); flex-shrink: 0; }
 .panel-cerrar:hover { background: var(--fondo-sidebar); }
 .panel-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
-.panel-kpi { background: var(--fondo-sidebar); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--borde); display: flex; flex-direction: column; gap: 0.2rem; }
+.panel-kpi { background: #1A1A1A; border-radius: 8px; padding: 0.75rem; border: 1px solid var(--borde); display: flex; flex-direction: column; gap: 0.2rem; }
 .panel-kpi-label { font-size: 0.7rem; color: var(--texto-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.04em; }
-.panel-kpi-valor { font-size: 1.2rem; font-weight: 700; color: var(--texto-principal); }
+.panel-kpi-valor { font-size: 1.2rem; font-weight: 700; color: #FFCC00; }
 .panel-costos { display: flex; gap: 0; margin-bottom: 1.25rem; border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
 .panel-costo-item { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; align-items: center; padding: 0.75rem 0.5rem; border-right: 1px solid var(--borde); }
 .panel-costo-item:last-child { border-right: none; }
