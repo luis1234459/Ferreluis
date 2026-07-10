@@ -249,8 +249,8 @@ export default {
 
 <style scoped>
 .apt-filtros { display: flex; gap: 0.4rem; }
-.btn-filtro { background: var(--fondo-sidebar); border: 1px solid var(--borde); border-radius: 6px; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.82rem; color: var(--texto-sec); }
-.btn-filtro.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-filtro { background: #1A1A1A; border: 1px solid var(--borde); border-radius: 6px; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.82rem; color: #FFFFFF; }
+.btn-filtro.activo { background: #FFCC00; color: #1A1A1A; border-color: #FFCC00; }
 
 .apt-lista { display: flex; flex-direction: column; gap: 1rem; }
 .apt-card { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; }

@@ -2224,13 +2224,13 @@ export default {
 <style scoped>
 /* ── Top bar ── */
 .top-acciones { display: flex; gap: 0.6rem; align-items: center; }
-.btn-deptos   { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; }
+.btn-deptos   { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; }
 .btn-deptos:hover { border-color: var(--amarillo); }
 .btn-gen-codigos { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 700; }
 .btn-gen-codigos:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-gen-codigos:not(:disabled):hover { background: #333; }
-.btn-importar { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.88rem; text-decoration: none; }
-.btn-importar:hover { border-color: var(--amarillo); color: var(--texto-principal); }
+.btn-importar { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.88rem; text-decoration: none; }
+.btn-importar:hover { border-color: var(--amarillo); color: #FFCC00; }
 
 /* ── Tasas bar ── */
 .tasas-bar {
@@ -2282,8 +2282,8 @@ export default {
 .input-prefijo:focus { box-shadow: 0 0 0 2px #6366F133 !important; }
 
 /* ── Toggle inactivos y estado ── */
-.btn-toggle-inactivos { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
-.btn-toggle-inactivos.activo { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.btn-toggle-inactivos { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.btn-toggle-inactivos.activo { background: #FFCC00; color: #1A1A1A; border-color: #FFCC00; }
 .btn-eliminar-stock0 { background: #DC26261A; color: #DC2626; border: 1px solid #DC2626; padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
 .btn-eliminar-stock0:hover { background: #DC2626; color: #fff; }
 .btn-desactivar { background: #DC26261A; color: #DC2626; border: 1px solid #DC2626; padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }

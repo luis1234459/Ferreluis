@@ -2748,7 +2748,8 @@ export default {
 .btn-apartar:hover { background: #BFDBFE; }
 .input-apt { border: 1px solid var(--borde); border-radius: 6px; padding: 0.5rem 0.65rem; font-size: 0.875rem; width: 100%; box-sizing: border-box; background: var(--fondo-app, #fff); color: var(--texto-principal); }
 .input-apt:focus { outline: none; border-color: #FFCC00; }
-.apt-resumen-carrito { background: var(--fondo-sidebar); border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; font-size: 0.85rem; }
+.apt-resumen-carrito { background: #1A1A1A; border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #FFFFFF; }
+.apt-resumen-carrito strong { color: #FFCC00; }
 .btn-guardar-presupuesto {
   width: 100%;
   padding: 0.6rem;

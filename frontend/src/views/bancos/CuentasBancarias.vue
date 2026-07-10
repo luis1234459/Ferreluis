@@ -248,7 +248,7 @@ export default {
 .cuenta-banco { color: var(--texto-muted); font-size: 0.82rem; margin: 0 0 0.75rem; }
 .cuenta-saldo { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.75rem; }
 .cuenta-acciones { display: flex; gap: 0.5rem; }
-.btn-movs { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; }
+.btn-movs { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; }
 .btn-movs:hover { border-color: var(--amarillo); }
 .btn-edit  { background: var(--info); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; }
 

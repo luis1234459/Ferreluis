@@ -647,7 +647,7 @@ export default {
 
 <style scoped>
 .acciones { display: flex; gap: 0.35rem; }
-.btn-ver    { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.btn-ver    { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
 .btn-editar { background: var(--info); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
 .btn-aprobar{ background: var(--success); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
 .btn-anular { background: var(--danger); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }

@@ -485,7 +485,7 @@ export default {
 .sin-deuda td { opacity: 0.45; }
 .btn-pagar    { background: var(--success); color: white; border: none; padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; margin-right: 0.3rem; }
 .btn-pagar:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-historial{ background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.btn-historial{ background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
 
 .deuda-info { color: var(--texto-sec); font-size: 0.9rem; margin-bottom: 1rem; }
 .btn-confirmar { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 600; }

@@ -1303,8 +1303,8 @@ export default {
 .fecha-preview { display: block; color: #16A34A; font-size: 0.75rem; margin-top: 0.25rem; font-weight: 600; }
 .btn-filtrar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; font-weight: 600; }
 .btn-limpiar  { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.45rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
-.btn-rapido   { background: var(--fondo-sidebar); color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; align-self: flex-end; }
-.btn-rapido:hover { color: var(--texto-principal); }
+.btn-rapido   { background: #1A1A1A; color: #FFFFFF; border: 1px solid var(--borde); padding: 0.45rem 0.7rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; align-self: flex-end; }
+.btn-rapido:hover { background: #333; }
 .btn-exportar { margin-left: auto; background: transparent; color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
 .btn-exportar:hover { background: var(--fondo-sidebar); }
 .ejecutivo-wrap { display: flex; gap: 0.4rem; align-items: center; }
@@ -1345,10 +1345,13 @@ export default {
 .pareto-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 700px; }
 .pareto-card { border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid var(--borde); }
 .pareto-clave { background: #FFCC0015; border-color: #FFCC0066; }
-.pareto-resto { background: var(--fondo-sidebar); }
+.pareto-resto { background: #1A1A1A; }
 .pareto-titulo { color: var(--texto-sec); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem; }
 .pareto-cant   { color: var(--texto-sec); font-size: 0.85rem; margin: 0; }
 .pareto-usd    { color: var(--texto-principal); font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0; }
+.pareto-resto .pareto-titulo,
+.pareto-resto .pareto-cant { color: #FFFFFF; opacity: 0.6; }
+.pareto-resto .pareto-usd  { color: #FFCC00; }
 .pareto-pct    { color: var(--texto-sec); font-size: 0.82rem; margin: 0; }
 
 /* Inventario */
