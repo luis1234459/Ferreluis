@@ -29,6 +29,7 @@
             <template v-if="esAdmin">
               <span>Binance: <strong class="txt-yellow">{{ tasaBinance ? tasaBinance.toFixed(2) : '...' }}</strong></span>
               <span>Factor: <strong class="txt-green">{{ factor ? factor.toFixed(4) : '...' }}</strong></span>
+              <span v-if="descuentoBcv > 0">Descuento a BCV: <strong>-{{ descuentoBcv }}%</strong></span>
             </template>
             <template v-else>
               <span class="tasa-oculta">
@@ -38,6 +39,10 @@
               <span class="tasa-oculta">
                 <span class="tasa-letra txt-green">F</span>
                 <span class="tasa-valor">Factor: <strong class="txt-green">{{ factor ? factor.toFixed(4) : '...' }}</strong></span>
+              </span>
+              <span class="tasa-oculta" v-if="descuentoBcv > 0">
+                <span class="tasa-letra">D</span>
+                <span class="tasa-valor">Descuento a BCV: <strong>-{{ descuentoBcv }}%</strong></span>
               </span>
             </template>
           </div>
@@ -1301,6 +1306,10 @@ export default {
       if (this.tabActivo === 'clientes') return 'Clientes'
       if (this.tabActivo === 'historial') return 'Historial del Día'
       return 'Nueva Venta'
+    },
+    descuentoBcv() {
+      if (!this.tasaBcv || !this.tasaBinance || this.tasaBcv >= this.tasaBinance) return 0
+      return Math.round((1 - this.tasaBcv / this.tasaBinance) * 100)
     },
     productosFiltrados() {
       const q = this.busqueda.trim().toLowerCase()
