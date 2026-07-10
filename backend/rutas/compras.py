@@ -16,8 +16,10 @@ from database import get_db
 from models import (
     Proveedor, CatalogoProveedor, OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion, Producto, VarianteProducto,
+    Venta, DetalleVenta,
 )
 from rutas.usuarios import require_admin
+from rutas.productos import listar_productos as _listar_productos_completo
 from typing import Optional
 from datetime import datetime, date, timedelta
 
@@ -853,4 +855,72 @@ def variaciones_precio(db: Session = Depends(get_db), _: None = Depends(require_
                 ((d.precio_unitario_real_usd - (d.costo_anterior or 0)) / (d.costo_anterior or 1)) * 100, 1
             ),
         })
+    return resultado
+
+
+# ---------------------------------------------------------------------------
+# CATÁLOGO ENRIQUECIDO PARA "Nueva orden a proveedor"
+# Reusa el listado completo de /productos/ (mismos campos de siempre) y le
+# agrega, por producto: costo/fecha/cantidad de la última recepción real
+# (no devuelta) y unidades vendidas desde esa fecha. Endpoint separado para
+# no penalizar con estas queries extra al resto de las pantallas que usan
+# /productos/ (Ventas, Inventario, Reportes, etc.).
+# ---------------------------------------------------------------------------
+
+@router.get("/catalogo-costos")
+def catalogo_costos(db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    resultado = _listar_productos_completo(
+        incluir_inactivos=False, skip=0, limit=1_000_000, db=db
+    )
+    productos = resultado["productos"]
+
+    # ── Última recepción no devuelta por producto ────────────────────────
+    filas_recepcion = (
+        db.query(DetalleRecepcion.producto_id, DetalleRecepcion.cantidad_recibida,
+                  DetalleRecepcion.precio_unitario_real_usd, RecepcionCompra.fecha_recepcion)
+        .join(RecepcionCompra, RecepcionCompra.id == DetalleRecepcion.recepcion_id)
+        .filter(RecepcionCompra.devuelta == False)
+        .all()
+    )
+    ultima_recepcion: dict = {}
+    for producto_id, cantidad, precio, fecha in filas_recepcion:
+        if producto_id is None or fecha is None:
+            continue
+        actual = ultima_recepcion.get(producto_id)
+        if actual is None or fecha > actual["fecha"]:
+            ultima_recepcion[producto_id] = {
+                "costo":    float(precio or 0),
+                "fecha":    fecha,
+                "cantidad": cantidad,
+            }
+
+    # ── Ventas no anuladas por producto (se filtran por fecha en Python,
+    #    ya que la fecha de corte varía según el producto) ────────────────
+    filas_venta = (
+        db.query(DetalleVenta.producto_id, DetalleVenta.cantidad, Venta.fecha)
+        .join(Venta, Venta.id == DetalleVenta.venta_id)
+        .filter(Venta.estado != 'anulada')
+        .all()
+    )
+    ventas_por_producto: dict = {}
+    for producto_id, cantidad, fecha in filas_venta:
+        ventas_por_producto.setdefault(producto_id, []).append((fecha, float(cantidad or 0)))
+
+    for p in productos:
+        rec = ultima_recepcion.get(p["id"])
+        if rec:
+            p["ultimo_costo_usd"]      = round(rec["costo"], 4)
+            p["ultimo_costo_fecha"]    = rec["fecha"].date().isoformat()
+            p["ultimo_costo_cantidad"] = int(rec["cantidad"] or 0)
+            vendidas = sum(
+                cant for fecha, cant in ventas_por_producto.get(p["id"], [])
+                if fecha > rec["fecha"]
+            )
+            p["vendidas_desde_ultimo_costo"] = int(vendidas)
+        else:
+            p["ultimo_costo_usd"]            = None
+            p["ultimo_costo_fecha"]          = None
+            p["ultimo_costo_cantidad"]       = None
+            p["vendidas_desde_ultimo_costo"] = 0
+
     return resultado

@@ -182,16 +182,20 @@
                   <div v-for="op in opcionesFiltradas" :key="op.key" class="oc-prod-item"
                     :class="{ 'oc-prod-en-orden': productoEnOrden(op.key) }">
                     <div class="oc-prod-info">
-                      <div class="oc-prod-nombre">{{ op.label }}</div>
-                      <div class="oc-prod-meta">
-                        <span v-if="op.departamento_id">{{ deptoNombre(op.departamento_id) }}</span>
-                        <span v-if="op.categoria_id"> > {{ catNombre(op) }}</span>
-                        <span v-if="op.marca_id"> · {{ marcaNombre(op.marca_id) }}</span>
+                      <div class="oc-prod-nombre-row">
+                        <span class="oc-prod-nombre">{{ op.label }}</span>
+                        <span class="oc-prod-precio">${{ op.costo.toFixed(2) }}</span>
                       </div>
-                    </div>
-                    <div class="oc-prod-nums">
-                      <span class="oc-prod-costo">${{ op.costo.toFixed(2) }}</span>
-                      <span class="oc-prod-stock" :class="{ 'oc-stock-bajo': op.stock < 5 }">stk: {{ op.stock }}</span>
+                      <div class="oc-prod-datos" v-if="op.ultimoCostoUsd != null">
+                        Costo: ${{ op.ultimoCostoUsd.toFixed(2) }} ({{ formatFechaCorta(op.ultimoCostoFecha) }} · {{ op.ultimoCostoCantidad }}u)
+                        | Venta: ${{ Number(op.ventaPrecio || 0).toFixed(2) }}
+                        | Margen: {{ op.margenPct !== null ? op.margenPct + '%' : '—' }}
+                        | Vendidas: {{ op.vendidas || 0 }}
+                        | Stock: <span :class="{ 'oc-stock-bajo': op.stock < 5 }">{{ op.stock }}</span>
+                      </div>
+                      <div class="oc-prod-datos oc-prod-sin-compras" v-else>
+                        Sin compras previas | Stock: <span :class="{ 'oc-stock-bajo': op.stock < 5 }">{{ op.stock }}</span>
+                      </div>
                     </div>
                     <button v-if="!productoEnOrden(op.key)" class="oc-btn-add" @click="agregarDesdeCatalogo(op)">+</button>
                     <span v-else class="oc-ya-agregado">
@@ -220,7 +224,7 @@
                 <div class="oc-orden-items">
                   <div v-for="(linea, i) in form.detalles" :key="i" class="oc-orden-item">
                     <div class="oc-item-nombre">
-                      <span v-if="linea._key">{{ linea.nombre_producto }}</span>
+                      <span v-if="linea._key" :title="linea.nombre_producto">{{ linea.nombre_producto }}</span>
                       <input v-else v-model="linea.nombre_producto" placeholder="Nombre producto nuevo"
                         class="oc-input-nombre" />
                       <span v-if="linea.es_producto_nuevo" class="tag-nuevo">NUEVO</span>
@@ -327,6 +331,19 @@ export default {
     opcionesProductos() {
       const lista = []
       for (const p of this.productosRaw) {
+        const ventaPrecio = p.precio_referencial_usd ?? null
+        const ultimoCostoUsd = p.ultimo_costo_usd ?? null
+        const margenPct = (ultimoCostoUsd != null && ventaPrecio)
+          ? Math.round(((ventaPrecio - ultimoCostoUsd) / ventaPrecio) * 100)
+          : null
+        const datosCompra = {
+          ventaPrecio,
+          ultimoCostoUsd,
+          ultimoCostoFecha:    p.ultimo_costo_fecha ?? null,
+          ultimoCostoCantidad: p.ultimo_costo_cantidad ?? null,
+          vendidas:            p.vendidas_desde_ultimo_costo || 0,
+          margenPct,
+        }
         const variantes = (p.variantes_resumen || []).filter(v => v.activo)
         if (variantes.length > 0) {
           for (const v of variantes) {
@@ -348,6 +365,7 @@ export default {
               costo,
               stock:          v.stock || 0,
               stock_label:    v.stock < 5 ? ` · ⚠ stock:${v.stock}` : ` · stock:${v.stock}`,
+              ...datosCompra,
             })
           }
         } else {
@@ -364,6 +382,7 @@ export default {
             costo:          p.costo_usd || 0,
             stock:          p.stock || 0,
             stock_label:    (p.stock || 0) < 5 ? ` · ⚠ stock:${p.stock}` : ` · stock:${p.stock}`,
+            ...datosCompra,
           })
         }
       }
@@ -410,7 +429,7 @@ export default {
       this.proveedores = res.data
     },
     async cargarInventario() {
-      const res = await axios.get('/productos/', { params: { limit: 9999, incluir_inactivos: false } })
+      const res = await axios.get('/compras/catalogo-costos')
       this.productosRaw = Array.isArray(res.data) ? res.data : (res.data.productos || [])
     },
     async cargarDepartamentos() {
@@ -486,22 +505,11 @@ export default {
     productoEnOrden(key) {
       return this.form.detalles.some(d => d._key === key && d._key !== '')
     },
-    deptoNombre(id) {
-      const d = this.departamentos.find(x => x.id === id)
-      return d ? d.nombre : ''
-    },
-    catNombre(op) {
-      if (!op.categoria_id) return ''
-      const d = this.departamentos.find(x => x.id === op.departamento_id)
-      if (!d) return ''
-      // buscar en departamentos-con-categorias si disponible
-      const cats = d.categorias || []
-      const c = cats.find(x => x.id === op.categoria_id)
-      return c ? c.nombre : ''
-    },
-    marcaNombre(id) {
-      const m = this.marcas.find(x => x.id === id)
-      return m ? m.nombre : ''
+    formatFechaCorta(iso) {
+      if (!iso) return ''
+      const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+      const [, m, d] = iso.split('-').map(Number)
+      return `${String(d).padStart(2, '0')}-${meses[m - 1]}`
     },
     quitarLinea(i) { this.form.detalles.splice(i, 1) },
     llenarDesdeInventario(linea) {
@@ -753,7 +761,7 @@ export default {
 .btn-whatsapp:disabled { opacity: 0.4; cursor: not-allowed; }
 .sel-inline { max-width: 120px; font-size: 0.8rem; height: 30px; }
 /* ── Nuevo diseño: Orden a proveedor (dos paneles) ────────────────── */
-.modal-catalogo { max-width: 1200px !important; width: 98vw; }
+.modal-catalogo { max-width: 1400px !important; width: 92vw !important; }
 .oc-prov-bar { padding: 0 1.25rem 0.5rem; display: flex; align-items: center; gap: 8px; }
 .oc-prov-bar label { font-size: 0.82rem; color: var(--texto-sec); white-space: nowrap; }
 .oc-prov-bar select { flex: 1; }
@@ -770,12 +778,12 @@ export default {
 .oc-prod-item:hover { background: var(--fondo-hover, rgba(255,204,0,0.03)); }
 .oc-prod-en-orden { opacity: 0.5; }
 .oc-prod-info { flex: 1; min-width: 0; }
-.oc-prod-nombre { font-size: 0.82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.oc-prod-meta { font-size: 0.72rem; color: var(--texto-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.oc-prod-nums { text-align: right; min-width: 50px; }
-.oc-prod-costo { display: block; font-size: 0.78rem; color: var(--texto-sec); }
-.oc-prod-stock { display: block; font-size: 0.72rem; color: var(--texto-sec); }
-.oc-stock-bajo { color: #DC2626 !important; }
+.oc-prod-nombre-row { display: flex; align-items: baseline; gap: 8px; }
+.oc-prod-nombre { min-width: 0; flex: 1; font-size: 0.82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-prod-precio { flex-shrink: 0; font-size: 0.82rem; font-weight: 600; color: var(--texto-sec); }
+.oc-prod-datos { font-size: 0.72rem; color: var(--texto-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.oc-prod-sin-compras { color: var(--texto-muted); font-style: italic; }
+.oc-stock-bajo { color: #DC2626 !important; font-weight: 700; }
 .oc-btn-add { background: #FFCC00; color: #1A1A1A; border: none; border-radius: 6px; width: 26px; height: 26px; font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
 .oc-btn-add:hover { background: #FFD700; }
 .oc-ya-agregado { color: #16A34A; font-size: 15px; width: 26px; text-align: center; flex-shrink: 0; }
@@ -783,7 +791,7 @@ export default {
 .oc-crear-nuevo { padding: 10px 0; text-align: center; color: #FFCC00; font-size: 0.8rem; cursor: pointer; border-top: 1px dashed var(--borde); margin-top: 4px; }
 .oc-crear-nuevo:hover { text-decoration: underline; }
 /* Panel derecho: orden */
-.oc-orden { width: 350px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
+.oc-orden { width: 400px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
 .oc-orden-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.88rem; font-weight: 500; border-bottom: 0.5px solid var(--borde); }
 .oc-orden-items { flex: 1; overflow-y: auto; padding: 4px 12px; }
 .oc-orden-item { padding: 8px 0; border-bottom: 0.5px solid var(--borde); }
