@@ -4,7 +4,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias, admin, notificaciones, export
+from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias, admin, notificaciones, export, reposicion
 from database import engine, SessionLocal
 from database import Base
 from config import ENVIRONMENT
@@ -60,6 +60,7 @@ app.include_router(garantias.router)
 app.include_router(admin.router)
 app.include_router(notificaciones.router)
 app.include_router(export.router)
+app.include_router(reposicion.router)
 
 from rutas import marcas as _marcas_mod
 app.include_router(_marcas_mod.router, prefix="/marcas")

@@ -16,7 +16,7 @@ from database import get_db
 from models import (
     Proveedor, CatalogoProveedor, OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion, Producto, VarianteProducto,
-    Venta, DetalleVenta,
+    Venta, DetalleVenta, ProductoProveedor,
 )
 from rutas.usuarios import require_admin
 from rutas.productos import listar_productos as _listar_productos_completo
@@ -135,6 +135,8 @@ def crear_proveedor(datos: dict, db: Session = Depends(get_db), _: None = Depend
         direccion      = datos.get("direccion"),
         contacto       = datos.get("contacto"),
         dias_credito   = int(datos.get("dias_credito", 0) or 0),
+        lead_time_dias_default = int(datos.get("lead_time_dias_default", 0) or 0),
+        notas          = datos.get("notas"),
         activo         = True,
         fecha_registro = datetime.now(),
     )
@@ -158,6 +160,10 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
             setattr(p, k, datos[k])
     if "dias_credito" in datos:
         p.dias_credito = int(datos["dias_credito"] or 0)
+    if "lead_time_dias_default" in datos:
+        p.lead_time_dias_default = int(datos["lead_time_dias_default"] or 0)
+    if "notas" in datos:
+        p.notas = datos["notas"]
     if "pricing_policy" in datos:
         policy = datos["pricing_policy"]
         if policy in ("MARKET_FACTOR", "BCV_DIRECT"):
@@ -615,6 +621,17 @@ def registrar_recepcion(orden_id: int, datos: dict, db: Session = Depends(get_db
                 costo_anterior     = float(producto.costo_usd or 0)
                 producto.costo_usd = precio_real
                 actualizo_costo    = True
+
+            # Ficha de reposición: recibir mercancía de este proveedor demuestra
+            # que sí tiene stock — se baja la bandera sola, sin que el
+            # comprador tenga que acordarse.
+            pp = db.query(ProductoProveedor).filter(
+                ProductoProveedor.producto_id == prod_id,
+                ProductoProveedor.proveedor_id == orden.proveedor_id,
+            ).first()
+            if pp and pp.sin_stock_declarado:
+                pp.sin_stock_declarado = False
+                pp.sin_stock_fecha     = None
 
         dr = DetalleRecepcion(
             recepcion_id             = recepcion.id,
