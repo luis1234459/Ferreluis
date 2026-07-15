@@ -476,6 +476,76 @@ def inicializar_datos():
             ["ALTER TABLE ventas ADD COLUMN IF NOT EXISTS despachado_por TEXT"],
         )
 
+        # ── proveedores: ficha de reposición (lead time default + notas) ─────
+        migrar(
+            ["ALTER TABLE proveedores ADD COLUMN lead_time_dias_default INTEGER DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN notas TEXT"],
+            ["ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS lead_time_dias_default INTEGER DEFAULT 0",
+             "ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS notas TEXT"],
+        )
+
+        # ── producto_proveedor: hasta 3 proveedores por producto con prioridad ─
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS producto_proveedor (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+                proveedor_id INTEGER NOT NULL REFERENCES proveedores(id) ON DELETE RESTRICT,
+                prioridad INTEGER NOT NULL CHECK (prioridad IN (1,2,3)),
+                precio_actual_usd FLOAT,
+                credito_dias INTEGER,
+                lead_time_dias INTEGER,
+                minimo_compra INTEGER,
+                notas TEXT,
+                sin_stock_declarado BOOLEAN DEFAULT 0,
+                sin_stock_fecha DATE,
+                UNIQUE(producto_id, prioridad)
+            )""",
+             "CREATE INDEX IF NOT EXISTS ix_pp_producto ON producto_proveedor(producto_id)",
+             "CREATE INDEX IF NOT EXISTS ix_pp_proveedor ON producto_proveedor(proveedor_id)"],
+            ["""CREATE TABLE IF NOT EXISTS producto_proveedor (
+                id SERIAL PRIMARY KEY,
+                producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+                proveedor_id INTEGER NOT NULL REFERENCES proveedores(id) ON DELETE RESTRICT,
+                prioridad INTEGER NOT NULL CHECK (prioridad IN (1,2,3)),
+                precio_actual_usd FLOAT,
+                credito_dias INTEGER,
+                lead_time_dias INTEGER,
+                minimo_compra INTEGER,
+                notas TEXT,
+                sin_stock_declarado BOOLEAN DEFAULT FALSE,
+                sin_stock_fecha DATE,
+                UNIQUE(producto_id, prioridad)
+            )""",
+             "CREATE INDEX IF NOT EXISTS ix_pp_producto ON producto_proveedor(producto_id)",
+             "CREATE INDEX IF NOT EXISTS ix_pp_proveedor ON producto_proveedor(proveedor_id)"],
+        )
+
+        # ── producto_reposicion: ficha 1:1 con producto ──────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS producto_reposicion (
+                producto_id INTEGER PRIMARY KEY REFERENCES productos(id) ON DELETE CASCADE,
+                modo_reposicion TEXT NOT NULL DEFAULT 'stock_continuo',
+                stock_min_objetivo INTEGER DEFAULT 0,
+                stock_max_objetivo INTEGER DEFAULT 0,
+                unidades_exhibicion INTEGER DEFAULT 0,
+                colchon_dias INTEGER DEFAULT 3,
+                activo BOOLEAN DEFAULT 1,
+                notas TEXT,
+                actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS producto_reposicion (
+                producto_id INTEGER PRIMARY KEY REFERENCES productos(id) ON DELETE CASCADE,
+                modo_reposicion TEXT NOT NULL DEFAULT 'stock_continuo',
+                stock_min_objetivo INTEGER DEFAULT 0,
+                stock_max_objetivo INTEGER DEFAULT 0,
+                unidades_exhibicion INTEGER DEFAULT 0,
+                colchon_dias INTEGER DEFAULT 3,
+                activo BOOLEAN DEFAULT TRUE,
+                notas TEXT,
+                actualizado_en TIMESTAMP DEFAULT NOW()
+            )"""],
+        )
+
         # ── marcas ───────────────────────────────────────────────────────────
         migrar(
             ["""CREATE TABLE IF NOT EXISTS marcas (

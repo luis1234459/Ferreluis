@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Date, Index, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Date, Index, ForeignKey, UniqueConstraint, CheckConstraint
 from datetime import datetime
 from sqlalchemy.sql import func
 from database import Base
@@ -342,6 +342,54 @@ class Proveedor(Base):
     ajuste_tipo        = Column(String,   default="manual")           # sistema | manual
     descuento_pct      = Column(Float,    default=0)
     descuento_max_pct  = Column(Float,    nullable=True)              # límite de descuento en ventas (fracción)
+
+    # ── Ficha de reposición ────────────────────────────────────────────
+    lead_time_dias_default = Column(Integer, default=0)
+    notas                  = Column(String,  nullable=True)
+
+
+class ProductoProveedor(Base):
+    """
+    Hasta 3 proveedores por producto, con prioridad 1=principal, 2=alternativo,
+    3=terciario. credito_dias/lead_time_dias en None heredan el default del
+    Proveedor (dias_credito / lead_time_dias_default).
+    """
+    __tablename__ = "producto_proveedor"
+    __table_args__ = (
+        UniqueConstraint('producto_id', 'prioridad', name='uq_producto_proveedor_prioridad'),
+        CheckConstraint('prioridad IN (1,2,3)', name='ck_producto_proveedor_prioridad'),
+    )
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    producto_id         = Column(Integer, ForeignKey("productos.id",  ondelete="CASCADE"),  nullable=False, index=True)
+    proveedor_id        = Column(Integer, ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False, index=True)
+    prioridad           = Column(Integer, nullable=False)   # 1=principal | 2=alternativo | 3=terciario
+    precio_actual_usd   = Column(Float,   nullable=True)
+    credito_dias        = Column(Integer, nullable=True)    # None → hereda Proveedor.dias_credito
+    lead_time_dias      = Column(Integer, nullable=True)    # None → hereda Proveedor.lead_time_dias_default
+    minimo_compra       = Column(Integer, nullable=True)
+    notas               = Column(String,  nullable=True)
+
+    # C24: distinguir quiebre por gestión vs quiebre por proveedor
+    sin_stock_declarado = Column(Boolean, default=False)
+    sin_stock_fecha     = Column(Date,    nullable=True)
+
+
+class ProductoReposicion(Base):
+    """Ficha de reposición 1:1 con Producto. activo=False permite desactivar
+    sin borrar el producto (evita el bug de perder historia de ventas)."""
+    __tablename__ = "producto_reposicion"
+
+    producto_id         = Column(Integer, ForeignKey("productos.id", ondelete="CASCADE"), primary_key=True)
+    modo_reposicion     = Column(String,  default="stock_continuo")
+    # 'stock_continuo' | 'pedido_bajo_demanda' | 'lote_grande' | 'stock_estrategico_descuento'
+    stock_min_objetivo  = Column(Integer, default=0)
+    stock_max_objetivo  = Column(Integer, default=0)
+    unidades_exhibicion = Column(Integer, default=0)   # no cuentan como stock disponible
+    colchon_dias        = Column(Integer, default=3)   # se suma al lead time para la alerta
+    activo              = Column(Boolean, default=True)
+    notas               = Column(String,  nullable=True)
+    actualizado_en      = Column(DateTime, nullable=True, onupdate=func.now(), server_default=func.now())
 
 
 class CatalogoProveedor(Base):
