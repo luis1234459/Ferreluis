@@ -121,6 +121,7 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN descuento_compuesto_pct FLOAT DEFAULT 0",
              "ALTER TABLE productos ADD COLUMN comision_pct FLOAT DEFAULT 0",
              "ALTER TABLE productos ADD COLUMN comision_push FLOAT",
+             "ALTER TABLE productos ADD COLUMN es_delicado BOOLEAN DEFAULT 0",
              "ALTER TABLE productos ADD COLUMN activo BOOLEAN DEFAULT 1",
              "ALTER TABLE productos ADD COLUMN codigo TEXT",
              "ALTER TABLE productos ADD COLUMN categoria_id INTEGER",
