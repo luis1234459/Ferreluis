@@ -395,7 +395,7 @@
         <!-- Modal: Nuevo / Editar Producto                           -->
         <!-- ══════════════════════════════════════════════════════════ -->
         <div class="overlay" v-if="mostrarForm" @click.self="cancelar">
-          <div class="modal modal-form">
+          <div class="modal modal-form" :class="{ 'modal-form-ancho': editando && tabProducto === 'reposicion' }">
             <div class="modal-header">
               <h2>{{ editando ? 'Editar producto' : 'Nuevo producto' }}</h2>
               <button class="btn-cerrar-modal" @click="cancelar">✕</button>
@@ -406,6 +406,15 @@
               Solo puedes editar la URL de imagen del producto.
             </div>
 
+            <!-- Pestañas: solo tiene sentido "Reposición" con el producto ya creado -->
+            <div class="tabs-ficha" v-if="editando && !esVendedor">
+              <button type="button" :class="['tab-ficha-btn', tabProducto === 'general' ? 'activo' : '']"
+                @click="tabProducto = 'general'">Datos generales</button>
+              <button type="button" :class="['tab-ficha-btn', tabProducto === 'reposicion' ? 'activo' : '']"
+                @click="abrirTabReposicion">📦 Reposición</button>
+            </div>
+
+            <template v-if="tabProducto === 'general' || !editando || esVendedor">
             <div class="grid-form">
               <div class="field field-wide">
                 <label>Nombre *</label>
@@ -641,14 +650,204 @@
                 <strong>Bs. {{ precioBsForm.toFixed(2) }}</strong>
               </div>
             </div>
+            </template>
+
+            <!-- ═══════════ Pestaña: Reposición ═══════════ -->
+            <template v-if="editando && !esVendedor && tabProducto === 'reposicion'">
+              <div v-if="cargandoReposicion" class="msg-info">Cargando ficha de reposición...</div>
+
+              <!-- Ficha no cargada todavía -->
+              <div v-else-if="reposicion && !reposicion.ficha_cargada && !repoForm" class="repo-vacio">
+                <div class="repo-vacio-icono">📦</div>
+                <h3>Ficha de reposición no cargada</h3>
+                <p>
+                  La ficha guarda quién es el proveedor de este producto, cuánto tarda en llegar
+                  y cuánto stock mantener — con eso el sistema calcula solo cuándo pedir, cuánto
+                  y a quién.
+                </p>
+                <button type="button" class="btn-guardar" @click="crearFichaDefaults">+ Crear ficha</button>
+              </div>
+
+              <!-- Formulario de la ficha -->
+              <template v-else-if="repoForm">
+                <div class="repo-seccion">
+                  <h4>Proveedores</h4>
+                  <div v-for="(fila, i) in repoForm.proveedores" :key="i" class="repo-prov-row">
+                    <div class="field">
+                      <label>{{ ['Principal', 'Alternativo 1', 'Alternativo 2'][i] }}</label>
+                      <select v-model.number="fila.proveedor_id">
+                        <option :value="null">— Seleccionar proveedor —</option>
+                        <option v-for="pv in proveedores" :key="pv.id" :value="pv.id">{{ pv.nombre }}</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Precio actual USD</label>
+                      <input v-model.number="fila.precio_actual_usd" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </div>
+                    <div class="field">
+                      <label>Crédito (días)</label>
+                      <input v-model.number="fila.credito_dias" type="number" min="0"
+                        :placeholder="defaultCreditoProveedor(fila.proveedor_id) != null ? String(defaultCreditoProveedor(fila.proveedor_id)) : '0'" />
+                    </div>
+                    <div class="field">
+                      <label>Lead time (días)</label>
+                      <input v-model.number="fila.lead_time_dias" type="number" min="0"
+                        :placeholder="defaultLeadTimeProveedor(fila.proveedor_id) != null ? String(defaultLeadTimeProveedor(fila.proveedor_id)) : '0'" />
+                    </div>
+                    <div class="field">
+                      <label>Mínimo de compra</label>
+                      <input v-model.number="fila.minimo_compra" type="number" min="0" placeholder="unidades" />
+                    </div>
+                    <div class="field field-wide">
+                      <label class="check-opt">
+                        <input type="checkbox" v-model="fila.sin_stock_declarado" />
+                        <span class="check-label">
+                          <strong>Sin stock declarado</strong>
+                          <small v-if="fila.sin_stock_fecha">Desde {{ formatFechaCorta(fila.sin_stock_fecha) }}</small>
+                        </span>
+                      </label>
+                    </div>
+                    <div class="field field-wide">
+                      <label>Notas</label>
+                      <input v-model="fila.notas" placeholder="Notas de este proveedor para este producto..." />
+                    </div>
+                    <button type="button" class="btn-quitar-proveedor" @click="quitarProveedorFicha(i)" title="Quitar proveedor">✕</button>
+                  </div>
+
+                  <button v-if="repoForm.proveedores.length < 3" type="button" class="btn-agregar-linea" @click="agregarFilaProveedor">
+                    + Agregar proveedor
+                  </button>
+                  <p v-else class="label-hint" style="margin:0.4rem 0 0">Máximo 3 proveedores por producto.</p>
+
+                  <button type="button" class="btn-link-nuevo-proveedor" @click="modalNuevoProveedor = true">
+                    + Agregar proveedor global (nuevo)
+                  </button>
+                </div>
+
+                <div class="repo-seccion">
+                  <h4>Parámetros de reposición</h4>
+                  <div class="grid-form">
+                    <div class="field">
+                      <label>Modo de reposición</label>
+                      <select v-model="repoForm.modo_reposicion">
+                        <option v-for="m in MODOS_REPOSICION" :key="m.value" :value="m.value">{{ m.label }}</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Stock mínimo objetivo</label>
+                      <input v-model.number="repoForm.stock_min_objetivo" type="number" min="0" placeholder="0" />
+                    </div>
+                    <div class="field">
+                      <label>Stock máximo objetivo</label>
+                      <input v-model.number="repoForm.stock_max_objetivo" type="number" min="0" placeholder="0" />
+                    </div>
+                    <div class="field">
+                      <label>Unidades de exhibición <span class="label-hint">(no cuentan como disponibles)</span></label>
+                      <input v-model.number="repoForm.unidades_exhibicion" type="number" min="0" placeholder="0" />
+                    </div>
+                    <div class="field">
+                      <label>Colchón (días) <span class="label-hint">(se suma al lead time para alertar)</span></label>
+                      <input v-model.number="repoForm.colchon_dias" type="number" min="0" placeholder="3" />
+                    </div>
+                    <div class="field">
+                      <label class="check-opt" style="margin-top:1.35rem">
+                        <input type="checkbox" v-model="repoForm.activo" />
+                        <span class="check-label"><strong>Ficha activa</strong></span>
+                      </label>
+                    </div>
+                    <div class="field field-wide">
+                      <label>Notas</label>
+                      <input v-model="repoForm.notas" placeholder="Notas generales de reposición..." />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Panel de cálculo — solo lectura, se recalcula al guardar -->
+                <div class="repo-seccion repo-calculo" v-if="reposicion && reposicion.ficha_cargada">
+                  <h4>Cálculo actual</h4>
+                  <div class="repo-calc-grid">
+                    <div class="repo-calc-item">
+                      <span class="repo-calc-label">Venta diaria promedio</span>
+                      <span class="repo-calc-valor">{{ Number(reposicion.venta_diaria_90d).toFixed(2) }} u/día</span>
+                    </div>
+                    <div class="repo-calc-item">
+                      <span class="repo-calc-label">Disponible</span>
+                      <span class="repo-calc-valor">{{ reposicion.existencia_disponible }} u</span>
+                    </div>
+                    <div class="repo-calc-item">
+                      <span class="repo-calc-label">Días de cobertura</span>
+                      <span class="repo-calc-valor">{{ reposicion.dias_cobertura >= 999 ? '∞' : reposicion.dias_cobertura }}</span>
+                    </div>
+                  </div>
+                  <div class="repo-semaforo" :class="'repo-semaforo--' + reposicion.estado_semaforo">
+                    <span class="repo-semaforo-icono">{{ semaforoIcono(reposicion.estado_semaforo) }}</span>
+                    <span class="repo-semaforo-texto">{{ semaforoLeyenda(reposicion) }}</span>
+                  </div>
+                  <div class="repo-recomendacion">
+                    <p>{{ reposicion.recomendacion_pedido.texto }}</p>
+                    <button type="button" class="btn-copiar-recomendacion" @click="copiarRecomendacion" title="Copiar">
+                      📋 Copiar
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <p class="msg-error" v-if="errorReposicion">{{ errorReposicion }}</p>
+            </template>
 
             <div class="form-botones">
               <button class="btn-cancelar" @click="cancelar">Cancelar</button>
-              <button class="btn-guardar"  @click="guardar" :disabled="guardando">
+              <button v-if="tabProducto === 'general' || !editando || esVendedor"
+                class="btn-guardar" @click="guardar" :disabled="guardando">
                 {{ guardando ? 'Guardando...' : 'Guardar' }}
+              </button>
+              <button v-else-if="repoForm"
+                class="btn-guardar" @click="guardarReposicion" :disabled="guardandoReposicion">
+                {{ guardandoReposicion ? 'Guardando...' : 'Guardar ficha de reposición' }}
               </button>
             </div>
             <p class="msg-error" v-if="error">{{ error }}</p>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- Modal: Nuevo proveedor global (desde la ficha de reposición) -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <div class="overlay" v-if="modalNuevoProveedor" @click.self="modalNuevoProveedor = false">
+          <div class="modal modal-sm">
+            <div class="modal-header">
+              <h2>Nuevo proveedor</h2>
+              <button class="btn-cerrar-modal" @click="modalNuevoProveedor = false">✕</button>
+            </div>
+            <div class="grid-form">
+              <div class="field field-wide">
+                <label>Nombre *</label>
+                <input v-model="nuevoProveedorForm.nombre" placeholder="Ej: CINDU Venezuela" />
+              </div>
+              <div class="field field-wide">
+                <label>Contacto</label>
+                <input v-model="nuevoProveedorForm.contacto" placeholder="Nombre / teléfono" />
+              </div>
+              <div class="field">
+                <label>Crédito por defecto (días)</label>
+                <input v-model.number="nuevoProveedorForm.dias_credito" type="number" min="0" placeholder="0" />
+              </div>
+              <div class="field">
+                <label>Lead time por defecto (días)</label>
+                <input v-model.number="nuevoProveedorForm.lead_time_dias_default" type="number" min="0" placeholder="0" />
+              </div>
+              <div class="field field-wide">
+                <label>Notas</label>
+                <input v-model="nuevoProveedorForm.notas" placeholder="Notas generales del proveedor..." />
+              </div>
+            </div>
+            <div class="form-botones">
+              <button class="btn-cancelar" @click="modalNuevoProveedor = false">Cancelar</button>
+              <button class="btn-guardar" @click="guardarNuevoProveedor" :disabled="guardandoProveedor">
+                {{ guardandoProveedor ? 'Guardando...' : 'Guardar proveedor' }}
+              </button>
+            </div>
+            <p class="msg-error" v-if="errorNuevoProveedor">{{ errorNuevoProveedor }}</p>
           </div>
         </div>
 
@@ -1180,6 +1379,24 @@ export default {
         descuento_compuesto_pct: 0,
       },
 
+      // Ficha de reposición
+      tabProducto:         'general',
+      reposicion:          null,
+      repoForm:            null,
+      cargandoReposicion:  false,
+      guardandoReposicion: false,
+      errorReposicion:     '',
+      modalNuevoProveedor: false,
+      guardandoProveedor:  false,
+      errorNuevoProveedor: '',
+      nuevoProveedorForm: { nombre: '', contacto: '', dias_credito: 0, lead_time_dias_default: 0, notas: '' },
+      MODOS_REPOSICION: [
+        { value: 'stock_continuo',              label: 'Stock continuo (rotación normal)' },
+        { value: 'pedido_bajo_demanda',          label: 'Pedido bajo demanda' },
+        { value: 'lote_grande',                  label: 'Lote grande' },
+        { value: 'stock_estrategico_descuento',  label: 'Stock estratégico (descuento por volumen)' },
+      ],
+
       // Modal variantes
       modalVariantes:      null,
       variantes:           [],
@@ -1604,6 +1821,163 @@ export default {
       this.mostrarForm = false
       this.editando    = false
       this.error       = ''
+      this.tabProducto     = 'general'
+      this.reposicion      = null
+      this.repoForm        = null
+      this.errorReposicion = ''
+    },
+
+    // ── Ficha de reposición ──────────────────────────────────────────────
+    async abrirTabReposicion() {
+      this.tabProducto = 'reposicion'
+      if (this.reposicion || this.cargandoReposicion) return
+      await this.cargarReposicion()
+    },
+    async cargarReposicion() {
+      this.cargandoReposicion = true
+      this.errorReposicion    = ''
+      try {
+        const res = await axios.get(`/productos/${this.form.id}/reposicion`)
+        this.reposicion = res.data
+        if (res.data.ficha_cargada) {
+          this.repoForm = {
+            modo_reposicion:     res.data.modo_reposicion,
+            stock_min_objetivo:  res.data.stock_min_objetivo,
+            stock_max_objetivo:  res.data.stock_max_objetivo,
+            unidades_exhibicion: res.data.unidades_exhibicion,
+            colchon_dias:        res.data.colchon_dias,
+            activo:              res.data.activo,
+            notas:               res.data.notas || '',
+            proveedores:         (res.data.proveedores || []).map(p => ({ ...p })),
+          }
+        } else {
+          this.repoForm = null
+        }
+      } catch (e) {
+        this.errorReposicion = e?.response?.data?.detail || 'Error al cargar la ficha de reposición'
+      } finally {
+        this.cargandoReposicion = false
+      }
+    },
+    crearFichaDefaults() {
+      this.repoForm = {
+        modo_reposicion: 'stock_continuo',
+        stock_min_objetivo: 0,
+        stock_max_objetivo: 0,
+        unidades_exhibicion: 0,
+        colchon_dias: 3,
+        activo: true,
+        notas: '',
+        proveedores: [],
+      }
+    },
+    agregarFilaProveedor() {
+      if (this.repoForm.proveedores.length >= 3) return
+      this.repoForm.proveedores.push({
+        proveedor_id: null, precio_actual_usd: null, credito_dias: null,
+        lead_time_dias: null, minimo_compra: null, notas: '',
+        sin_stock_declarado: false, sin_stock_fecha: null,
+      })
+    },
+    quitarProveedorFicha(i) {
+      const fila         = this.repoForm.proveedores[i]
+      const nombreProv   = this.nombreProveedor(fila.proveedor_id) || 'este proveedor'
+      const labelProv    = ['principal', 'alternativo 1', 'alternativo 2'][i] || ''
+      const extra        = i === 0 ? ' La ficha va a quedar sin proveedor principal hasta que asignés otro.' : ''
+      if (!confirm(`¿Quitar a ${nombreProv} como proveedor ${labelProv} de este producto?${extra}`)) return
+      this.repoForm.proveedores.splice(i, 1)
+    },
+    nombreProveedor(id) {
+      const p = this.proveedores.find(x => x.id === id)
+      return p ? p.nombre : null
+    },
+    defaultCreditoProveedor(id) {
+      const p = this.proveedores.find(x => x.id === id)
+      return p ? (p.dias_credito ?? null) : null
+    },
+    defaultLeadTimeProveedor(id) {
+      const p = this.proveedores.find(x => x.id === id)
+      return p ? (p.lead_time_dias_default ?? null) : null
+    },
+    formatFechaCorta(iso) {
+      if (!iso) return ''
+      const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+      const [, m, d] = iso.split('-').map(Number)
+      return `${String(d).padStart(2, '0')}-${meses[m - 1]}`
+    },
+    semaforoIcono(estado) {
+      return { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' }[estado] || '⚪'
+    },
+    semaforoLeyenda(r) {
+      const dias = r.dias_cobertura >= 999 ? '∞' : `${r.dias_cobertura}d`
+      if (r.estado_semaforo === 'gris') {
+        const fechaFila = (r.proveedores || []).find(p => p.sin_stock_fecha)
+        const fecha = fechaFila ? this.formatFechaCorta(fechaFila.sin_stock_fecha) : null
+        return `Proveedor sin stock${fecha ? ' desde ' + fecha : ''}`
+      }
+      if (r.estado_semaforo === 'verde')    return `Cubierto (${dias})`
+      if (r.estado_semaforo === 'amarillo') return `Pedir ya (${dias})`
+      if (r.estado_semaforo === 'rojo') {
+        const umbral = (r.lead_time_dias_proveedor_principal || 0) + (r.colchon_dias || 0)
+        const vencidoHace = r.dias_cobertura < 999 ? Math.max(Math.round(umbral - r.dias_cobertura), 0) : 0
+        return `Vencido (pedir hace ${vencidoHace} día${vencidoHace === 1 ? '' : 's'})`
+      }
+      return ''
+    },
+    copiarRecomendacion() {
+      const texto = this.reposicion?.recomendacion_pedido?.texto
+      if (texto && navigator.clipboard) navigator.clipboard.writeText(texto).catch(() => {})
+    },
+    async guardarReposicion() {
+      const proveedoresPayload = this.repoForm.proveedores.map((f, i) => ({
+        proveedor_id:         f.proveedor_id,
+        prioridad:            i + 1,
+        precio_actual_usd:    f.precio_actual_usd ?? null,
+        credito_dias:         f.credito_dias ?? null,
+        lead_time_dias:       f.lead_time_dias ?? null,
+        minimo_compra:        f.minimo_compra ?? null,
+        notas:                f.notas || null,
+        sin_stock_declarado:  !!f.sin_stock_declarado,
+      }))
+      if (proveedoresPayload.some(p => !p.proveedor_id)) {
+        this.errorReposicion = 'Todas las filas de proveedor deben tener un proveedor seleccionado'
+        return
+      }
+      this.guardandoReposicion = true
+      this.errorReposicion     = ''
+      try {
+        const res = await axios.put(`/productos/${this.form.id}/reposicion`, {
+          modo_reposicion:     this.repoForm.modo_reposicion,
+          stock_min_objetivo:  Number(this.repoForm.stock_min_objetivo  || 0),
+          stock_max_objetivo:  Number(this.repoForm.stock_max_objetivo  || 0),
+          unidades_exhibicion: Number(this.repoForm.unidades_exhibicion || 0),
+          colchon_dias:        Number(this.repoForm.colchon_dias        || 0),
+          activo:              !!this.repoForm.activo,
+          notas:               this.repoForm.notas || null,
+          proveedores:         proveedoresPayload,
+        })
+        this.reposicion = res.data
+        this.repoForm.proveedores = (res.data.proveedores || []).map(p => ({ ...p }))
+      } catch (e) {
+        this.errorReposicion = e?.response?.data?.detail || 'Error al guardar la ficha de reposición'
+      } finally {
+        this.guardandoReposicion = false
+      }
+    },
+    async guardarNuevoProveedor() {
+      if (!this.nuevoProveedorForm.nombre.trim()) { this.errorNuevoProveedor = 'El nombre es obligatorio'; return }
+      this.guardandoProveedor = true
+      this.errorNuevoProveedor = ''
+      try {
+        const res = await axios.post('/compras/proveedores/', this.nuevoProveedorForm)
+        this.proveedores.push(res.data)
+        this.modalNuevoProveedor = false
+        this.nuevoProveedorForm = { nombre: '', contacto: '', dias_credito: 0, lead_time_dias_default: 0, notas: '' }
+      } catch (e) {
+        this.errorNuevoProveedor = e?.response?.data?.detail || 'Error al crear el proveedor'
+      } finally {
+        this.guardandoProveedor = false
+      }
     },
 
     // ── Edición masiva ───────────────────────────────────────────────────────
@@ -2324,6 +2698,65 @@ export default {
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.55rem 1.2rem; border-radius: 6px; cursor: pointer; }
+
+/* ── Ficha de reposición ───────────────────────────────────────────────── */
+.modal-form-ancho { max-width: 920px; }
+
+.tabs-ficha { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid var(--borde); }
+.tab-ficha-btn {
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.9rem; margin-bottom: -1px; cursor: pointer;
+  font-size: 0.88rem; font-weight: 600; color: var(--texto-sec);
+}
+.tab-ficha-btn.activo { color: #1A1A1A; border-bottom-color: #FFCC00; }
+.tab-ficha-btn:hover:not(.activo) { color: var(--texto-principal); }
+
+.repo-vacio { text-align: center; padding: 2.5rem 1.5rem; }
+.repo-vacio-icono { font-size: 2.4rem; margin-bottom: 0.5rem; }
+.repo-vacio h3 { margin: 0 0 0.5rem; color: var(--texto-principal); }
+.repo-vacio p  { color: var(--texto-sec); font-size: 0.88rem; max-width: 420px; margin: 0 auto 1.25rem; line-height: 1.5; }
+
+.repo-seccion { margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--borde-suave); }
+.repo-seccion:last-child { border-bottom: none; }
+.repo-seccion h4 { margin: 0 0 0.75rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-sec); font-weight: 700; }
+
+.repo-prov-row {
+  display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: flex-end;
+  padding: 0.75rem; margin-bottom: 0.6rem;
+  background: var(--borde-suave); border: 1px solid var(--borde); border-radius: 8px; position: relative;
+}
+.repo-prov-row .field { flex: 1 1 140px; min-width: 120px; }
+.repo-prov-row .field-wide { flex: 1 1 100%; }
+.btn-quitar-proveedor {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem;
+}
+.btn-agregar-linea {
+  background: transparent; border: 1px dashed var(--borde); color: var(--texto-sec);
+  padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; width: 100%;
+}
+.btn-agregar-linea:hover { border-color: var(--amarillo); background: #FFCC0011; color: #1A1A1A; }
+.btn-link-nuevo-proveedor {
+  background: none; border: none; color: #1A1A1A; text-decoration: underline;
+  cursor: pointer; font-size: 0.82rem; padding: 0.5rem 0 0; display: block;
+}
+
+.repo-calculo { background: var(--borde-suave); border-radius: 8px; padding: 1rem; }
+.repo-calc-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.repo-calc-item { display: flex; flex-direction: column; gap: 0.15rem; }
+.repo-calc-label { font-size: 0.72rem; color: var(--texto-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.repo-calc-valor { font-size: 1.15rem; font-weight: 700; color: var(--texto-principal); }
+
+.repo-semaforo { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.6rem; font-weight: 700; }
+.repo-semaforo-icono { font-size: 1.3rem; }
+.repo-semaforo--verde    { background: #DCFCE7; color: #15803D; }
+.repo-semaforo--amarillo { background: #FEF3C7; color: #92400E; }
+.repo-semaforo--rojo     { background: #FEE2E2; color: #B91C1C; }
+.repo-semaforo--gris     { background: #F3F4F6; color: #4B5563; }
+
+.repo-recomendacion { display: flex; align-items: center; gap: 0.75rem; background: #fff; border: 1px solid var(--borde); border-radius: 8px; padding: 0.65rem 0.85rem; }
+.repo-recomendacion p { margin: 0; font-size: 0.88rem; color: var(--texto-principal); flex: 1; }
+.btn-copiar-recomendacion { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
 
 /* ── Modo edición masiva ── */
 .btn-modo-edicion    { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; }
