@@ -548,6 +548,15 @@ def inicializar_datos():
             )"""],
         )
 
+        # ── proveedores: codigo único (3 letras) — el formato se valida en el
+        # endpoint, acá solo se asegura que no haya dos proveedores con el
+        # mismo código. Los PRV-XXXX autogenerados históricos ya son únicos
+        # entre sí, así que el índice se puede crear sin migrar datos.
+        migrar(
+            ["CREATE UNIQUE INDEX IF NOT EXISTS ux_proveedores_codigo ON proveedores(codigo)"],
+            ["CREATE UNIQUE INDEX IF NOT EXISTS ux_proveedores_codigo ON proveedores(codigo)"],
+        )
+
         # ── marcas ───────────────────────────────────────────────────────────
         migrar(
             ["""CREATE TABLE IF NOT EXISTS marcas (

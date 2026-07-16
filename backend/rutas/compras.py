@@ -118,6 +118,24 @@ def _serializar_factura(r: RecepcionCompra, db: Session) -> dict:
 # PROVEEDORES
 # ---------------------------------------------------------------------------
 
+import re
+
+_RE_CODIGO_PROVEEDOR = re.compile(r"^[A-Z]{3}$")
+
+
+def _validar_codigo_proveedor(db: Session, codigo: str, excluir_id: int | None = None) -> None:
+    if not _RE_CODIGO_PROVEEDOR.match(codigo or ""):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Código inválido: '{codigo}'. Debe ser exactamente 3 letras mayúsculas (ej: CIN, DEC, LEO)",
+        )
+    q = db.query(Proveedor).filter(Proveedor.codigo == codigo)
+    if excluir_id is not None:
+        q = q.filter(Proveedor.id != excluir_id)
+    if q.first():
+        raise HTTPException(status_code=400, detail=f"El código '{codigo}' ya está en uso por otro proveedor")
+
+
 @router.get("/proveedores/")
 def listar_proveedores(db: Session = Depends(get_db)):
     return db.query(Proveedor).filter(Proveedor.activo == True).order_by(Proveedor.nombre).all()
@@ -127,8 +145,12 @@ def listar_proveedores(db: Session = Depends(get_db)):
 def crear_proveedor(datos: dict, db: Session = Depends(get_db), _: None = Depends(require_admin)):
     if not datos.get("nombre"):
         raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    codigo = (datos.get("codigo") or "").strip().upper() or None
+    if codigo:
+        _validar_codigo_proveedor(db, codigo)
     p = Proveedor(
         nombre         = datos["nombre"],
+        codigo         = codigo,
         rif            = datos.get("rif"),
         telefono       = datos.get("telefono"),
         email          = datos.get("email"),
@@ -143,10 +165,6 @@ def crear_proveedor(datos: dict, db: Session = Depends(get_db), _: None = Depend
     db.add(p)
     db.commit()
     db.refresh(p)
-    if not p.codigo:
-        p.codigo = f"PRV-{p.id:04d}"
-        db.commit()
-        db.refresh(p)
     return p
 
 
@@ -158,6 +176,11 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
     for k in ("nombre", "rif", "telefono", "email", "direccion", "contacto"):
         if k in datos:
             setattr(p, k, datos[k])
+    if "codigo" in datos:
+        codigo = (datos.get("codigo") or "").strip().upper() or None
+        if codigo:
+            _validar_codigo_proveedor(db, codigo, excluir_id=proveedor_id)
+        p.codigo = codigo
     if "dias_credito" in datos:
         p.dias_credito = int(datos["dias_credito"] or 0)
     if "lead_time_dias_default" in datos:
