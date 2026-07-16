@@ -5,13 +5,17 @@ El CRUD de proveedores NO vive acá — ya existe en rutas/compras.py
 (GET/POST/PUT /compras/proveedores), solo se le agregaron los campos
 lead_time_dias_default y notas. Acá solo la ficha 1:1 + sus proveedores.
 """
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Producto, Proveedor, ProductoProveedor, ProductoReposicion
+from models import (
+    Producto, Proveedor, ProductoProveedor, ProductoReposicion,
+    Departamento, Categoria, Venta, DetalleVenta,
+)
 from reposicion import obtener_ficha_reposicion, MODOS_VALIDOS
 from rutas.usuarios import require_admin_o_gestionador
 
@@ -60,6 +64,84 @@ def get_reposicion(producto_id: int, db: Session = Depends(get_db)):
     if resultado is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return resultado
+
+
+@router.get("/reposicion/departamentos-resumen")
+def departamentos_resumen(db: Session = Depends(get_db)):
+    """
+    Para el selector de departamento de la vista tabla: cuántos productos
+    activos tiene cada departamento, cuántos ya tienen ficha cargada, y el
+    ingreso de los últimos 90 días (para que el usuario sepa por dónde
+    priorizar la carga). Nunca se navega el catálogo completo desde acá.
+    """
+    corte = datetime.now(timezone.utc).replace(tzinfo=None)
+    desde = corte - timedelta(days=90)
+
+    departamentos = db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
+
+    productos = db.query(Producto.id, Producto.departamento_id).filter(Producto.activo == True).all()
+    ids_por_depto: dict = {}
+    for pid, dep_id in productos:
+        if dep_id is not None:
+            ids_por_depto.setdefault(dep_id, []).append(pid)
+
+    todos_los_ids = [pid for pid, dep_id in productos if dep_id is not None]
+    fichas_cargadas_ids = set()
+    if todos_los_ids:
+        fichas_cargadas_ids = {
+            row[0] for row in db.query(ProductoReposicion.producto_id)
+            .filter(ProductoReposicion.producto_id.in_(todos_los_ids)).all()
+        }
+
+    ingreso_por_depto = {}
+    filas_ingreso = (
+        db.query(Producto.departamento_id, func.sum(DetalleVenta.cantidad * DetalleVenta.precio_unitario))
+        .join(DetalleVenta, DetalleVenta.producto_id == Producto.id)
+        .join(Venta, Venta.id == DetalleVenta.venta_id)
+        .filter(
+            Venta.fecha >= desde, Venta.fecha < corte,
+            Venta.estado != "anulada",
+            Producto.departamento_id.isnot(None),
+        )
+        .group_by(Producto.departamento_id)
+        .all()
+    )
+    for dep_id, monto in filas_ingreso:
+        ingreso_por_depto[dep_id] = float(monto or 0)
+
+    categorias_por_depto: dict = {}
+    for c in db.query(Categoria).all():
+        categorias_por_depto.setdefault(c.departamento_id, []).append(c)
+
+    resultado = []
+    for d in departamentos:
+        ids = ids_por_depto.get(d.id, [])
+        cargadas = sum(1 for pid in ids if pid in fichas_cargadas_ids)
+        resultado.append({
+            "id":               d.id,
+            "nombre":           d.nombre,
+            "total_productos":  len(ids),
+            "fichas_cargadas":  cargadas,
+            "ingreso_90d":      round(ingreso_por_depto.get(d.id, 0.0), 2),
+            "categorias":       [{"id": c.id, "nombre": c.nombre} for c in categorias_por_depto.get(d.id, [])],
+        })
+
+    resultado.sort(key=lambda r: r["ingreso_90d"], reverse=True)
+    return resultado
+
+
+@router.get("/reposicion/tabla")
+def tabla_reposicion(
+    departamento_id: int,
+    categoria_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Fichas + cálculo de todos los productos activos de UN departamento (nunca del catálogo completo)."""
+    q = db.query(Producto.id).filter(Producto.activo == True, Producto.departamento_id == departamento_id)
+    if categoria_id is not None:
+        q = q.filter(Producto.categoria_id == categoria_id)
+    ids = [row[0] for row in q.all()]
+    return {"productos": [obtener_ficha_reposicion(db, pid) for pid in ids]}
 
 
 def _validar_ficha_para_guardar(db: Session, producto_id: int, datos: dict) -> tuple[str, list]:

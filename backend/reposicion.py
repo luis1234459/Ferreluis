@@ -194,11 +194,29 @@ def _hay_pedido_vencido(db: Session, producto_id: int, proveedor_id: int, corte:
     return False
 
 
+def _venta_diaria_90d(db: Session, producto_id: int, corte: datetime) -> float:
+    desde = corte - timedelta(days=90)
+    total_vendido = (
+        db.query(func.sum(DetalleVenta.cantidad))
+        .join(Venta, Venta.id == DetalleVenta.venta_id)
+        .filter(
+            DetalleVenta.producto_id == producto_id,
+            Venta.fecha >= desde, Venta.fecha < corte,
+            Venta.estado != "anulada",
+        )
+        .scalar()
+    ) or 0
+    return float(total_vendido) / 90
+
+
 def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
     """
     Retorna None si el producto no existe.
-    Retorna {"producto_id":.., "ficha_cargada": False} si el producto existe
-    pero todavía no tiene ProductoReposicion (caso "Ficha no cargada" del frontend).
+    Retorna {"producto_id":.., "ficha_cargada": False, ...} si el producto existe
+    pero todavía no tiene ProductoReposicion (caso "Ficha no cargada" del frontend
+    y filas sin cargar en la vista tabla). Igual trae código/descripción/existencia/
+    venta_diaria_90d porque la vista tabla los necesita para ordenar y mostrar la
+    fila aunque no haya ficha todavía.
     """
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if not producto:
@@ -206,7 +224,15 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
 
     ficha = db.query(ProductoReposicion).filter(ProductoReposicion.producto_id == producto_id).first()
     if not ficha:
-        return {"producto_id": producto_id, "ficha_cargada": False}
+        corte = datetime.now(timezone.utc).replace(tzinfo=None)
+        return {
+            "producto_id": producto_id,
+            "ficha_cargada": False,
+            "producto_codigo": producto.codigo,
+            "producto_descripcion": producto.descripcion or producto.nombre,
+            "existencia": producto.stock,
+            "venta_diaria_90d": round(_venta_diaria_90d(db, producto_id, corte), 4),
+        }
 
     filas_pp = (
         db.query(ProductoProveedor)
@@ -254,18 +280,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
     # datetime.now(UTC) con tzinfo puesto rompería la comparación en Postgres
     # ("cannot compare timestamp with time zone and without time zone").
     corte = datetime.now(timezone.utc).replace(tzinfo=None)
-    desde = corte - timedelta(days=90)
-    total_vendido = (
-        db.query(func.sum(DetalleVenta.cantidad))
-        .join(Venta, Venta.id == DetalleVenta.venta_id)
-        .filter(
-            DetalleVenta.producto_id == producto_id,
-            Venta.fecha >= desde, Venta.fecha < corte,
-            Venta.estado != "anulada",
-        )
-        .scalar()
-    ) or 0
-    venta_diaria = float(total_vendido) / 90
+    venta_diaria = _venta_diaria_90d(db, producto_id, corte)
 
     disponible = float(producto.stock or 0) - float(ficha.unidades_exhibicion or 0)
 
@@ -293,6 +308,9 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
     resultado.update({
         "producto_id":    producto_id,
         "ficha_cargada":  True,
+        "producto_codigo": producto.codigo,
+        "producto_descripcion": producto.descripcion or producto.nombre,
+        "existencia":     producto.stock,
         "modo_reposicion": ficha.modo_reposicion,
         "activo":         ficha.activo,
         "stock_min_objetivo": ficha.stock_min_objetivo,

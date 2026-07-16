@@ -70,6 +70,10 @@
             Ofertas
             <span v-if="ofertas.length" class="tab-badge">{{ ofertas.length }}</span>
           </button>
+          <button v-if="esAdmin || esGestionador" :class="['tab-btn', tabActivo === 'reposicion' ? 'tab-activo' : '']"
+            @click="tabActivo = 'reposicion'">
+            📦 Reposición
+          </button>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════ -->
@@ -389,6 +393,13 @@
               </tbody>
             </table>
           </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- Tab: Reposición (vista tabla, carga en lote por depto)    -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <div v-show="tabActivo === 'reposicion'">
+          <ReposicionTabla />
         </div>
 
         <!-- ══════════════════════════════════════════════════════════ -->
@@ -1322,11 +1333,12 @@
 
 <script>
 import AppSidebar from '../components/AppSidebar.vue'
+import ReposicionTabla from '../components/ReposicionTabla.vue'
 import axios from 'axios'
 import { imprimirEtiqueta } from '../utils/zebra'
 
 export default {
-  components: { AppSidebar },
+  components: { AppSidebar, ReposicionTabla },
   name: 'Inventario',
   data() {
     return {
