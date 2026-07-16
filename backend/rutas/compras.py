@@ -16,7 +16,8 @@ from database import get_db
 from models import (
     Proveedor, CatalogoProveedor, OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion, Producto, VarianteProducto,
-    Venta, DetalleVenta, ProductoProveedor,
+    Venta, DetalleVenta, ProductoProveedor, MovimientoBancario,
+    DevolucionProveedor, AliasProveedor,
 )
 from rutas.usuarios import require_admin
 from rutas.productos import listar_productos as _listar_productos_completo
@@ -212,6 +213,90 @@ def eliminar_proveedor(proveedor_id: int, db: Session = Depends(get_db), _: None
     p.activo = False
     db.commit()
     return {"mensaje": "Proveedor desactivado"}
+
+
+# Tablas con proveedor_id que no son FK declaradas en el ORM (sin ondelete),
+# pero que igual hay que repuntar al fusionar dos proveedores en uno.
+_TABLAS_CON_PROVEEDOR_ID_PLANO = [Producto, CatalogoProveedor, OrdenCompra, MovimientoBancario, DevolucionProveedor, AliasProveedor]
+
+
+@router.post("/proveedores/fusionar")
+def fusionar_proveedores(datos: dict, db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    """
+    Fusiona hasta 3 proveedores duplicados en un proveedor canónico: repunta
+    todas las referencias (productos, catálogo, órdenes de compra, movimientos
+    bancarios, devoluciones, alias) al canónico y desactiva los duplicados.
+    No los borra — se preserva el historial, solo dejan de aparecer en listados.
+    """
+    canonico_id    = datos.get("canonico_id")
+    duplicados_ids = datos.get("duplicados_ids") or []
+
+    if not duplicados_ids or len(duplicados_ids) > 3:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Máximo 3 proveedores duplicados por fusión (recibidos: {len(duplicados_ids)})",
+        )
+    if canonico_id in duplicados_ids:
+        raise HTTPException(status_code=400, detail="El proveedor canónico no puede estar también en duplicados_ids")
+
+    canonico = db.query(Proveedor).filter(Proveedor.id == canonico_id).first()
+    if not canonico:
+        raise HTTPException(status_code=404, detail="Proveedor canónico no encontrado")
+
+    duplicados = db.query(Proveedor).filter(Proveedor.id.in_(duplicados_ids)).all()
+    faltantes = set(duplicados_ids) - {p.id for p in duplicados}
+    if faltantes:
+        raise HTTPException(status_code=404, detail=f"Proveedor(es) duplicado(s) no encontrado(s): {sorted(faltantes)}")
+
+    descartes = []   # filas de producto_proveedor del duplicado que no se pudieron repuntar
+
+    try:
+        for dup in duplicados:
+            for Modelo in _TABLAS_CON_PROVEEDOR_ID_PLANO:
+                db.query(Modelo).filter(Modelo.proveedor_id == dup.id).update(
+                    {"proveedor_id": canonico.id}, synchronize_session=False
+                )
+
+            # producto_proveedor: cada producto admite máximo 3 filas y una
+            # prioridad única — repuntar la fila del duplicado al canónico
+            # puede chocar con una fila que el canónico (u otro proveedor)
+            # ya tiene para ese mismo producto. En vez de fallar la fusión
+            # entera, se descarta esa fila puntual y se reporta en el resumen.
+            filas_dup = db.query(ProductoProveedor).filter(ProductoProveedor.proveedor_id == dup.id).all()
+            for fila in filas_dup:
+                otras_filas_mismo_producto = db.query(ProductoProveedor).filter(
+                    ProductoProveedor.producto_id == fila.producto_id,
+                    ProductoProveedor.id != fila.id,
+                ).all()
+                canonico_ya_presente = any(f.proveedor_id == canonico.id for f in otras_filas_mismo_producto)
+                sin_espacio          = len(otras_filas_mismo_producto) >= 3
+
+                if canonico_ya_presente or sin_espacio:
+                    descartes.append({
+                        "producto_id": fila.producto_id,
+                        "proveedor_duplicado_id": dup.id,
+                        "motivo": (
+                            "el canónico ya es proveedor de este producto" if canonico_ya_presente
+                            else "el producto ya tiene el máximo de 3 proveedores"
+                        ),
+                    })
+                    db.delete(fila)
+                else:
+                    fila.proveedor_id = canonico.id
+
+            dup.activo = False
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al fusionar proveedores: {e}")
+
+    db.refresh(canonico)
+    return {
+        "canonico": canonico,
+        "fusionados": [p.id for p in duplicados],
+        "filas_descartadas_por_conflicto": descartes,
+    }
 
 
 # Catálogo del proveedor
