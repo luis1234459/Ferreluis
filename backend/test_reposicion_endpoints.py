@@ -156,3 +156,70 @@ def test_put_sin_stock_declarado_setea_fecha_automatica(ctx):
     body2 = res2.json()
     assert body2["proveedores"][0]["sin_stock_declarado"] is False
     assert body2["proveedores"][0]["sin_stock_fecha"] is None
+
+
+def _crear_cinco_productos(ctx):
+    productos = [
+        models.Producto(nombre=f"Producto Bulk {i}", codigo=f"BLK-{i:03d}", stock=10 + i)
+        for i in range(5)
+    ]
+    # StaticPool comparte la misma conexión en memoria, así que una sesión
+    # abierta acá es visible para las requests posteriores del TestClient.
+    db = next(ctx.client.app.dependency_overrides[get_db]())
+    db.add_all(productos)
+    db.commit()
+    for p in productos:
+        db.refresh(p)
+    ids = [p.id for p in productos]
+    db.close()
+    return ids
+
+
+def test_put_bulk_exito_cinco_productos(ctx):
+    producto_ids = _crear_cinco_productos(ctx)
+    fichas = [
+        {
+            "producto_id": pid,
+            "modo_reposicion": "stock_continuo",
+            "stock_min_objetivo": 5,
+            "stock_max_objetivo": 20,
+            "unidades_exhibicion": 0,
+            "colchon_dias": 3,
+            "proveedores": [{"proveedor_id": ctx.proveedor_ids[0], "prioridad": 1}],
+        }
+        for pid in producto_ids
+    ]
+    res = ctx.client.put("/productos/reposicion/bulk", json={"fichas": fichas})
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["actualizadas"]) == 5
+    assert all(f["ficha_cargada"] for f in body["actualizadas"])
+
+    # Confirmamos que efectivamente quedó persistido (no solo en la respuesta)
+    verificacion = ctx.client.get(f"/productos/{producto_ids[0]}/reposicion")
+    assert verificacion.json()["ficha_cargada"] is True
+
+
+def test_put_bulk_rollback_si_tercero_invalido(ctx):
+    producto_ids = _crear_cinco_productos(ctx)
+    fichas = []
+    for i, pid in enumerate(producto_ids):
+        ficha = {
+            "producto_id": pid,
+            "modo_reposicion": "stock_continuo",
+            "proveedores": [{"proveedor_id": ctx.proveedor_ids[0], "prioridad": 1}],
+        }
+        if i == 2:
+            ficha["modo_reposicion"] = "modo_que_no_existe"   # el 3ro es inválido
+        fichas.append(ficha)
+
+    res = ctx.client.put("/productos/reposicion/bulk", json={"fichas": fichas})
+    assert res.status_code == 400
+    detail = res.json()["detail"]
+    assert len(detail["errores"]) == 1
+    assert detail["errores"][0]["producto_id"] == producto_ids[2]
+
+    # Nada debe haberse guardado, ni siquiera las 4 fichas válidas (rollback total)
+    for pid in producto_ids:
+        verificacion = ctx.client.get(f"/productos/{pid}/reposicion")
+        assert verificacion.json()["ficha_cargada"] is False
