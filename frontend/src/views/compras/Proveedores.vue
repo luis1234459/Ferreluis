@@ -17,7 +17,19 @@
             </thead>
             <tbody>
               <tr v-for="p in proveedores" :key="p.id">
-                <td><span class="codigo-prv">{{ p.codigo || '—' }}</span></td>
+                <td class="celda-codigo-prv">
+                  <span v-if="codigoEditando !== p.id" class="codigo-prv" @click="iniciarEditCodigo(p)" title="Clic para editar código">
+                    {{ p.codigo || '— asignar —' }}
+                  </span>
+                  <span v-else class="codigo-edit-wrap">
+                    <input v-model="codigoTemp" class="input-codigo-prv" maxlength="3" placeholder="CIN"
+                           @input="codigoTemp = codigoTemp.toUpperCase()"
+                           @keyup.enter="guardarCodigo(p)" @keyup.escape="codigoEditando = null" />
+                    <button class="btn-ok-codigo" @click="guardarCodigo(p)">✓</button>
+                    <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
+                  </span>
+                  <p class="msg-error-codigo" v-if="errorCodigo && codigoEditando === p.id">{{ errorCodigo }}</p>
+                </td>
                 <td style="font-weight:600">{{ p.nombre }}</td>
                 <td>
                   <span v-if="p.rif">{{ p.rif }}</span>
@@ -38,6 +50,7 @@
                 <td>
                   <button class="btn-editar" @click="editar(p)">Editar</button>
                   <button class="btn-catalogo" @click="verCatalogo(p)">Catálogo</button>
+                  <button class="btn-fusionar" @click="abrirFusion(p)" title="Combinar este proveedor duplicado en otro">Fusionar en...</button>
                   <button class="btn-eliminar" @click="eliminar(p.id)">Desactivar</button>
                 </td>
               </tr>
@@ -46,6 +59,37 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Modal fusionar proveedores -->
+        <div class="overlay" v-if="modalFusion" @click.self="cerrarFusion">
+          <div class="modal modal-sm">
+            <div class="modal-header">
+              <h2>Fusionar proveedor</h2>
+              <button class="btn-cerrar-modal" @click="cerrarFusion">✕</button>
+            </div>
+            <p class="fusion-explicacion">
+              <strong>{{ modalFusion.nombre }}</strong> se desactivará y todas sus referencias
+              (productos, órdenes de compra, fichas de reposición, etc.) pasarán al proveedor que elijas abajo.
+              Esta acción no se puede deshacer desde acá.
+            </p>
+            <div class="field">
+              <label>Fusionar en (proveedor canónico) *</label>
+              <select v-model="fusionCanonicoId">
+                <option :value="null">— Elegir proveedor —</option>
+                <option v-for="p in proveedores.filter(x => x.id !== modalFusion.id)" :key="p.id" :value="p.id">
+                  {{ p.codigo ? p.codigo + ' — ' : '' }}{{ p.nombre }}
+                </option>
+              </select>
+            </div>
+            <div class="form-botones">
+              <button class="btn-cancelar" @click="cerrarFusion">Cancelar</button>
+              <button class="btn-guardar" @click="confirmarFusion" :disabled="!fusionCanonicoId || fusionando">
+                {{ fusionando ? 'Fusionando...' : 'Fusionar' }}
+              </button>
+            </div>
+            <p class="msg-error" v-if="errorFusion">{{ errorFusion }}</p>
+          </div>
         </div>
 
         <!-- Modal proveedor -->
@@ -243,6 +287,13 @@ export default {
       proveedorCatalogo:   null,
       catalogoItems:       [],
       nuevoItem: { producto_id: '', nombre_producto: '', codigo_proveedor: '', precio_referencia_usd: '' },
+      codigoEditando:      null,
+      codigoTemp:          '',
+      errorCodigo:         '',
+      modalFusion:         null,
+      fusionCanonicoId:    null,
+      fusionando:          false,
+      errorFusion:         '',
     }
   },
   computed: {
@@ -347,6 +398,47 @@ export default {
       await axios.delete(`/compras/proveedores/${this.proveedorCatalogo.id}/catalogo/${itemId}`)
       this.catalogoItems = this.catalogoItems.filter(i => i.id !== itemId)
     },
+    iniciarEditCodigo(p) {
+      this.codigoEditando = p.id
+      this.codigoTemp     = p.codigo || ''
+      this.errorCodigo    = ''
+    },
+    async guardarCodigo(p) {
+      this.errorCodigo = ''
+      try {
+        await axios.put(`/compras/proveedores/${p.id}`, { codigo: this.codigoTemp || null })
+        p.codigo = this.codigoTemp ? this.codigoTemp.toUpperCase() : null
+        this.codigoEditando = null
+      } catch (e) {
+        this.errorCodigo = e?.response?.data?.detail || 'Error al guardar el código'
+      }
+    },
+    abrirFusion(p) {
+      this.modalFusion      = p
+      this.fusionCanonicoId = null
+      this.errorFusion      = ''
+    },
+    cerrarFusion() { this.modalFusion = null; this.errorFusion = '' },
+    async confirmarFusion() {
+      if (!this.fusionCanonicoId) return
+      const canonico = this.proveedores.find(p => p.id === this.fusionCanonicoId)
+      if (!confirm(`¿Fusionar "${this.modalFusion.nombre}" dentro de "${canonico?.nombre}"? Esta acción no se puede deshacer.`)) return
+      this.fusionando = true; this.errorFusion = ''
+      try {
+        const res = await axios.post('/compras/proveedores/fusionar', {
+          canonico_id: this.fusionCanonicoId,
+          duplicados_ids: [this.modalFusion.id],
+        })
+        await this.cargar()
+        this.cerrarFusion()
+        const descartes = res.data.filas_descartadas_por_conflicto || []
+        if (descartes.length > 0) {
+          alert(`Fusión completada. ${descartes.length} producto(s) ya tenían al canónico como proveedor y se descartó la fila duplicada del proveedor fusionado (no se perdió nada — solo era redundante).`)
+        }
+      } catch (e) {
+        this.errorFusion = e?.response?.data?.detail || 'Error al fusionar'
+      } finally { this.fusionando = false }
+    },
     salir() { localStorage.removeItem('usuario'); this.$router.push('/login') },
   },
 }
@@ -355,7 +447,11 @@ export default {
 <style scoped>
 .btn-editar   { background: var(--info); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; }
 .btn-catalogo { background: var(--success); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; }
+.btn-fusionar { background: #6B7280; color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; }
 .btn-eliminar { background: var(--danger); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+
+.modal-sm { max-width: 440px; }
+.fusion-explicacion { font-size: 0.85rem; color: var(--texto-secundario); line-height: 1.5; margin: 0 0 1rem; }
 
 .modal-catalogo { max-width: 700px; }
 .tabla-catalogo { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
@@ -367,7 +463,14 @@ export default {
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
 
-.codigo-prv { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; }
+.celda-codigo-prv { min-width: 100px; }
+.codigo-prv { font-size: 0.78rem; font-weight: 700; color: #996600; background: #FFCC0033; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.codigo-prv:hover { background: var(--amarillo); }
+.codigo-edit-wrap { display: flex; align-items: center; gap: 0.25rem; }
+.input-codigo-prv { width: 60px; padding: 0.2rem 0.4rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; border: 1px solid var(--amarillo); border-radius: 4px; }
+.btn-ok-codigo     { background: #16A34A; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
+.btn-cancel-codigo { background: #888; color: white; border: none; border-radius: 4px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.8rem; }
+.msg-error-codigo { font-size: 0.7rem; color: var(--danger); margin: 0.2rem 0 0; max-width: 160px; white-space: normal; }
 .rif-ausente { font-size: 0.75rem; font-weight: 600; color: #92400E; background: #FEF3C7; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: default; }
 
 /* Badges política en tabla */
