@@ -557,6 +557,18 @@ def inicializar_datos():
             ["CREATE UNIQUE INDEX IF NOT EXISTS ux_proveedores_codigo ON proveedores(codigo)"],
         )
 
+        # ── productos: limpieza one-shot de descripcion residual de Factura IA ──
+        # "Creado desde factura IA — <numero_factura>" (y variante histórica en
+        # minúscula "ia") se guardaba en descripcion antes de que el nombre del
+        # producto quedara bien resuelto. El nombre ya es correcto, así que la
+        # descripcion residual se reemplaza por el nombre. Idempotente: una vez
+        # reemplazada, la fila deja de matchear el LIKE/ILIKE, así que reintentos
+        # en próximos arranques no hacen nada.
+        migrar(
+            ["UPDATE productos SET descripcion = nombre WHERE descripcion LIKE 'Creado desde factura%'"],
+            ["UPDATE productos SET descripcion = nombre WHERE descripcion ILIKE 'Creado desde factura%'"],
+        )
+
         # ── marcas ───────────────────────────────────────────────────────────
         migrar(
             ["""CREATE TABLE IF NOT EXISTS marcas (
