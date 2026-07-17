@@ -67,6 +67,10 @@
             <button class="btn-descartar-lote" :disabled="filasModificadas.size === 0 || guardando" @click="descartarCambios">
               ✕ Descartar cambios
             </button>
+            <button class="btn-autonumerar" :disabled="seleccionados.size === 0" @click="abrirAutonumerar">
+              # Autonumerar selección
+              <span v-if="seleccionados.size > 0" class="badge-pendientes">{{ seleccionados.size }}</span>
+            </button>
             <span v-if="errorGuardado" class="repo-error-guardado">{{ errorGuardado }}</span>
           </div>
 
@@ -76,6 +80,10 @@
             <table class="repo-tabla">
               <thead>
                 <tr>
+                  <th class="repo-celda-check">
+                    <input type="checkbox" :checked="todosVisiblesSeleccionados" @change="toggleSeleccionarTodos"
+                      title="Seleccionar todos los visibles" />
+                  </th>
                   <th>Código</th>
                   <th>Descripción</th>
                   <th title="Existencia en stock">Exist.</th>
@@ -100,9 +108,19 @@
                 <tr v-for="fila in productosFiltrados" :key="fila.producto_id"
                     :data-producto-id="fila.producto_id"
                     :class="{ 'repo-fila-modificada': filasModificadas.has(fila.producto_id) }">
-                  <td class="repo-celda-codigo" :class="{ 'repo-celda-planificada': esPlanificado(fila) }"
+                  <td class="repo-celda-check">
+                    <input type="checkbox" :checked="seleccionados.has(fila.producto_id)"
+                      @change="toggleSeleccion(fila.producto_id)" />
+                  </td>
+                  <td class="repo-celda-codigo" :class="{ 'repo-celda-planificada': esPlanificado(fila), 'repo-celda-codigo-error': erroresCodigoPorFila[fila.producto_id] }"
                       :title="esPlanificado(fila) ? 'Producto planificado, sin existencia aún' : ''">
-                    <span v-if="esPlanificado(fila)" class="repo-icono-planificado">🧭</span>{{ fila.producto_codigo || '—' }}
+                    <span v-if="esPlanificado(fila)" class="repo-icono-planificado">🧭</span>
+                    <input class="repo-input-codigo"
+                      v-model="borrador[fila.producto_id].codigo"
+                      @input="marcarModificado(fila.producto_id); erroresCodigoPorFila[fila.producto_id] && delete erroresCodigoPorFila[fila.producto_id]"
+                      @keydown.enter.prevent="bajarFila($event)"
+                      :title="erroresCodigoPorFila[fila.producto_id] || ''"
+                      placeholder="—" />
                   </td>
                   <td class="repo-celda-desc" :title="fila.producto_descripcion">{{ fila.producto_descripcion }}</td>
                   <td class="repo-celda-num">{{ fila.existencia }}</td>
@@ -126,18 +144,18 @@
                   </td>
                   <td><input class="repo-input-sm" type="number" min="0" step="0.01"
                     v-model.number="borrador[fila.producto_id].p1.precio_actual_usd"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p1.credito_dias"
                     :placeholder="String(defaultCreditoProveedor(borrador[fila.producto_id].p1.proveedor_id))"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p1.lead_time_dias"
                     :placeholder="String(defaultLeadTimeProveedor(borrador[fila.producto_id].p1.proveedor_id))"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p1.minimo_compra"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
 
                   <!-- P2 -->
                   <td class="repo-celda-autocomplete">
@@ -159,20 +177,20 @@
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p2.credito_dias"
                     :placeholder="String(defaultCreditoProveedor(borrador[fila.producto_id].p2.proveedor_id))"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p2.lead_time_dias"
                     :placeholder="String(defaultLeadTimeProveedor(borrador[fila.producto_id].p2.proveedor_id))"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p2.minimo_compra"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
 
                   <!-- Parámetros -->
                   <td>
                     <select class="repo-input-modo" v-model="borrador[fila.producto_id].modo_reposicion"
                       :title="modoNombreCompleto(borrador[fila.producto_id].modo_reposicion)"
-                      @change="marcarModificado(fila.producto_id)">
+                      @change="marcarFichaModificada(fila.producto_id)">
                       <option value="stock_continuo">SCO</option>
                       <option value="pedido_bajo_demanda">PBD</option>
                       <option value="lote_grande">LG</option>
@@ -181,16 +199,16 @@
                   </td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].stock_min_objetivo"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].stock_max_objetivo"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].unidades_exhibicion"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].colchon_dias"
-                    @input="marcarModificado(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
+                    @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
 
                   <!-- Semáforo -->
                   <td class="repo-celda-semaforo">
@@ -202,7 +220,7 @@
                   </td>
                 </tr>
                 <tr v-if="productosFiltrados.length === 0">
-                  <td colspan="18" class="repo-sin-datos">Sin productos que coincidan con los filtros</td>
+                  <td colspan="19" class="repo-sin-datos">Sin productos que coincidan con los filtros</td>
                 </tr>
               </tbody>
             </table>
@@ -280,6 +298,42 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal: autonumerar selección -->
+    <div class="overlay" v-if="modalAutonumerar" @click.self="cerrarAutonumerar">
+      <div class="modal modal-autonumerar">
+        <div class="modal-header">
+          <h2>Autonumerar selección ({{ seleccionados.size }} producto{{ seleccionados.size !== 1 ? 's' : '' }})</h2>
+          <button class="btn-cerrar-modal" @click="cerrarAutonumerar">✕</button>
+        </div>
+        <div class="grid-form">
+          <div class="field">
+            <label>Prefijo (2 a 6 caracteres)</label>
+            <input v-model="autonumerarForm.prefijo" maxlength="6" placeholder="Ej: LPCO" />
+          </div>
+          <div class="field">
+            <label>Número inicial</label>
+            <input v-model.number="autonumerarForm.numeroInicial" type="number" min="1" />
+          </div>
+          <div class="field">
+            <label>Padding de ceros</label>
+            <input v-model.number="autonumerarForm.padding" type="number" min="1" max="6" />
+          </div>
+        </div>
+        <p v-if="!prefijoValidoAutonumerar" class="msg-error">El prefijo debe tener entre 2 y 6 caracteres.</p>
+        <div class="repo-preview-autonumerar" v-else>
+          <strong>Preview:</strong>
+          <span v-for="c in previewAutonumerar" :key="c" class="repo-preview-codigo">{{ c }}</span>
+          <span v-if="seleccionados.size > 3">… (+{{ seleccionados.size - 3 }} más)</span>
+        </div>
+        <div class="form-botones">
+          <button class="btn-cancelar" @click="cerrarAutonumerar">Cancelar</button>
+          <button class="btn-guardar" :disabled="!prefijoValidoAutonumerar" @click="confirmarAutonumerar">
+            Asignar {{ seleccionados.size }} código{{ seleccionados.size !== 1 ? 's' : '' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -306,8 +360,13 @@ export default {
       productos:        [],
       borrador:         {},
       filasModificadas: new Set(),
+      filasFichaTocada: new Set(),   // subconjunto de filasModificadas: cambio de campo de ficha (no solo codigo)
+      erroresCodigoPorFila: {},      // producto_id -> mensaje, cuando el UNIQUE de codigo choca al guardar
       guardando:        false,
       errorGuardado:    '',
+      seleccionados:    new Set(),
+      modalAutonumerar: false,
+      autonumerarForm:  { prefijo: '', numeroInicial: 1, padding: 3 },
       busqueda:         '',
       filtroEstado:     'todos',
       orden:            'ventas_desc',
@@ -335,6 +394,26 @@ export default {
     },
     categoriasDelDeptoActivo() {
       return this.deptoActivoObj?.categorias || []
+    },
+    todosVisiblesSeleccionados() {
+      return this.productosFiltrados.length > 0
+        && this.productosFiltrados.every(f => this.seleccionados.has(f.producto_id))
+    },
+    prefijoValidoAutonumerar() {
+      const p = (this.autonumerarForm.prefijo || '').trim()
+      return p.length >= 2 && p.length <= 6
+    },
+    previewAutonumerar() {
+      if (!this.prefijoValidoAutonumerar) return []
+      const prefijo = this.autonumerarForm.prefijo.trim().toUpperCase()
+      const padding = Math.max(1, Number(this.autonumerarForm.padding) || 3)
+      const inicio  = Math.max(1, Number(this.autonumerarForm.numeroInicial) || 1)
+      const cantidad = Math.min(3, this.seleccionados.size)
+      const codigos = []
+      for (let i = 0; i < cantidad; i++) {
+        codigos.push(`${prefijo}-${String(inicio + i).padStart(padding, '0')}`)
+      }
+      return codigos
     },
     proveedoresOrdenados() {
       return [...this.proveedores].sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -408,6 +487,9 @@ export default {
       this.deptoActivoId     = id
       this.categoriaActivaId = null
       this.filasModificadas  = new Set()
+      this.filasFichaTocada  = new Set()
+      this.erroresCodigoPorFila = {}
+      this.seleccionados     = new Set()
       this.errorGuardado     = ''
       if (id) localStorage.setItem(LS_KEY_DEPTO, String(id))
       else localStorage.removeItem(LS_KEY_DEPTO)
@@ -423,6 +505,9 @@ export default {
         this.productos = res.data.productos
         this.reconstruirBorrador()
         this.filasModificadas = new Set()
+        this.filasFichaTocada = new Set()
+        this.erroresCodigoPorFila = {}
+        this.seleccionados = new Set()
       } finally {
         this.cargandoTabla = false
       }
@@ -450,6 +535,7 @@ export default {
         sin_stock_fecha:      pp?.sin_stock_fecha ?? null,
       })
       return {
+        codigo:              fila.producto_codigo     ?? '',
         modo_reposicion:     fila.modo_reposicion     ?? 'stock_continuo',
         stock_min_objetivo:  fila.stock_min_objetivo  ?? 0,
         stock_max_objetivo:  fila.stock_max_objetivo  ?? 0,
@@ -465,6 +551,69 @@ export default {
     },
     marcarModificado(id) {
       this.filasModificadas = new Set([...this.filasModificadas, id])
+    },
+    // Distinto de marcarModificado: además de marcar la fila como "sucia"
+    // (borde amarillo, contador, botón guardar), registra que lo que cambió
+    // es un campo de FICHA — así, si lo único que cambió en una fila sin
+    // ficha_cargada es el código, guardarCambios() no la manda al bulk y no
+    // crea una ficha vacía sin que nadie la haya pedido.
+    marcarFichaModificada(id) {
+      this.marcarModificado(id)
+      this.filasFichaTocada = new Set([...this.filasFichaTocada, id])
+    },
+    toggleSeleccion(id) {
+      const nuevo = new Set(this.seleccionados)
+      if (nuevo.has(id)) nuevo.delete(id)
+      else nuevo.add(id)
+      this.seleccionados = nuevo
+    },
+    toggleSeleccionarTodos() {
+      this.seleccionados = this.todosVisiblesSeleccionados
+        ? new Set()
+        : new Set(this.productosFiltrados.map(f => f.producto_id))
+    },
+    sugerirPrefijoDepartamento(nombre) {
+      const STOPWORDS = new Set(['y', 'de', 'en', 'para', 'o', 'del', 'la', 'los', 'las', 'el'])
+      const letras = (p) => (p.match(/[a-zA-Z]/g) || []).map(c => c.toUpperCase())
+      const palabras = (nombre || '').trim().split(/\s+/).filter(Boolean)
+      if (palabras.length === 0) return ''
+      const l1 = letras(palabras[0])[0] || ''
+      const segunda = palabras.slice(1).find(p => !STOPWORDS.has(p.toLowerCase()) && letras(p).length > 0)
+      let l2
+      if (segunda) {
+        l2 = letras(segunda)[0]
+      } else {
+        const letrasPrimera = letras(palabras[0])
+        l2 = letrasPrimera.length > 1 ? letrasPrimera[1] : 'X'
+      }
+      // Sugerencia simple, sin resolucion de colisiones entre departamentos
+      // (eso solo lo resuelve el script offline de recodificacion masiva) —
+      // el usuario siempre ve el preview y puede editar el prefijo antes de confirmar.
+      return l1 + l2
+    },
+    abrirAutonumerar() {
+      if (this.seleccionados.size === 0) return
+      const sugerido = this.deptoActivoObj ? this.sugerirPrefijoDepartamento(this.deptoActivoObj.nombre) : ''
+      this.autonumerarForm = { prefijo: sugerido, numeroInicial: 1, padding: 3 }
+      this.modalAutonumerar = true
+    },
+    cerrarAutonumerar() {
+      this.modalAutonumerar = false
+    },
+    confirmarAutonumerar() {
+      if (!this.prefijoValidoAutonumerar) return
+      const prefijo = this.autonumerarForm.prefijo.trim().toUpperCase()
+      const padding = Math.max(1, Number(this.autonumerarForm.padding) || 3)
+      let numero = Math.max(1, Number(this.autonumerarForm.numeroInicial) || 1)
+      const idsEnOrden = this.productosFiltrados.map(f => f.producto_id).filter(id => this.seleccionados.has(id))
+      for (const id of idsEnOrden) {
+        this.borrador[id].codigo = `${prefijo}-${String(numero).padStart(padding, '0')}`
+        numero++
+        this.marcarModificado(id)
+        delete this.erroresCodigoPorFila[id]
+      }
+      this.modalAutonumerar = false
+      this.seleccionados = new Set()
     },
     textoProveedor(productoId, slot) {
       const key = `${productoId}_${slot}`
@@ -504,7 +653,7 @@ export default {
       this.borrador[productoId][slot].proveedor_id = proveedor.id
       this.autocompleteAbierto = null
       delete this.autocompleteTextoLibre[`${productoId}_${slot}`]
-      this.marcarModificado(productoId)
+      this.marcarFichaModificada(productoId)
     },
     defaultCreditoProveedor(proveedorId) {
       const p = this.proveedores.find(x => x.id === proveedorId)
@@ -605,59 +754,110 @@ export default {
       if (!confirm(`¿Descartar ${this.filasModificadas.size} cambio(s) sin guardar?`)) return
       this.reconstruirBorrador()
       this.filasModificadas = new Set()
+      this.filasFichaTocada = new Set()
+      this.erroresCodigoPorFila = {}
       this.errorGuardado = ''
     },
     async guardarCambios() {
       if (this.filasModificadas.size === 0) return
       this.guardando = true
       this.errorGuardado = ''
-      try {
-        const fichas = [...this.filasModificadas].map(id => {
-          const b = this.borrador[id]
-          const proveedores = []
-          if (b.p1.proveedor_id) proveedores.push({ prioridad: 1, ...this._limpiarSlot(b.p1) })
-          if (b.p2.proveedor_id) proveedores.push({ prioridad: 2, ...this._limpiarSlot(b.p2) })
-          if (b.p3Passthrough) {
-            proveedores.push({
-              prioridad: 3,
-              proveedor_id: b.p3Passthrough.proveedor_id,
-              precio_actual_usd: b.p3Passthrough.precio_actual_usd,
-              credito_dias: b.p3Passthrough.credito_dias,
-              lead_time_dias: b.p3Passthrough.lead_time_dias,
-              minimo_compra: b.p3Passthrough.minimo_compra,
-              sin_stock_declarado: b.p3Passthrough.sin_stock_declarado,
-              sin_stock_fecha: b.p3Passthrough.sin_stock_fecha,
-            })
-          }
-          return {
-            producto_id:         id,
-            modo_reposicion:     b.modo_reposicion,
-            stock_min_objetivo:  Number(b.stock_min_objetivo) || 0,
-            stock_max_objetivo:  Number(b.stock_max_objetivo) || 0,
-            unidades_exhibicion: Number(b.unidades_exhibicion) || 0,
-            colchon_dias:        Number(b.colchon_dias) || 0,
-            activo:              b.activo,
-            proveedores,
-          }
-        })
-        const res = await axios.put('/productos/reposicion/bulk', { fichas })
-        const actualizadas = res.data.actualizadas
-        for (const fichaActualizada of actualizadas) {
-          const idx = this.productos.findIndex(p => p.producto_id === fichaActualizada.producto_id)
-          if (idx !== -1) this.productos.splice(idx, 1, fichaActualizada)
-          this.borrador[fichaActualizada.producto_id] = this.construirFilaBorrador(fichaActualizada)
-        }
-        this.filasModificadas = new Set()
-      } catch (e) {
-        const detail = e?.response?.data?.detail
-        if (detail && detail.errores) {
-          this.errorGuardado = detail.errores.map(er => `Producto ${er.producto_id}: ${er.detail}`).join(' · ')
+
+      // 1) Código: PUT individual por fila (mismo endpoint que Inventario clásico
+      // ya usa, valida UNIQUE). Aislado a propósito — si uno choca, no bloquea
+      // ni el resto de los códigos ni el guardado de fichas.
+      const idsConCodigoCambiado = [...this.filasModificadas].filter(id => {
+        const original = this.productos.find(p => p.producto_id === id)
+        return original && (this.borrador[id].codigo || '') !== (original.producto_codigo || '')
+      })
+      const resultadosCodigo = await Promise.allSettled(
+        idsConCodigoCambiado.map(id =>
+          axios.put(`/productos/${id}/codigo`, { codigo: this.borrador[id].codigo || null })
+        )
+      )
+      resultadosCodigo.forEach((resultado, i) => {
+        const id = idsConCodigoCambiado[i]
+        if (resultado.status === 'fulfilled') {
+          delete this.erroresCodigoPorFila[id]
+          const prod = this.productos.find(p => p.producto_id === id)
+          if (prod) prod.producto_codigo = resultado.value.data.codigo
         } else {
-          this.errorGuardado = detail || 'Error al guardar los cambios'
+          this.erroresCodigoPorFila[id] = resultado.reason?.response?.data?.detail || 'Error al guardar el código'
         }
-      } finally {
-        this.guardando = false
+      })
+
+      // 2) Ficha: bulk transaccional, solo para filas donde cambió de verdad
+      // algo de la ficha (no las que solo tocaron el código — si no, una fila
+      // sin ficha_cargada terminaría creando una ficha vacía sin que nadie
+      // la haya pedido, solo por renombrar su código).
+      const idsFicha = [...this.filasFichaTocada]
+      let fichaOk = true
+      if (idsFicha.length > 0) {
+        try {
+          const fichas = idsFicha.map(id => {
+            const b = this.borrador[id]
+            const proveedores = []
+            if (b.p1.proveedor_id) proveedores.push({ prioridad: 1, ...this._limpiarSlot(b.p1) })
+            if (b.p2.proveedor_id) proveedores.push({ prioridad: 2, ...this._limpiarSlot(b.p2) })
+            if (b.p3Passthrough) {
+              proveedores.push({
+                prioridad: 3,
+                proveedor_id: b.p3Passthrough.proveedor_id,
+                precio_actual_usd: b.p3Passthrough.precio_actual_usd,
+                credito_dias: b.p3Passthrough.credito_dias,
+                lead_time_dias: b.p3Passthrough.lead_time_dias,
+                minimo_compra: b.p3Passthrough.minimo_compra,
+                sin_stock_declarado: b.p3Passthrough.sin_stock_declarado,
+                sin_stock_fecha: b.p3Passthrough.sin_stock_fecha,
+              })
+            }
+            return {
+              producto_id:         id,
+              modo_reposicion:     b.modo_reposicion,
+              stock_min_objetivo:  Number(b.stock_min_objetivo) || 0,
+              stock_max_objetivo:  Number(b.stock_max_objetivo) || 0,
+              unidades_exhibicion: Number(b.unidades_exhibicion) || 0,
+              colchon_dias:        Number(b.colchon_dias) || 0,
+              activo:              b.activo,
+              proveedores,
+            }
+          })
+          const res = await axios.put('/productos/reposicion/bulk', { fichas })
+          const actualizadas = res.data.actualizadas
+          const idsActualizados = new Set()
+          for (const fichaActualizada of actualizadas) {
+            const idx = this.productos.findIndex(p => p.producto_id === fichaActualizada.producto_id)
+            if (idx !== -1) {
+              // el bulk no toca el codigo — preservar el que ya quedo en this.productos
+              const conCodigoPreservado = { ...fichaActualizada, producto_codigo: this.productos[idx].producto_codigo }
+              this.productos.splice(idx, 1, conCodigoPreservado)
+              this.borrador[fichaActualizada.producto_id] = this.construirFilaBorrador(conCodigoPreservado)
+            }
+            idsActualizados.add(fichaActualizada.producto_id)
+          }
+          this.filasFichaTocada = new Set([...this.filasFichaTocada].filter(id => !idsActualizados.has(id)))
+        } catch (e) {
+          fichaOk = false
+          const detail = e?.response?.data?.detail
+          if (detail && detail.errores) {
+            this.errorGuardado = detail.errores.map(er => `Producto ${er.producto_id}: ${er.detail}`).join(' · ')
+          } else {
+            this.errorGuardado = detail || 'Error al guardar los cambios'
+          }
+        }
       }
+
+      // 3) Una fila sigue "modificada" solo si le quedó pendiente un error de
+      // código, o (si el bulk de fichas falló entero) su cambio de ficha.
+      const nuevasModificadas = new Set()
+      for (const id of this.filasModificadas) {
+        const tieneErrorCodigo    = id in this.erroresCodigoPorFila
+        const tieneFichaPendiente = !fichaOk && this.filasFichaTocada.has(id)
+        if (tieneErrorCodigo || tieneFichaPendiente) nuevasModificadas.add(id)
+      }
+      this.filasModificadas = nuevasModificadas
+
+      this.guardando = false
     },
     _limpiarSlot(slot) {
       return {
@@ -694,6 +894,9 @@ export default {
 
 .modal-nuevo-planificado { max-width: 620px; }
 .repo-modal-hint { font-size: 0.82rem; color: var(--texto-secundario); margin: -0.25rem 0 1rem; }
+.modal-autonumerar { max-width: 460px; }
+.repo-preview-autonumerar { font-size: 0.85rem; margin: 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.repo-preview-codigo { background: #FFCC0033; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; font-family: monospace; }
 .btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
 .btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -719,6 +922,8 @@ export default {
 .badge-pendientes { background: #DC2626; color: white; border-radius: 999px; padding: 0.05rem 0.45rem; font-size: 0.72rem; margin-left: 0.4rem; }
 .btn-descartar-lote { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-descartar-lote:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-autonumerar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; position: relative; }
+.btn-autonumerar:disabled { opacity: 0.4; cursor: not-allowed; }
 .repo-error-guardado { color: var(--danger); font-size: 0.82rem; font-weight: 600; }
 
 .repo-cargando { padding: 2rem; text-align: center; color: var(--texto-secundario); }
@@ -730,7 +935,11 @@ export default {
 .repo-fila-modificada { box-shadow: inset 3px 0 0 #FFCC00; background: #FFCC0011; }
 .repo-celda-codigo { font-weight: 700; font-size: 0.78rem; }
 .repo-celda-planificada { border-left: 3px dashed #9CA3AF; padding-left: 0.3rem; cursor: help; }
+.repo-celda-codigo-error { box-shadow: inset 3px 0 0 var(--danger); }
 .repo-icono-planificado { margin-right: 0.15rem; }
+.repo-input-codigo { width: 78px; font-weight: 700; }
+.repo-celda-codigo-error .repo-input-codigo { border-color: var(--danger) !important; background: #DC262611; }
+.repo-celda-check { text-align: center; width: 28px; }
 .repo-celda-desc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .repo-celda-num { text-align: right; }
 .repo-sin-datos { text-align: center; color: var(--texto-secundario); padding: 1.5rem; }
