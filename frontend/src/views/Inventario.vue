@@ -530,37 +530,6 @@
 
             <!-- Opciones especiales -->
             <div class="opciones-especiales" v-if="!esVendedor">
-              <!-- Genericidad — solo admin -->
-              <div class="campo-seccion" v-if="esAdmin">
-                <label class="campo-toggle-row">
-                  <div class="toggle-texto">
-                    <span class="toggle-titulo">Producto genérico (multi-proveedor)</span>
-                    <span class="toggle-subtitulo">El código interno del sistema es el que manda. No se vincula de forma inamovible a ningún proveedor.</span>
-                  </div>
-                  <div class="toggle-switch" :class="{ activo: form.es_generico }" @click="form.es_generico = !form.es_generico">
-                    <div class="toggle-knob"></div>
-                  </div>
-                </label>
-
-                <!-- Solo mostrar si estaba como genérico y el admin lo está cambiando a específico -->
-                <div v-if="editando && form._cambioGenerico && !form.es_generico" class="asociacion-fija-box">
-                  <p class="asociacion-aviso">⚠ Al guardar, este producto quedará vinculado de forma permanente al proveedor y código seleccionados.</p>
-                  <div class="campo-fila">
-                    <div class="campo">
-                      <label>Proveedor a vincular</label>
-                      <select v-model="form._proveedor_fijo_id">
-                        <option :value="null">— Seleccionar —</option>
-                        <option v-for="pv in proveedores" :key="pv.id" :value="pv.id">{{ pv.nombre }}</option>
-                      </select>
-                    </div>
-                    <div class="campo">
-                      <label>Código del proveedor</label>
-                      <input v-model="form._codigo_proveedor_fijo" placeholder="Código exacto del proveedor" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <label class="check-opt">
                 <input type="checkbox" v-model="form.es_producto_clave" />
                 <span class="check-label">
@@ -1554,11 +1523,6 @@ export default {
   },
 
   watch: {
-    'form.es_generico'(nuevoVal, anteriorVal) {
-      if (this.editando && nuevoVal !== anteriorVal) {
-        this.form._cambioGenerico = true
-      }
-    },
     busqueda() {
       clearTimeout(this._busquedaTimer)
       this._busquedaTimer = setTimeout(() => {
@@ -1702,7 +1666,6 @@ export default {
         es_producto_clave: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
-        es_generico: false, _cambioGenerico: false, _proveedor_fijo_id: null, _codigo_proveedor_fijo: '',
         unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '',
         precio_paquete_base_usd: null, precio_paquete_ref_usd: null,
         descuento_max_pct_display: null,
@@ -1722,10 +1685,6 @@ export default {
         descuento_compuesto_pct: p.descuento_compuesto_pct ?? 0,
         requiere_serial:         p.requiere_serial         ?? false,
         plantilla_garantia_id:   p.plantilla_garantia_id   ?? null,
-        es_generico:             p.es_generico             ?? false,
-        _cambioGenerico:         false,
-        _proveedor_fijo_id:      null,
-        _codigo_proveedor_fijo:  '',
         unidad_medida:           p.unidad_medida               ?? 'unidad',
         unidades_por_paquete:    p.unidades_por_paquete        ?? 1,
         nombre_paquete:          p.nombre_paquete              ?? '',
@@ -1769,7 +1728,6 @@ export default {
           codigo:                  this.form.codigo               || null,
           requiere_serial:         Boolean(this.form.requiere_serial),
           plantilla_garantia_id:   this.form.plantilla_garantia_id || null,
-          es_generico:             Boolean(this.form.es_generico),
           unidad_medida:           this.form.unidad_medida                 || 'unidad',
           unidades_por_paquete:    Number(this.form.unidades_por_paquete   || 1),
           nombre_paquete:          this.form.nombre_paquete                || null,
@@ -1779,17 +1737,6 @@ export default {
         }
         if (this.editando) {
           await axios.put(`/productos/${this.form.id}`, payload)
-          // Si hubo cambio de genericidad, llamar endpoint dedicado
-          if (this.form._cambioGenerico) {
-            await axios.patch(`/productos/${this.form.id}/genericidad`, {
-              es_generico:      this.form.es_generico,
-              proveedor_id:     this.form._proveedor_fijo_id     || null,
-              codigo_proveedor: this.form._codigo_proveedor_fijo || '',
-            })
-            this.form._cambioGenerico        = false
-            this.form._proveedor_fijo_id     = null
-            this.form._codigo_proveedor_fijo = ''
-          }
         } else {
           await axios.post('/productos/', payload)
         }

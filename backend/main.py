@@ -143,6 +143,17 @@ def inicializar_datos():
              "ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_generico BOOLEAN DEFAULT FALSE"],
         )
 
+        # ── productos: es_generico deprecated, forzado a true para todos ───────
+        # La ficha de reposición (proveedor principal + alternativos) reemplaza
+        # la distinción genérico/específico. La columna no se borra (ver nota en
+        # models.py) pero deja de tener ningún efecto — se fuerza a true en todos
+        # los productos existentes. El WHERE evita reescribir filas ya migradas
+        # en cada arranque.
+        migrar(
+            ["UPDATE productos SET es_generico = 1 WHERE es_generico IS NULL OR es_generico = 0"],
+            ["UPDATE productos SET es_generico = TRUE WHERE es_generico IS NOT TRUE"],
+        )
+
         # ── proveedores ──────────────────────────────────────────────────────
         migrar(
             ["ALTER TABLE proveedores ADD COLUMN dias_credito INTEGER DEFAULT 0",

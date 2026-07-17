@@ -1260,15 +1260,6 @@ export default {
         this.lineaActualizarNombre = linea
         this.modalActualizarNombre = true
       }
-
-      // Verificar genericidad en segundo plano
-      axios.get(`/productos/${prod.id}`).then(res => {
-        if (res.data.es_generico) {
-          this.lineaGenericaPendiente = linea
-          this.proveedorGenericoOpc   = this.proveedorId
-          this.modalGenerico          = true
-        }
-      }).catch(() => {})
     },
     limpiarMatch(linea) {
       linea.match            = null

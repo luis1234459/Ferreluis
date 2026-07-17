@@ -38,7 +38,6 @@ class ProductoSchema(BaseModel):
     activo:                  bool            = True
     requiere_serial:         bool            = False
     plantilla_garantia_id:   Optional[int]   = None
-    es_generico:             bool            = False
     marca_id:                Optional[int]   = None
 
     unidad_medida:           str            = 'unidad'
@@ -953,42 +952,42 @@ def cambiar_genericidad(
     _: None = Depends(require_admin),
 ):
     """
-    Solo admin puede cambiar un producto entre genérico y específico.
-    Si se cambia a específico (es_generico=False), se puede pasar
-    proveedor_id y codigo_proveedor para fijar la asociación inamovible.
+    DEPRECATED, retirar en C18: la ficha de reposición (proveedor principal +
+    alternativos) reemplaza la distinción genérico/específico. El endpoint se
+    mantiene por compatibilidad con clientes viejos que todavía lo llamen,
+    pero el valor entrante de es_generico se ignora — ya no hace nada más que
+    confirmar que el producto existe.
     """
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    es_generico = bool(datos.get("es_generico", False))
-    p.es_generico = es_generico
+    # deprecated, retirar en C18: fijar el producto a un proveedor específico
+    # de forma inamovible ya no aplica (ver nota en models.py) — rama muerta,
+    # se preserva comentada para no perder el rastro del comportamiento viejo.
+    # es_generico = bool(datos.get("es_generico", False))
+    # if not es_generico:
+    #     proveedor_id    = datos.get("proveedor_id")
+    #     codigo_prov     = (datos.get("codigo_proveedor") or "").strip()
+    #     nombre_producto = p.nombre
+    #     if proveedor_id and codigo_prov:
+    #         existente = db.query(CatalogoProveedor).filter(
+    #             CatalogoProveedor.proveedor_id == proveedor_id,
+    #             CatalogoProveedor.producto_id  == producto_id,
+    #         ).first()
+    #         if not existente:
+    #             db.add(CatalogoProveedor(
+    #                 proveedor_id          = proveedor_id,
+    #                 producto_id           = producto_id,
+    #                 nombre_producto       = nombre_producto,
+    #                 codigo_proveedor      = codigo_prov,
+    #                 precio_referencia_usd = float(p.costo_usd or 0),
+    #             ))
+    #         else:
+    #             if not existente.codigo_proveedor and codigo_prov:
+    #                 existente.codigo_proveedor = codigo_prov
 
-    if not es_generico:
-        proveedor_id    = datos.get("proveedor_id")
-        codigo_prov     = (datos.get("codigo_proveedor") or "").strip()
-        nombre_producto = p.nombre
-
-        if proveedor_id and codigo_prov:
-            existente = db.query(CatalogoProveedor).filter(
-                CatalogoProveedor.proveedor_id == proveedor_id,
-                CatalogoProveedor.producto_id  == producto_id,
-            ).first()
-            if not existente:
-                db.add(CatalogoProveedor(
-                    proveedor_id          = proveedor_id,
-                    producto_id           = producto_id,
-                    nombre_producto       = nombre_producto,
-                    codigo_proveedor      = codigo_prov,
-                    precio_referencia_usd = float(p.costo_usd or 0),
-                ))
-            else:
-                if not existente.codigo_proveedor and codigo_prov:
-                    existente.codigo_proveedor = codigo_prov
-
-    db.commit()
-    db.refresh(p)
-    return {"id": p.id, "es_generico": p.es_generico}
+    return {"id": p.id, "es_generico": True}
 
 
 @router.put("/{producto_id}/codigo")

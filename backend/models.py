@@ -87,7 +87,9 @@ class Producto(Base):
     plantilla_garantia_id   = Column(Integer, nullable=True)   # FK → PlantillaGarantia
 
     pricing_policy_override = Column(String, nullable=True)   # None → hereda del Proveedor
-    es_generico             = Column(Boolean, default=False)  # True = multi-proveedor, código interno manda
+    # es_generico = Column(Boolean, default=False)  # deprecated, retirar en C18 — reemplazado por
+    # la ficha de reposición (proveedor principal + alternativos). La columna sigue
+    # existiendo en la DB (seteada a true para todos), pero el ORM ya no la mapea.
 
     unidad_medida             = Column(String,  default='unidad')  # metro | kilo | litro | unidad
     unidades_por_paquete      = Column(Integer, default=1)         # 1 = sin paquete; N = unidades/paquete
