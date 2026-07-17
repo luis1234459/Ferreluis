@@ -917,25 +917,12 @@ def importar_catalogo(
                 continue
 
             if accion == "nuevo":
-                # Código: usar el del catálogo si está disponible; si ya existe en otro producto, no asignar
-                codigo_a_asignar = None
-                if codigo_cat:
-                    ya_existe = db.query(Producto.id).filter(Producto.codigo == codigo_cat).first()
-                    codigo_a_asignar = None if ya_existe else codigo_cat
-
-                # Si el catálogo no trae código, generar uno automático
-                if not codigo_a_asignar:
-                    import re as _re
-                    letras  = _re.sub(r'[^A-Za-z]', '', nombre).upper()[:3].ljust(3, 'X')
-                    prefijo = letras + '-'
-                    nums    = [int(m.group(1)) for (c,) in db.query(Producto.codigo).filter(
-                                   Producto.codigo.like(f"{prefijo}%")).all()
-                               if c and (m := _re.search(r'(\d+)$', c))]
-                    codigo_a_asignar = f"{prefijo}{(max(nums)+1 if nums else 1):03d}"
-
+                # productos.codigo es el código interno de Ferre-Util y lo asigna
+                # el dueño del catálogo — el código del proveedor se guarda más
+                # abajo en catalogo_proveedor.codigo_proveedor, que es su lugar.
                 nuevo = Producto(
                     nombre          = nombre,
-                    codigo          = codigo_a_asignar,
+                    codigo          = None,
                     proveedor_id    = proveedor_id,
                     departamento_id = depto_id,
                     categoria_id    = cat_id,
