@@ -1001,7 +1001,7 @@ def actualizar_codigo_producto(
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    nuevo_codigo = datos.get("codigo", "").strip() or None
+    nuevo_codigo = (datos.get("codigo") or "").strip() or None
     if nuevo_codigo:
         existe = db.query(Producto).filter(
             Producto.codigo == nuevo_codigo,
