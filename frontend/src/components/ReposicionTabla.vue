@@ -21,6 +21,11 @@
       <button class="btn-panel-proveedores" @click="panelAbierto = !panelAbierto">
         {{ panelAbierto ? '✕ Ocultar proveedores' : '📋 Ver proveedores' }}
       </button>
+      <button class="btn-agregar-planificado" :disabled="!deptoActivoId"
+        :title="!deptoActivoId ? 'Elegí un departamento primero' : 'Crear un producto planificado (sin existencia todavía)'"
+        @click="abrirModalNuevoProducto">
+        + Agregar producto
+      </button>
     </div>
 
     <!-- Estado vacío: sin departamento elegido -->
@@ -93,8 +98,12 @@
               </thead>
               <tbody>
                 <tr v-for="fila in productosFiltrados" :key="fila.producto_id"
+                    :data-producto-id="fila.producto_id"
                     :class="{ 'repo-fila-modificada': filasModificadas.has(fila.producto_id) }">
-                  <td class="repo-celda-codigo">{{ fila.producto_codigo || '—' }}</td>
+                  <td class="repo-celda-codigo" :class="{ 'repo-celda-planificada': esPlanificado(fila) }"
+                      :title="esPlanificado(fila) ? 'Producto planificado, sin existencia aún' : ''">
+                    <span v-if="esPlanificado(fila)" class="repo-icono-planificado">🧭</span>{{ fila.producto_codigo || '—' }}
+                  </td>
                   <td class="repo-celda-desc" :title="fila.producto_descripcion">{{ fila.producto_descripcion }}</td>
                   <td class="repo-celda-num">{{ fila.existencia }}</td>
 
@@ -214,6 +223,63 @@
         </div>
       </div>
     </template>
+
+    <!-- Modal: agregar producto planificado -->
+    <div class="overlay" v-if="modalNuevoProducto" @click.self="cerrarModalNuevoProducto">
+      <div class="modal modal-nuevo-planificado">
+        <div class="modal-header">
+          <h2>Agregar producto planificado</h2>
+          <button class="btn-cerrar-modal" @click="cerrarModalNuevoProducto">✕</button>
+        </div>
+        <p class="repo-modal-hint">
+          Para planificar el catálogo ideal del departamento: creá el producto con existencia 0
+          y cargá su ficha de reposición en la misma tabla, sin cambiar de pantalla.
+        </p>
+        <div class="grid-form">
+          <div class="field">
+            <label>Código</label>
+            <input v-model="formNuevoProducto.codigo" placeholder="Opcional — se autogenera si lo dejás vacío" />
+          </div>
+          <div class="field field-wide">
+            <label>Descripción *</label>
+            <input v-model="formNuevoProducto.descripcion" placeholder="Nombre del producto" />
+          </div>
+          <div class="field">
+            <label>Departamento</label>
+            <select v-model="formNuevoProducto.departamento_id" @change="formNuevoProducto.categoria_id = null">
+              <option :value="null">— Sin departamento —</option>
+              <option v-for="d in deptos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Categoría</label>
+            <select v-model="formNuevoProducto.categoria_id">
+              <option :value="null">— Sin categoría —</option>
+              <option v-for="c in categoriasParaNuevoProducto" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Costo USD</label>
+            <input v-model.number="formNuevoProducto.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Precio de venta USD</label>
+            <input v-model.number="formNuevoProducto.precio_venta_usd" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Existencia inicial</label>
+            <input v-model.number="formNuevoProducto.stock" type="number" min="0" placeholder="0" />
+          </div>
+        </div>
+        <p class="msg-error" v-if="errorNuevoProducto">{{ errorNuevoProducto }}</p>
+        <div class="form-botones">
+          <button class="btn-cancelar" @click="cerrarModalNuevoProducto">Cancelar</button>
+          <button class="btn-guardar" :disabled="guardandoNuevoProducto" @click="crearProductoPlanificado">
+            {{ guardandoNuevoProducto ? 'Creando...' : 'Crear producto' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -249,6 +315,10 @@ export default {
       panelAbierto:     false,
       autocompleteAbierto: null,   // { productoId, slot }
       autocompleteTextoLibre: {},  // texto crudo mientras el usuario tipea, key `${id}_${slot}`
+      modalNuevoProducto:     false,
+      guardandoNuevoProducto: false,
+      errorNuevoProducto:     '',
+      formNuevoProducto: { codigo: '', descripcion: '', departamento_id: null, categoria_id: null, costo_usd: 0, precio_venta_usd: 0, stock: 0 },
     }
   },
   computed: {
@@ -268,6 +338,10 @@ export default {
     },
     proveedoresOrdenados() {
       return [...this.proveedores].sort((a, b) => a.nombre.localeCompare(b.nombre))
+    },
+    categoriasParaNuevoProducto() {
+      const d = this.deptos.find(x => x.id === this.formNuevoProducto.departamento_id)
+      return d?.categorias || []
     },
     sugerenciasProveedor() {
       if (!this.autocompleteAbierto) return []
@@ -440,6 +514,67 @@ export default {
       const p = this.proveedores.find(x => x.id === proveedorId)
       return p?.lead_time_dias_default || 0
     },
+    esPlanificado(fila) {
+      return (fila.existencia || 0) === 0 && (fila.stock_min_objetivo || 0) > 0
+    },
+    abrirModalNuevoProducto() {
+      if (!this.deptoActivoId) return
+      this.formNuevoProducto = {
+        codigo: '', descripcion: '',
+        departamento_id: this.deptoActivoId,
+        categoria_id:    this.categoriaActivaId || null,
+        costo_usd: 0, precio_venta_usd: 0, stock: 0,
+      }
+      this.errorNuevoProducto = ''
+      this.modalNuevoProducto = true
+    },
+    cerrarModalNuevoProducto() {
+      this.modalNuevoProducto = false
+      this.errorNuevoProducto = ''
+    },
+    async crearProductoPlanificado() {
+      if (!this.formNuevoProducto.descripcion.trim()) {
+        this.errorNuevoProducto = 'La descripción es obligatoria'
+        return
+      }
+      this.guardandoNuevoProducto = true
+      this.errorNuevoProducto = ''
+      try {
+        const costo  = Number(this.formNuevoProducto.costo_usd) || 0
+        const precio = Number(this.formNuevoProducto.precio_venta_usd) || 0
+        const margen = costo > 0 ? (precio / costo - 1) : 0.30
+        const res = await axios.post('/productos/', {
+          nombre:          this.formNuevoProducto.descripcion,
+          codigo:          this.formNuevoProducto.codigo || null,
+          departamento_id: this.formNuevoProducto.departamento_id,
+          categoria_id:    this.formNuevoProducto.categoria_id,
+          costo_usd:       costo,
+          margen,
+          stock:           Number(this.formNuevoProducto.stock) || 0,
+        })
+        const nuevoId = res.data.id
+        this.modalNuevoProducto = false
+        // Limpiar filtros secundarios para garantizar que la fila nueva se vea
+        // (un producto recién creado, sin ficha, puede no calzar con "con ficha"
+        // o un semáforo puntual, aunque sí pertenezca al depto/categoría activos).
+        this.busqueda     = ''
+        this.filtroEstado = 'todos'
+        await this.cargarTabla()
+        await this.$nextTick()
+        this.enfocarFilaNueva(nuevoId)
+      } catch (e) {
+        this.errorNuevoProducto = e?.response?.data?.detail || 'Error al crear el producto'
+      } finally {
+        this.guardandoNuevoProducto = false
+      }
+    },
+    enfocarFilaNueva(productoId) {
+      const input = this.$el.querySelector(`tr[data-producto-id="${productoId}"] .repo-input-prov`)
+      if (input) {
+        input.scrollIntoView({ block: 'nearest' })
+        input.focus()
+      }
+    },
     bajarFila(event) {
       const cell = event.target.closest('td')
       const row  = event.target.closest('tr')
@@ -551,6 +686,17 @@ export default {
   background: transparent; color: var(--texto-principal); border: 1px solid var(--borde);
   padding: 0.55rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
 }
+.btn-agregar-planificado {
+  background: #1A1A1A; color: #FFCC00; border: none;
+  padding: 0.55rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+}
+.btn-agregar-planificado:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.modal-nuevo-planificado { max-width: 620px; }
+.repo-modal-hint { font-size: 0.82rem; color: var(--texto-secundario); margin: -0.25rem 0 1rem; }
+.btn-cancelar { background: transparent; color: var(--texto-principal); border: 1px solid var(--borde); padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; }
+.btn-guardar  { background: #1A1A1A; color: #FFCC00; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .repo-vacio-inicial {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -583,6 +729,8 @@ export default {
 .repo-tabla td { padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--borde); white-space: nowrap; }
 .repo-fila-modificada { box-shadow: inset 3px 0 0 #FFCC00; background: #FFCC0011; }
 .repo-celda-codigo { font-weight: 700; font-size: 0.78rem; }
+.repo-celda-planificada { border-left: 3px dashed #9CA3AF; padding-left: 0.3rem; cursor: help; }
+.repo-icono-planificado { margin-right: 0.15rem; }
 .repo-celda-desc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .repo-celda-num { text-align: right; }
 .repo-sin-datos { text-align: center; color: var(--texto-secundario); padding: 1.5rem; }
