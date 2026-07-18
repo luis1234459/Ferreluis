@@ -88,7 +88,7 @@
                   <th>Descripción</th>
                   <th title="Existencia en stock">Exist.</th>
                   <th title="Proveedor principal">P1</th>
-                  <th title="Precio actual (USD)">Precio</th>
+                  <th title="Costo de compra al proveedor principal en USD">Costo</th>
                   <th title="Crédito (días) — placeholder es el default del proveedor">Cred</th>
                   <th title="Lead time (días) — placeholder es el default del proveedor">LT</th>
                   <th title="Mínimo de compra">Min</th>
