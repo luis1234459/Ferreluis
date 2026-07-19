@@ -937,7 +937,7 @@ export default {
 .repo-celda-planificada { border-left: 3px dashed #9CA3AF; padding-left: 0.3rem; cursor: help; }
 .repo-celda-codigo-error { box-shadow: inset 3px 0 0 var(--danger); }
 .repo-icono-planificado { margin-right: 0.15rem; }
-.repo-input-codigo { width: 78px; font-weight: 700; }
+.repo-input-codigo { width: 94px; font-weight: 700; }
 .repo-celda-codigo-error .repo-input-codigo { border-color: var(--danger) !important; background: #DC262611; }
 .repo-celda-check { text-align: center; width: 28px; }
 .repo-celda-desc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
