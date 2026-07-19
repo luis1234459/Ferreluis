@@ -5,6 +5,10 @@
     <main class="contenido">
       <div class="top-bar">
         <h1>Proveedores</h1>
+        <label class="toggle-inactivos">
+          <input type="checkbox" v-model="mostrarInactivos" @change="cargar" />
+          Mostrar inactivos
+        </label>
         <button class="btn-nuevo" @click="abrirNuevo">+ Nuevo proveedor</button>
       </div>
 
@@ -16,7 +20,7 @@
               <tr><th>Código</th><th>Nombre</th><th>RIF</th><th>Teléfono</th><th>Contacto</th><th>Email</th><th>Crédito</th><th>Precio</th><th>Acciones</th></tr>
             </thead>
             <tbody>
-              <tr v-for="p in proveedores" :key="p.id">
+              <tr v-for="p in proveedores" :key="p.id" :class="{ 'fila-inactiva': !p.activo }">
                 <td class="celda-codigo-prv">
                   <span v-if="codigoEditando !== p.id" class="codigo-prv" @click="iniciarEditCodigo(p)" title="Clic para editar código">
                     {{ p.codigo || '— asignar —' }}
@@ -28,6 +32,7 @@
                     <button class="btn-ok-codigo" @click="guardarCodigo(p)">✓</button>
                     <button class="btn-cancel-codigo" @click="codigoEditando = null">✕</button>
                   </span>
+                  <span v-if="!p.activo" class="badge-inactivo">Inactivo</span>
                   <p class="msg-error-codigo" v-if="errorCodigo && codigoEditando === p.id">{{ errorCodigo }}</p>
                 </td>
                 <td style="font-weight:600">{{ p.nombre }}</td>
@@ -51,7 +56,8 @@
                   <button class="btn-editar" @click="editar(p)">Editar</button>
                   <button class="btn-catalogo" @click="verCatalogo(p)">Catálogo</button>
                   <button class="btn-fusionar" @click="abrirFusion(p)" title="Combinar este proveedor duplicado en otro">Fusionar en...</button>
-                  <button class="btn-eliminar" @click="eliminar(p.id)">Desactivar</button>
+                  <button v-if="p.activo" class="btn-eliminar" @click="eliminar(p.id)">Desactivar</button>
+                  <button v-else class="btn-reactivar" @click="reactivar(p.id)">Reactivar</button>
                 </td>
               </tr>
               <tr v-if="proveedores.length === 0">
@@ -294,6 +300,7 @@ export default {
       fusionCanonicoId:    null,
       fusionando:          false,
       errorFusion:         '',
+      mostrarInactivos:    false,
     }
   },
   computed: {
@@ -312,7 +319,9 @@ export default {
   },
   methods: {
     async cargar() {
-      const res = await axios.get('/compras/proveedores/')
+      const res = await axios.get('/compras/proveedores/', {
+        params: this.mostrarInactivos ? { incluir_inactivos: true } : {},
+      })
       this.proveedores = res.data
     },
     async cargarInventario() {
@@ -372,6 +381,11 @@ export default {
     async eliminar(id) {
       if (!confirm('¿Desactivar este proveedor?')) return
       await axios.delete(`/compras/proveedores/${id}`)
+      await this.cargar()
+    },
+    async reactivar(id) {
+      // Reversible (volver a desactivar es un click), sin confirmacion a proposito.
+      await axios.put(`/compras/proveedores/${id}`, { activo: true })
       await this.cargar()
     },
     async verCatalogo(p) {
@@ -449,6 +463,12 @@ export default {
 .btn-catalogo { background: var(--success); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; }
 .btn-fusionar { background: #6B7280; color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-right: 0.3rem; }
 .btn-eliminar { background: var(--danger); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.btn-reactivar { background: var(--success); color: white; border: none; padding: 0.28rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+
+.toggle-inactivos { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--texto-secundario); margin-left: auto; margin-right: 1rem; cursor: pointer; }
+.fila-inactiva { color: var(--texto-secundario); background: #00000008; }
+.fila-inactiva td { opacity: 0.75; }
+.badge-inactivo { font-size: 0.68rem; font-weight: 700; color: #6B7280; background: #E5E7EB; padding: 0.1rem 0.35rem; border-radius: 4px; margin-left: 0.35rem; }
 
 .modal-sm { max-width: 440px; }
 .fusion-explicacion { font-size: 0.85rem; color: var(--texto-secundario); line-height: 1.5; margin: 0 0 1rem; }

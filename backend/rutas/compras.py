@@ -138,8 +138,11 @@ def _validar_codigo_proveedor(db: Session, codigo: str, excluir_id: int | None =
 
 
 @router.get("/proveedores/")
-def listar_proveedores(db: Session = Depends(get_db)):
-    return db.query(Proveedor).filter(Proveedor.activo == True).order_by(Proveedor.nombre).all()
+def listar_proveedores(incluir_inactivos: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Proveedor)
+    if not incluir_inactivos:
+        q = q.filter(Proveedor.activo == True)
+    return q.order_by(Proveedor.nombre).all()
 
 
 @router.post("/proveedores/")
@@ -200,6 +203,8 @@ def actualizar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(g
         p.descuento_pct = float(datos["descuento_pct"] or 0)
     if "descuento_max_pct" in datos:
         p.descuento_max_pct = float(datos["descuento_max_pct"]) if datos["descuento_max_pct"] is not None else None
+    if "activo" in datos:
+        p.activo = bool(datos["activo"])
     db.commit()
     db.refresh(p)
     return p
