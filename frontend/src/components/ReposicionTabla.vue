@@ -88,7 +88,7 @@
                   <th>Descripción</th>
                   <th title="Existencia en stock">Exist.</th>
                   <th title="Proveedor principal">P1</th>
-                  <th title="Costo de compra al proveedor principal en USD">Costo</th>
+                  <th title="Costo real del proveedor principal en USD. Si no hay ficha cargada, se muestra entre paréntesis el costo genérico del producto como referencia visual.">Costo</th>
                   <th title="Crédito (días) — placeholder es el default del proveedor">Cred</th>
                   <th title="Lead time (días) — placeholder es el default del proveedor">LT</th>
                   <th title="Mínimo de compra">Min</th>
@@ -142,8 +142,11 @@
                       <li v-if="sugerenciasProveedor.length === 0" class="repo-autocomplete-vacio">Sin coincidencias</li>
                     </ul>
                   </td>
-                  <td><input class="repo-input-sm" type="number" min="0" step="0.01"
+                  <td class="repo-celda-costo-p1">
+                    <span class="repo-costo-signo">$</span><input class="repo-input-costo-p1" type="number" min="0" step="0.01"
                     v-model.number="borrador[fila.producto_id].p1.precio_actual_usd"
+                    :placeholder="placeholderCostoGenerico(fila)"
+                    :title="placeholderCostoGenerico(fila) ? 'Costo genérico del producto, sin ficha de proveedor cargada — solo referencia' : ''"
                     @input="marcarFichaModificada(fila.producto_id)" @keydown.enter.prevent="bajarFila($event)" /></td>
                   <td><input class="repo-input-sm" type="number" min="0"
                     v-model.number="borrador[fila.producto_id].p1.credito_dias"
@@ -655,6 +658,16 @@ export default {
       delete this.autocompleteTextoLibre[`${productoId}_${slot}`]
       this.marcarFichaModificada(productoId)
     },
+    placeholderCostoGenerico(fila) {
+      // Solo aplica a P1: mientras no haya costo real del proveedor cargado,
+      // se muestra productos.costo_usd como referencia visual (gris, entre
+      // parentesis via placeholder nativo — nunca es parte del valor
+      // editable, y desaparece solo al tipear un valor real).
+      const real = this.borrador[fila.producto_id]?.p1?.precio_actual_usd
+      if (real) return ''
+      const generico = fila.costo_generico_usd
+      return generico > 0 ? `(${Number(generico).toFixed(2)})` : ''
+    },
     defaultCreditoProveedor(proveedorId) {
       const p = this.proveedores.find(x => x.id === proveedorId)
       return p?.dias_credito || 0
@@ -946,6 +959,10 @@ export default {
 
 .repo-tabla input, .repo-tabla select { border: 1px solid var(--borde); border-radius: 4px; padding: 0.2rem 0.3rem; font-size: 0.8rem; background: var(--fondo); color: var(--texto-principal); }
 .repo-input-sm { width: 52px; }
+.repo-celda-costo-p1 { white-space: nowrap; }
+.repo-costo-signo { color: var(--texto-secundario); font-weight: 700; margin-right: 1px; font-size: 0.8rem; }
+.repo-input-costo-p1 { width: 68px; }
+.repo-input-costo-p1::placeholder { color: #999; font-style: italic; opacity: 1; }
 .repo-input-prov { width: 130px; }
 .repo-input-modo { width: 62px; }
 

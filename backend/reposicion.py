@@ -231,6 +231,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
             "producto_codigo": producto.codigo,
             "producto_descripcion": producto.descripcion or producto.nombre,
             "existencia": producto.stock,
+            "costo_generico_usd": producto.costo_usd,
             "venta_diaria_90d": round(_venta_diaria_90d(db, producto_id, corte), 4),
         }
 
@@ -311,6 +312,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
         "producto_codigo": producto.codigo,
         "producto_descripcion": producto.descripcion or producto.nombre,
         "existencia":     producto.stock,
+        "costo_generico_usd": producto.costo_usd,
         "modo_reposicion": ficha.modo_reposicion,
         "activo":         ficha.activo,
         "stock_min_objetivo": ficha.stock_min_objetivo,
