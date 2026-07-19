@@ -961,7 +961,7 @@ export default {
 .repo-input-sm { width: 52px; }
 .repo-celda-costo-p1 { white-space: nowrap; }
 .repo-costo-signo { color: var(--texto-secundario); font-weight: 700; margin-right: 1px; font-size: 0.8rem; }
-.repo-input-costo-p1 { width: 68px; }
+.repo-input-costo-p1 { width: 96px; }
 .repo-input-costo-p1::placeholder { color: #999; font-style: italic; opacity: 1; }
 .repo-input-prov { width: 130px; }
 .repo-input-modo { width: 62px; }
