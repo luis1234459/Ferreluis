@@ -129,6 +129,7 @@
                   <td class="repo-celda-autocomplete">
                     <input class="repo-input-prov"
                       :value="textoProveedor(fila.producto_id, 'p1')"
+                      :title="tituloProveedor(fila.producto_id, 'p1')"
                       @input="onInputAutocomplete(fila.producto_id, 'p1', $event)"
                       @focus="abrirAutocomplete(fila.producto_id, 'p1')"
                       @keydown.enter.prevent="onEnterAutocomplete(fila.producto_id, 'p1', $event)"
@@ -137,7 +138,7 @@
                     <ul v-if="autocompleteAbierto && autocompleteAbierto.productoId === fila.producto_id && autocompleteAbierto.slot === 'p1'"
                         class="repo-autocomplete-lista">
                       <li v-for="p in sugerenciasProveedor" :key="p.id" @mousedown.prevent="seleccionarProveedor(fila.producto_id, 'p1', p)">
-                        {{ p.codigo || '???' }} — {{ p.nombre }}
+                        <span class="ac-codigo">{{ p.codigo || '???' }}</span><span class="ac-nombre">{{ p.nombre }}</span>
                       </li>
                       <li v-if="sugerenciasProveedor.length === 0" class="repo-autocomplete-vacio">Sin coincidencias</li>
                     </ul>
@@ -164,6 +165,7 @@
                   <td class="repo-celda-autocomplete">
                     <input class="repo-input-prov"
                       :value="textoProveedor(fila.producto_id, 'p2')"
+                      :title="tituloProveedor(fila.producto_id, 'p2')"
                       @input="onInputAutocomplete(fila.producto_id, 'p2', $event)"
                       @focus="abrirAutocomplete(fila.producto_id, 'p2')"
                       @keydown.enter.prevent="onEnterAutocomplete(fila.producto_id, 'p2', $event)"
@@ -172,7 +174,7 @@
                     <ul v-if="autocompleteAbierto && autocompleteAbierto.productoId === fila.producto_id && autocompleteAbierto.slot === 'p2'"
                         class="repo-autocomplete-lista">
                       <li v-for="p in sugerenciasProveedor" :key="p.id" @mousedown.prevent="seleccionarProveedor(fila.producto_id, 'p2', p)">
-                        {{ p.codigo || '???' }} — {{ p.nombre }}
+                        <span class="ac-codigo">{{ p.codigo || '???' }}</span><span class="ac-nombre">{{ p.nombre }}</span>
                       </li>
                       <li v-if="sugerenciasProveedor.length === 0" class="repo-autocomplete-vacio">Sin coincidencias</li>
                     </ul>
@@ -430,9 +432,27 @@ export default {
       const key = `${this.autocompleteAbierto.productoId}_${this.autocompleteAbierto.slot}`
       const texto = (this.autocompleteTextoLibre[key] || '').trim().toLowerCase()
       if (!texto) return this.proveedoresOrdenados.slice(0, 8)
-      return this.proveedoresOrdenados.filter(p =>
-        (p.codigo || '').toLowerCase().includes(texto) || p.nombre.toLowerCase().includes(texto)
-      ).slice(0, 8)
+
+      // Prioriza coincidencias de codigo sobre nombre: exacto > empieza con > contiene,
+      // y dentro de cada nivel lo mismo para nombre. "CIN" encuentra CINDU por codigo
+      // exacto; "cind" (mas largo que el codigo) lo encuentra por nombre empieza-con.
+      const puntaje = (p) => {
+        const cod = (p.codigo || '').toLowerCase()
+        const nom = p.nombre.toLowerCase()
+        if (cod && cod === texto) return 0
+        if (cod && cod.startsWith(texto)) return 1
+        if (cod && cod.includes(texto)) return 2
+        if (nom.startsWith(texto)) return 3
+        if (nom.includes(texto)) return 4
+        return null
+      }
+
+      return this.proveedoresOrdenados
+        .map(p => ({ p, s: puntaje(p) }))
+        .filter(x => x.s !== null)
+        .sort((a, b) => a.s - b.s || a.p.nombre.localeCompare(b.p.nombre))
+        .map(x => x.p)
+        .slice(0, 8)
     },
     productosFiltrados() {
       let lista = this.productos.filter(fila => {
@@ -627,7 +647,15 @@ export default {
       const provId = this.borrador[productoId]?.[slot]?.proveedor_id
       if (!provId) return ''
       const p = this.proveedores.find(x => x.id === provId)
-      return p ? `${p.codigo || '???'} — ${p.nombre}` : ''
+      // Compacto: solo el codigo (la tabla ya tiene 19 columnas). El nombre
+      // completo queda en el title del input, a un hover de distancia.
+      return p ? (p.codigo || '???') : ''
+    },
+    tituloProveedor(productoId, slot) {
+      const provId = this.borrador[productoId]?.[slot]?.proveedor_id
+      if (!provId) return ''
+      const p = this.proveedores.find(x => x.id === provId)
+      return p ? p.nombre : ''
     },
     abrirAutocomplete(productoId, slot) {
       this.autocompleteAbierto = { productoId, slot }
@@ -968,12 +996,17 @@ export default {
 
 .repo-celda-autocomplete { position: relative; }
 .repo-autocomplete-lista {
-  position: absolute; z-index: 20; top: 100%; left: 0; min-width: 220px; max-height: 200px; overflow-y: auto;
-  background: var(--fondo); border: 1px solid var(--borde); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  position: absolute; z-index: 60; top: 100%; left: 0; min-width: 280px; max-height: 200px; overflow-y: auto;
+  background: var(--fondo); border: 1px solid var(--borde); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   list-style: none; margin: 2px 0 0; padding: 0.25rem 0;
 }
-.repo-autocomplete-lista li { padding: 0.35rem 0.6rem; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+.repo-autocomplete-lista li {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  padding: 0.35rem 0.6rem; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
+}
 .repo-autocomplete-lista li:hover { background: #FFCC0033; }
+.ac-codigo { font-weight: 700; color: var(--texto-principal); width: 34px; flex-shrink: 0; }
+.ac-nombre { color: var(--texto-secundario); overflow: hidden; text-overflow: ellipsis; }
 .repo-autocomplete-vacio { color: var(--texto-secundario); cursor: default !important; }
 .repo-autocomplete-vacio:hover { background: transparent !important; }
 
