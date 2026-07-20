@@ -638,6 +638,168 @@ def inicializar_datos():
              "CREATE INDEX IF NOT EXISTS ix_conteo_prio_prod ON conteo_prioritario(producto_id)"],
         )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # Multisede Fase 1A — schema + migracion historica, SIN cambios de
+        # comportamiento (no se toca ningun endpoint ni models.py en esta
+        # sub-fase). Todo el codigo existente sigue leyendo/escribiendo
+        # productos.stock exactamente igual que antes; las tablas y columnas
+        # nuevas quedan pobladas pero invisibles para la app hasta 1B+.
+        # ══════════════════════════════════════════════════════════════════════
+
+        # ── sedes ────────────────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS sedes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT UNIQUE NOT NULL,
+                nombre TEXT NOT NULL,
+                ciudad TEXT,
+                direccion TEXT,
+                telefono TEXT,
+                activa BOOLEAN DEFAULT 1,
+                fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+             "INSERT OR IGNORE INTO sedes (id, codigo, nombre, ciudad, activa) VALUES (1, 'OJEDA', 'Ferreutil Ojeda', 'Ojeda', 1)",
+             "INSERT OR IGNORE INTO sedes (id, codigo, nombre, ciudad, activa) VALUES (2, 'VALERA', 'Ferreutil Valera', 'Valera', 1)"],
+            ["""CREATE TABLE IF NOT EXISTS sedes (
+                id SERIAL PRIMARY KEY,
+                codigo TEXT UNIQUE NOT NULL,
+                nombre TEXT NOT NULL,
+                ciudad TEXT,
+                direccion TEXT,
+                telefono TEXT,
+                activa BOOLEAN DEFAULT TRUE,
+                fecha_creacion TIMESTAMP DEFAULT NOW()
+            )""",
+             "INSERT INTO sedes (id, codigo, nombre, ciudad, activa) VALUES (1, 'OJEDA', 'Ferreutil Ojeda', 'Ojeda', TRUE) ON CONFLICT (id) DO NOTHING",
+             "INSERT INTO sedes (id, codigo, nombre, ciudad, activa) VALUES (2, 'VALERA', 'Ferreutil Valera', 'Valera', TRUE) ON CONFLICT (id) DO NOTHING",
+             # ids insertados a mano (1,2) -> hay que adelantar la secuencia para
+             # que el proximo INSERT sin id explicito (POST /sedes/ en 1B) no choque
+             "SELECT setval(pg_get_serial_sequence('sedes','id'), (SELECT MAX(id) FROM sedes))"],
+        )
+
+        # ── existencia_sede ──────────────────────────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS existencia_sede (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+                sede_id INTEGER NOT NULL REFERENCES sedes(id) ON DELETE RESTRICT,
+                existencia INTEGER DEFAULT 0,
+                ultima_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(producto_id, sede_id)
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS existencia_sede (
+                id SERIAL PRIMARY KEY,
+                producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+                sede_id INTEGER NOT NULL REFERENCES sedes(id) ON DELETE RESTRICT,
+                existencia INTEGER DEFAULT 0,
+                ultima_actualizacion TIMESTAMP DEFAULT NOW(),
+                UNIQUE(producto_id, sede_id)
+            )"""],
+        )
+
+        # Backfill: una fila por producto en Ojeda (id=1), salvo los que tienen
+        # variantes ACTIVAS — esos siguen operando solo por variantes_producto.stock
+        # (congelado, fuera de alcance de existencia_sede en Fase 1). La ausencia
+        # de fila en existencia_sede para un producto asi ES la señal de "todavia
+        # vive en el flujo viejo de variantes" — no hace falta una columna aparte.
+        migrar(
+            ["""INSERT OR IGNORE INTO existencia_sede (producto_id, sede_id, existencia)
+                SELECT p.id, 1, p.stock FROM productos p
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM variantes_producto vp
+                    WHERE vp.producto_id = p.id AND vp.activo = 1
+                )"""],
+            ["""INSERT INTO existencia_sede (producto_id, sede_id, existencia)
+                SELECT p.id, 1, p.stock FROM productos p
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM variantes_producto vp
+                    WHERE vp.producto_id = p.id AND vp.activo = TRUE
+                )
+                ON CONFLICT (producto_id, sede_id) DO NOTHING"""],
+        )
+
+        # ── usuarios: sede principal + permiso de alternar ──────────────────
+        migrar(
+            ["ALTER TABLE usuarios ADD COLUMN sede_id INTEGER",
+             "ALTER TABLE usuarios ADD COLUMN puede_alternar_sedes BOOLEAN DEFAULT 0"],
+            ["ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sede_id INTEGER REFERENCES sedes(id)",
+             "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS puede_alternar_sedes BOOLEAN DEFAULT FALSE"],
+        )
+        migrar(
+            ["UPDATE usuarios SET sede_id = 1 WHERE sede_id IS NULL",
+             "UPDATE usuarios SET puede_alternar_sedes = 1 WHERE rol = 'admin'"],
+            ["UPDATE usuarios SET sede_id = 1 WHERE sede_id IS NULL",
+             "UPDATE usuarios SET puede_alternar_sedes = TRUE WHERE rol = 'admin'"],
+        )
+
+        # ── ventas.sede_id — NOT NULL DEFAULT 1 en el mismo ALTER: codigo viejo
+        # que hace INSERT sin mencionar sede_id sigue funcionando igual, Postgres/
+        # SQLite completan el default solos. Sin esto no habria forma segura de
+        # endurecer el constraint sin arriesgar el INSERT de registrar_venta.
+        migrar(
+            ["ALTER TABLE ventas ADD COLUMN sede_id INTEGER NOT NULL DEFAULT 1"],
+            ["ALTER TABLE ventas ADD COLUMN IF NOT EXISTS sede_id INTEGER NOT NULL DEFAULT 1 REFERENCES sedes(id)"],
+        )
+
+        # ── ordenes_compra.sede_id_destino ───────────────────────────────────
+        migrar(
+            ["ALTER TABLE ordenes_compra ADD COLUMN sede_id_destino INTEGER NOT NULL DEFAULT 1"],
+            ["ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS sede_id_destino INTEGER NOT NULL DEFAULT 1 REFERENCES sedes(id)"],
+        )
+
+        # ── cierres_caja.sede_id — el cierre del dia es por sede ────────────
+        migrar(
+            ["ALTER TABLE cierres_caja ADD COLUMN sede_id INTEGER NOT NULL DEFAULT 1"],
+            ["ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS sede_id INTEGER NOT NULL DEFAULT 1 REFERENCES sedes(id)"],
+        )
+
+        # ── movimientos_bancarios.cierre_caja_id — SIN sede_id propio: las
+        # cuentas bancarias son globales (misma cuenta Zelle/pago movil para
+        # las dos sedes). El link al cierre permite saber que sede origino el
+        # movimiento de forma indirecta cuando el cierre lo genera automatico.
+        migrar(
+            ["ALTER TABLE movimientos_bancarios ADD COLUMN cierre_caja_id INTEGER"],
+            ["ALTER TABLE movimientos_bancarios ADD COLUMN IF NOT EXISTS cierre_caja_id INTEGER REFERENCES cierres_caja(id)"],
+        )
+
+        # ── transferencias_sede / transferencias_detalle (schema de 1H, se
+        # crea ahora para no volver a tocar la base esa noche — sin endpoints
+        # ni UI todavia, tablas inertes hasta 1H) ────────────────────────────
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS transferencias_sede (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sede_origen_id INTEGER NOT NULL REFERENCES sedes(id),
+                sede_destino_id INTEGER NOT NULL REFERENCES sedes(id),
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                usuario_id INTEGER REFERENCES usuarios(id),
+                estado TEXT DEFAULT 'pendiente',
+                notas TEXT,
+                CHECK (sede_origen_id != sede_destino_id)
+            )""",
+             """CREATE TABLE IF NOT EXISTS transferencias_detalle (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transferencia_id INTEGER NOT NULL REFERENCES transferencias_sede(id) ON DELETE CASCADE,
+                producto_id INTEGER NOT NULL REFERENCES productos(id),
+                cantidad INTEGER NOT NULL CHECK (cantidad > 0)
+            )"""],
+            ["""CREATE TABLE IF NOT EXISTS transferencias_sede (
+                id SERIAL PRIMARY KEY,
+                sede_origen_id INTEGER NOT NULL REFERENCES sedes(id),
+                sede_destino_id INTEGER NOT NULL REFERENCES sedes(id),
+                fecha TIMESTAMP DEFAULT NOW(),
+                usuario_id INTEGER REFERENCES usuarios(id),
+                estado TEXT DEFAULT 'pendiente',
+                notas TEXT,
+                CHECK (sede_origen_id != sede_destino_id)
+            )""",
+             """CREATE TABLE IF NOT EXISTS transferencias_detalle (
+                id SERIAL PRIMARY KEY,
+                transferencia_id INTEGER NOT NULL REFERENCES transferencias_sede(id) ON DELETE CASCADE,
+                producto_id INTEGER NOT NULL REFERENCES productos(id),
+                cantidad INTEGER NOT NULL CHECK (cantidad > 0)
+            )"""],
+        )
+
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True
