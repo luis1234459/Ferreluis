@@ -15,3 +15,10 @@ dist/
 
 # Claude Code
 .claude/
+
+# Exports de datos del negocio (locales, no van al repo)
+exports/
+
+# Credenciales OAuth del backup a Drive (locales, nunca al repo)
+backend/oauth_client.json
+backend/oauth_token.json
