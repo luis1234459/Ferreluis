@@ -233,6 +233,21 @@ class Usuario(Base):
     rol      = Column(String, default="vendedor")
     permisos = Column(String, nullable=True)   # JSON string: ["ventas","clientes",...]
     activo   = Column(Boolean, default=True)
+    sede_id             = Column(Integer, nullable=True)   # FK → Sede — sede "home" del usuario
+    puede_alternar_sedes= Column(Boolean, default=False)   # True = puede operar en otra sede via X-Sede-Id
+
+
+class Sede(Base):
+    __tablename__ = "sedes"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    codigo         = Column(String,   unique=True, nullable=False)
+    nombre         = Column(String,   nullable=False)
+    ciudad         = Column(String,   nullable=True)
+    direccion      = Column(String,   nullable=True)
+    telefono       = Column(String,   nullable=True)
+    activa         = Column(Boolean,  default=True)
+    fecha_creacion = Column(DateTime, default=datetime.now)
 
 
 class Configuracion(Base):
