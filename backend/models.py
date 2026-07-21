@@ -187,6 +187,7 @@ class Venta(Base):
     estado           = Column(String, default="pagado")
     observacion      = Column(String, nullable=True)
     despachado_por   = Column(String, nullable=True)  # 'vendedor' | 'despachador' | null
+    sede_id          = Column(Integer, nullable=False, default=1)  # FK → Sede
 
 
 class PagoVenta(Base):
@@ -248,6 +249,24 @@ class Sede(Base):
     telefono       = Column(String,   nullable=True)
     activa         = Column(Boolean,  default=True)
     fecha_creacion = Column(DateTime, default=datetime.now)
+
+
+class ExistenciaSede(Base):
+    """Existencia por sede para productos SIN variante activa (los que tienen
+    variante activa siguen operando por variantes_producto.stock — congelado
+    hasta que una sub-fase posterior migre tambien los flujos de variante).
+    Ausencia de fila para un producto == "vive en el flujo viejo de variantes"."""
+    __tablename__ = "existencia_sede"
+
+    id                    = Column(Integer, primary_key=True, index=True)
+    producto_id           = Column(Integer, ForeignKey("productos.id", ondelete="CASCADE"), nullable=False)
+    sede_id               = Column(Integer, ForeignKey("sedes.id", ondelete="RESTRICT"), nullable=False)
+    existencia            = Column(Integer, default=0)
+    ultima_actualizacion  = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint('producto_id', 'sede_id', name='uq_existencia_sede_producto_sede'),
+    )
 
 
 class Configuracion(Base):

@@ -2,17 +2,20 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor, Marca
+from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor, Marca, ExistenciaSede
 from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 from rutas.usuarios import require_admin, require_admin_o_gestionador
+from rutas.auth import resolver_sede_activa_opcional
 import io
 import re
 import pandas as pd
 
 router = APIRouter(prefix="/productos", tags=["productos"])
+
+_SIN_FILTRO_SEDE = object()  # sentinel: distingue "no participa del filtro por sede" de existencia=0
 
 
 # ============================================================================
@@ -148,9 +151,12 @@ def _enriquecer(p: Producto, tasa_bcv: float, tasa_binance: float,
                 ajuste_divisa_pct: float = 0.0,
                 codigo_proveedor: str = "",
                 db: Session = None,
-                marca_obj=None) -> dict:
+                marca_obj=None,
+                existencia_sede=_SIN_FILTRO_SEDE) -> dict:
     d = {c.name: getattr(p, c.name) for c in p.__table__.columns}
     d.update(_precios_computados(p, tasa_bcv, tasa_binance, policy, ajuste_tipo, ajuste_divisa_pct))
+    if existencia_sede is not _SIN_FILTRO_SEDE:
+        d["stock"] = existencia_sede if existencia_sede is not None else 0
     d["tiene_catalogo"]    = tiene_catalogo
     d["codigo_proveedor"]  = codigo_proveedor
     d["marca_nombre"]      = marca_obj.nombre if marca_obj else None
@@ -561,6 +567,7 @@ def listar_productos(
     marca_id: Optional[int] = None,
     stock_cero: bool = False,
     db: Session = Depends(get_db),
+    sede_activa: Optional[int] = Depends(resolver_sede_activa_opcional),
 ):
     q = db.query(Producto)
     if not incluir_inactivos:
@@ -606,6 +613,13 @@ def listar_productos(
     if ids:
         for v in db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(ids)).all():
             variantes_map.setdefault(v.producto_id, []).append(v)
+    existencia_map: dict = {}
+    if sede_activa is not None and ids:
+        for es in db.query(ExistenciaSede).filter(
+            ExistenciaSede.producto_id.in_(ids),
+            ExistenciaSede.sede_id == sede_activa,
+        ).all():
+            existencia_map[es.producto_id] = es.existencia
     plantilla_ids = {p.plantilla_garantia_id for p in lista if p.plantilla_garantia_id}
     plantillas_map: dict = {}
     if plantilla_ids:
@@ -647,14 +661,19 @@ def listar_productos(
             prov_policy_map=prov_policy_map,
         )
         ajuste_tipo = "manual" if p.pricing_policy_override else prov_ajuste_map.get(p.proveedor_id, "manual")
-        enriq = _enriquecer(p, bcv, binance, variantes_map.get(p.id, []),
+        variantes_p = variantes_map.get(p.id, [])
+        kwargs_sede = {}
+        if sede_activa is not None and not any(v.activo for v in variantes_p):
+            kwargs_sede["existencia_sede"] = existencia_map.get(p.id, 0)
+        enriq = _enriquecer(p, bcv, binance, variantes_p,
                             plantillas_map.get(p.plantilla_garantia_id),
                             tiene_catalogo=(p.id in catalogo_ids),
                             policy=policy,
                             ajuste_tipo=ajuste_tipo,
                             ajuste_divisa_pct=ajuste_divisa_pct,
                             codigo_proveedor=catalogo_codigo_map.get(p.id, ""),
-                            marca_obj=marcas_map.get(p.marca_id) if p.marca_id else None)
+                            marca_obj=marcas_map.get(p.marca_id) if p.marca_id else None,
+                            **kwargs_sede)
         dmx = getattr(p, 'descuento_max_pct', None)
         if dmx is None and p.categoria_id:
             dmx = cat_descuento_map.get(p.categoria_id)
@@ -662,7 +681,7 @@ def listar_productos(
             dmx = prov_descuento_max_map.get(p.proveedor_id)
         enriq["descuento_max_pct"] = dmx
         productos.append(enriq)
-    return {"total": total, "productos": productos}
+    return {"total": total, "productos": productos, "sede_activa": sede_activa}
 
 
 @router.post("/importar-masivo")

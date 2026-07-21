@@ -31,11 +31,12 @@ from models import (
     Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
-    GarantiaVenta, PlantillaGarantia, Proveedor,
+    GarantiaVenta, PlantillaGarantia, Proveedor, ExistenciaSede,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
 from rutas.usuarios import require_admin, get_current_user
+from rutas.auth import resolver_sede_activa
 
 router = APIRouter()
 
@@ -220,7 +221,11 @@ def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/ventas/")
-def registrar_venta(data: dict, db: Session = Depends(get_db)):
+def registrar_venta(
+    data: dict,
+    db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
+):
     """
     Payload esperado:
     {
@@ -239,6 +244,9 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         ]
     }
     """
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para registrar la venta")
 
     # ── Datos básicos ────────────────────────────────────────────────────────
     usuario         = data.get("usuario", "")
@@ -492,6 +500,7 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
         exceso            = exceso,
         estado            = "pagado",
         observacion       = observacion,
+        sede_id           = sede_activa,
     )
     db.add(venta)
     db.commit()
@@ -529,6 +538,12 @@ def registrar_venta(data: dict, db: Session = Depends(get_db)):
             d["variante"].stock = float(d["variante"].stock or 0) - d["cantidad"]
         else:
             d["producto"].stock = float(d["producto"].stock or 0) - d["cantidad"]
+            existencia = db.query(ExistenciaSede).filter(
+                ExistenciaSede.producto_id == d["producto_id"],
+                ExistenciaSede.sede_id == sede_activa,
+            ).first()
+            if existencia:
+                existencia.existencia = float(existencia.existencia or 0) - d["cantidad"]
 
     db.commit()
 
