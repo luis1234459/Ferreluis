@@ -2,5 +2,5 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python backup_drive.py"
+startCommand = "python backend/backup_drive.py"
 restartPolicyType = "never"
