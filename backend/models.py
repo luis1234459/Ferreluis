@@ -269,6 +269,31 @@ class ExistenciaSede(Base):
     )
 
 
+class TransferenciaSede(Base):
+    """Movimiento de stock entre dos sedes. Tabla creada (inerte) en la
+    migracion de la Fase 1A; recien tiene endpoints desde 1H.
+    Estados: pendiente -> en_transito -> recibida, o cancelada desde
+    pendiente/en_transito."""
+    __tablename__ = "transferencias_sede"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    sede_origen_id   = Column(Integer, ForeignKey("sedes.id"), nullable=False)
+    sede_destino_id  = Column(Integer, ForeignKey("sedes.id"), nullable=False)
+    fecha            = Column(DateTime, default=datetime.now)
+    usuario_id       = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    estado           = Column(String,  default="pendiente")  # pendiente|en_transito|recibida|cancelada
+    notas            = Column(String,  nullable=True)
+
+
+class TransferenciaDetalle(Base):
+    __tablename__ = "transferencias_detalle"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    transferencia_id  = Column(Integer, ForeignKey("transferencias_sede.id", ondelete="CASCADE"), nullable=False)
+    producto_id       = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    cantidad          = Column(Integer, nullable=False)
+
+
 class Configuracion(Base):
     __tablename__ = "configuracion"
 
