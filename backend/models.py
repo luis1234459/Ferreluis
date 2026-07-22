@@ -909,6 +909,7 @@ class Apartado(Base):
     observacion        = Column(String,   nullable=True)
     moneda             = Column(String,   default="USD")
     tasa_bcv           = Column(Float,    nullable=True)
+    sede_id            = Column(Integer,  nullable=False, default=1)  # FK → Sede
 
 
 class DetalleApartado(Base):

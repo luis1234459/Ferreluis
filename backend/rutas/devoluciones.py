@@ -9,6 +9,7 @@ from models import (
     MovimientoBancario, CuentaBancaria, MetodoPagoCuenta,
     Venta, VentaCliente, DetalleVenta,
 )
+from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
 from datetime import datetime
 from typing import Optional
 
@@ -221,13 +222,21 @@ def buscar_ventas(
 # ---------------------------------------------------------------------------
 
 @router.post("/cliente/procesar")
-def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
+def procesar_devolucion_cliente(
+    datos: dict,
+    db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
+):
     """
     Procesa una devolución de un producto individual.
     Body: { detalle_id, producto_id, cantidad_devuelta, tipo,
             producto_nuevo_id, monto_diferencia, direccion_diferencia,
             metodo_pago, usuario, observacion }
     """
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para procesar la devolución")
+
     detalle_id        = datos.get("detalle_id")
     cantidad_dev      = float(datos.get("cantidad_devuelta", 1) or 1)
     tipo              = datos.get("tipo", "reembolso")
@@ -277,6 +286,11 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
         variante_dev.stock = float(variante_dev.stock or 0) + cantidad_dev
     elif prod_original:
         prod_original.stock = int(float(prod_original.stock or 0)) + int(cantidad_dev)
+        ajustar_existencia_sede(
+            db, prod_original.id, sede_activa,
+            tipo="agregar", valor=int(cantidad_dev),
+            tiene_variante_activa=False,
+        )
 
     ahora = datetime.now()
 
@@ -321,6 +335,11 @@ def procesar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
                     ).first() is not None
                     if not tiene_vars:
                         prod_nuevo.stock = max(0, int(float(prod_nuevo.stock or 0)) - cantidad_nueva)
+                        ajustar_existencia_sede(
+                            db, prod_nuevo.id, sede_activa,
+                            tipo="restar", valor=cantidad_nueva,
+                            tiene_variante_activa=False,
+                        )
 
         # Recalcular diferencia en el backend
         precio_nuevo          = float(getattr(prod_nuevo, 'precio_referencial_usd', None) or getattr(prod_nuevo, 'precio_base_usd', None) or 0) if prod_nuevo else 0
@@ -411,7 +430,15 @@ def listar_devoluciones_cliente(db: Session = Depends(get_db)):
 
 
 @router.post("/cliente/")
-def registrar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
+def registrar_devolucion_cliente(
+    datos: dict,
+    db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
+):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para procesar la devolución")
+
     productos_data = datos.get("productos", [])
     if not productos_data:
         raise HTTPException(status_code=400, detail="Debe incluir al menos un producto")
@@ -457,6 +484,11 @@ def registrar_devolucion_cliente(datos: dict, db: Session = Depends(get_db)):
                 prod = db.query(Producto).filter(Producto.id == item["producto_id"]).first()
                 if prod:
                     prod.stock += int(cant)
+                    ajustar_existencia_sede(
+                        db, prod.id, sede_activa,
+                        tipo="agregar", valor=int(cant),
+                        tiene_variante_activa=False,
+                    )
 
     if datos.get("tipo_resolucion") == "credito" and datos.get("cliente_id"):
         cliente = db.query(Cliente).filter(Cliente.id == datos["cliente_id"]).first()
@@ -511,7 +543,15 @@ def listar_devoluciones_proveedor(
 
 
 @router.post("/proveedor/")
-def registrar_devolucion_proveedor(datos: dict, db: Session = Depends(get_db)):
+def registrar_devolucion_proveedor(
+    datos: dict,
+    db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
+):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para procesar la devolución")
+
     cantidad       = float(datos.get("cantidad", 0))
     costo_unitario = float(datos.get("costo_unitario", 0))
     if cantidad <= 0:
@@ -557,6 +597,11 @@ def registrar_devolucion_proveedor(datos: dict, db: Session = Depends(get_db)):
                 ).first() is not None
                 if not tiene_vars:
                     prod.stock = max(0, prod.stock - int(cantidad))
+                    ajustar_existencia_sede(
+                        db, prod.id, sede_activa,
+                        tipo="restar", valor=cantidad,
+                        tiene_variante_activa=False,
+                    )
 
     if datos.get("tipo_resolucion") == "credito" and datos.get("proveedor_id"):
         prov = db.query(Proveedor).filter(Proveedor.id == datos["proveedor_id"]).first()

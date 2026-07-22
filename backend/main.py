@@ -755,6 +755,15 @@ def inicializar_datos():
             ["ALTER TABLE cierres_caja ADD COLUMN IF NOT EXISTS sede_id INTEGER NOT NULL DEFAULT 1 REFERENCES sedes(id)"],
         )
 
+        # ── apartados.sede_id — Fase 1F: reserva de stock por sede. Se guarda
+        # en el registro (no se recalcula al cancelar) para que cancelar_apartado
+        # libere siempre en la misma sede donde se reservo, aunque quien cancele
+        # este operando desde otra sede en ese momento.
+        migrar(
+            ["ALTER TABLE apartados ADD COLUMN sede_id INTEGER NOT NULL DEFAULT 1"],
+            ["ALTER TABLE apartados ADD COLUMN IF NOT EXISTS sede_id INTEGER NOT NULL DEFAULT 1 REFERENCES sedes(id)"],
+        )
+
         # ── movimientos_bancarios.cierre_caja_id — SIN sede_id propio: las
         # cuentas bancarias son globales (misma cuenta Zelle/pago movil para
         # las dos sedes). El link al cierre permite saber que sede origino el

@@ -6,6 +6,7 @@ from models import (
     Producto, VarianteProducto, TasaCambio,
     Venta, DetalleVenta, VentaCliente,
 )
+from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -183,7 +184,12 @@ def convertir_a_venta(
     presupuesto_id: int,
     datos: dict = {},
     db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
 ):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para convertir el presupuesto")
+
     p = db.query(Presupuesto).filter(Presupuesto.id == presupuesto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Presupuesto no encontrado")
@@ -213,6 +219,7 @@ def convertir_a_venta(
         exceso           = 0,
         estado           = "pendiente",
         observacion      = f"Convertido de {p.numero}",
+        sede_id          = sede_activa,
     )
     db.add(venta)
     db.flush()
@@ -241,6 +248,11 @@ def convertir_a_venta(
             prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
             if prod:
                 prod.stock = max(0, prod.stock - int(d.cantidad))
+                ajustar_existencia_sede(
+                    db, prod.id, sede_activa,
+                    tipo="restar", valor=int(d.cantidad),
+                    tiene_variante_activa=False,
+                )
 
     if p.cliente_id:
         db.add(VentaCliente(venta_id=venta.id, cliente_id=p.cliente_id))

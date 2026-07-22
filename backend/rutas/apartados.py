@@ -9,6 +9,7 @@ from models import (
     Producto, VarianteProducto, MovimientoBancario,
     Venta, DetalleVenta,
 )
+from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
 
 router = APIRouter(tags=["apartados"])
 
@@ -38,6 +39,7 @@ def _serializar(apt: Apartado, db: Session) -> dict:
         "observacion":      apt.observacion,
         "moneda":           apt.moneda,
         "tasa_bcv":         apt.tasa_bcv,
+        "sede_id":          apt.sede_id,
         "detalles": [
             {
                 "id":                 d.id,
@@ -72,7 +74,12 @@ def crear_apartado(
     datos: dict,
     db: Session = Depends(get_db),
     x_usuario_nombre: Optional[str] = Header(None),
+    sede_activa: int = Depends(resolver_sede_activa),
 ):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para crear el apartado")
+
     productos_data = datos.get("productos", [])
     if not productos_data:
         raise HTTPException(status_code=400, detail="Debe incluir al menos un producto")
@@ -91,6 +98,7 @@ def crear_apartado(
         observacion      = datos.get("observacion"),
         moneda           = datos.get("moneda", "USD"),
         tasa_bcv         = datos.get("tasa_bcv"),
+        sede_id          = sede_activa,
     )
     db.add(apt)
     db.flush()
@@ -117,6 +125,11 @@ def crear_apartado(
             prod = db.query(Producto).filter(Producto.id == prod_id).first()
             if prod:
                 prod.stock = (prod.stock or 0) - cantidad
+                ajustar_existencia_sede(
+                    db, prod.id, sede_activa,
+                    tipo="restar", valor=cantidad,
+                    tiene_variante_activa=False,
+                )
 
     db.commit()
     db.refresh(apt)
@@ -223,6 +236,11 @@ def cancelar_apartado(apt_id: int, db: Session = Depends(get_db)):
             prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
             if prod:
                 prod.stock = (prod.stock or 0) + d.cantidad
+                ajustar_existencia_sede(
+                    db, prod.id, apt.sede_id,
+                    tipo="agregar", valor=d.cantidad,
+                    tiene_variante_activa=False,
+                )
 
     apt.estado = "cancelado"
     db.commit()
@@ -254,6 +272,7 @@ def convertir_a_venta(
         total            = apt.total_usd if apt.moneda == "USD" else round(apt.total_usd * tasa, 2),
         tasa_bcv         = tasa,
         estado           = "pagado",
+        sede_id          = apt.sede_id,
     )
     db.add(venta)
     db.flush()
