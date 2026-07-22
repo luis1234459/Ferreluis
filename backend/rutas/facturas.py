@@ -12,8 +12,9 @@ from models import (
     OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion,
     Producto, VarianteProducto, Proveedor, CatalogoProveedor, AliasProveedor,
-    MovimientoBancario, TasaCambio,
+    MovimientoBancario, TasaCambio, ExistenciaSede,
 )
+from rutas.auth import resolver_sede_activa, resolver_sede_activa_opcional, ajustar_existencia_sede
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -332,6 +333,7 @@ def buscar_producto(
     codigo: str = "",
     proveedor_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    sede_activa: Optional[int] = Depends(resolver_sede_activa_opcional),
 ):
     resultados = []
     ids_ya: set = set()  # (producto_id, variante_id_or_None)
@@ -357,12 +359,19 @@ def buscar_producto(
     def _res_producto(p, codigo_prov="", match_exacto=False):
         costo  = float(p.costo_usd or 0)
         margen = float(p.margen or 0.30)
+        stock_val = int(p.stock or 0)
+        if sede_activa is not None:
+            es = db.query(ExistenciaSede).filter(
+                ExistenciaSede.producto_id == p.id,
+                ExistenciaSede.sede_id == sede_activa,
+            ).first()
+            stock_val = int(es.existencia) if es else 0
         return {
             "id": p.id, "nombre": p.nombre,
             "codigo_proveedor": codigo_prov,
             "variante_id": None, "variante_codigo": None,
             "costo_usd": costo,
-            "stock": int(p.stock or 0),
+            "stock": stock_val,
             "match_exacto": match_exacto,
             "margen": margen,
             "precio_referencial_usd": round(costo * (1 + margen), 2),
@@ -523,7 +532,15 @@ def ordenes_pendientes(proveedor_id: Optional[int] = None, db: Session = Depends
 # ---------------------------------------------------------------------------
 
 @router.post("/confirmar-compra")
-def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
+def confirmar_compra(
+    datos: dict,
+    db: Session = Depends(get_db),
+    sede_activa: int = Depends(resolver_sede_activa),
+):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para confirmar la compra")
+
     proveedor_id        = datos.get("proveedor_id")
     numero_factura      = datos.get("numero_factura", "")
     fecha_str           = datos.get("fecha")
@@ -569,6 +586,7 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
             descuento        = round(descuento, 2),
             total            = round(total_factura, 2),
             observacion      = f"Factura IA: {numero_factura}",
+            sede_id_destino  = sede_activa,
         )
         db.add(orden)
         db.flush()
@@ -684,6 +702,11 @@ def confirmar_compra(datos: dict, db: Session = Depends(get_db)):
                         prod.costo_usd = precio
                         if margen_nuevo is not None:
                             prod.margen = margen_nuevo
+                    ajustar_existencia_sede(
+                        db, prod.id, orden.sede_id_destino,
+                        tipo="agregar", valor=int(cantidad),
+                        tiene_variante_activa=False,
+                    )
 
         db.add(DetalleRecepcion(
             recepcion_id             = recepcion.id,
