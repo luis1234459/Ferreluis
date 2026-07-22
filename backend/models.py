@@ -460,6 +460,7 @@ class OrdenCompra(Base):
     descuento        = Column(Float,  default=0)
     total            = Column(Float,  default=0)
     observacion      = Column(String, nullable=True)
+    sede_id_destino  = Column(Integer, nullable=False, default=1)  # FK → Sede
 
 
 class DetalleOrdenCompra(Base):

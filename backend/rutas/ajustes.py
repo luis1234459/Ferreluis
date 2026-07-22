@@ -14,6 +14,7 @@ from models import (
 )
 from rutas.productos import _precios_computados
 from rutas.usuarios import require_admin, require_admin_o_gestionador
+from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/ajustes", tags=["ajustes"])
@@ -111,6 +112,13 @@ def _tiene_variantes(producto_id: int, db: Session) -> int:
     return db.query(VarianteProducto).filter(
         VarianteProducto.producto_id == producto_id
     ).count()
+
+
+def _tiene_variante_activa(producto_id: int, db: Session) -> bool:
+    return db.query(VarianteProducto).filter(
+        VarianteProducto.producto_id == producto_id,
+        VarianteProducto.activo == True,
+    ).first() is not None
 
 
 def _guardar_historial(db, usuario, tipo, descripcion, cambios):
@@ -223,8 +231,11 @@ def ajuste_stock_lote(
     datos: AjusteStockLote,
     db:    Session           = Depends(get_db),
     _:     None              = Depends(require_admin_o_gestionador),
+    sede_activa: int         = Depends(resolver_sede_activa),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
+    if sede_activa is None:
+        raise HTTPException(status_code=400, detail="Debe seleccionar una sede específica para ajustar stock")
     cambios = []
     for item in datos.items:
         p = db.query(Producto).filter(Producto.id == item.producto_id).first()
@@ -237,6 +248,11 @@ def ajuste_stock_lote(
             p.stock = max(0, p.stock - int(item.cantidad))
         elif item.tipo == "fijar":
             p.stock = int(item.cantidad)
+        ajustar_existencia_sede(
+            db, p.id, sede_activa,
+            tipo=item.tipo, valor=int(item.cantidad),
+            tiene_variante_activa=_tiene_variante_activa(p.id, db),
+        )
         cambios.append({
             "producto_id":    p.id,
             "nombre":         p.nombre,
@@ -441,11 +457,14 @@ def crear_producto_ajuste(
     datos: CrearProductoSchema,
     db:    Session = Depends(get_db),
     _:     None    = Depends(require_admin_o_gestionador),
+    sede_activa: int = Depends(resolver_sede_activa),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
     if not datos.nombre.strip():
         raise HTTPException(400, "El nombre es obligatorio")
+    if sede_activa is None:
+        raise HTTPException(400, "Debe seleccionar una sede específica para crear el producto")
     nuevo = Producto(
         nombre          = datos.nombre.strip(),
         departamento_id = datos.departamento_id,
@@ -459,6 +478,13 @@ def crear_producto_ajuste(
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
+    if datos.stock:
+        ajustar_existencia_sede(
+            db, nuevo.id, sede_activa,
+            tipo="fijar", valor=int(datos.stock),
+            tiene_variante_activa=False,
+        )
+        db.commit()
     _guardar_historial(
         db, x_usuario_nombre, "gestion",
         f"Producto creado: '{nuevo.nombre}'",
@@ -476,8 +502,11 @@ def registrar_conteo(
     datos: ConteoFisicoLote,
     db:    Session           = Depends(get_db),
     _:     None              = Depends(require_admin_o_gestionador),
+    sede_activa: int         = Depends(resolver_sede_activa),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
+    if sede_activa is None:
+        raise HTTPException(status_code=400, detail="Debe seleccionar una sede específica para registrar el conteo")
     cambios = []
     for item in datos.items:
         p = db.query(Producto).filter(Producto.id == item.producto_id).first()
@@ -493,6 +522,11 @@ def registrar_conteo(
             p.auditoria_pendiente  = False
             p.conteo_pendiente     = None
             p.diferencia_pendiente = None
+            ajustar_existencia_sede(
+                db, p.id, sede_activa,
+                tipo="fijar", valor=item.cantidad_contada,
+                tiene_variante_activa=_tiene_variante_activa(p.id, db),
+            )
             cambios.append({
                 "producto_id":    p.id,
                 "nombre":         p.nombre,
@@ -989,7 +1023,8 @@ def listar_discrepancias_pendientes(db: Session = Depends(get_db),
 @router.post("/conteo-prioritario/{conteo_id}/aprobar")
 def aprobar_discrepancia(conteo_id: int, aprobar: bool = True,
                           db: Session = Depends(get_db),
-                          _: None = Depends(require_admin)):
+                          _: None = Depends(require_admin),
+                          sede_activa: int = Depends(resolver_sede_activa)):
     """Admin aprueba o rechaza la discrepancia. Si aprueba, ajusta el stock."""
     c = db.query(ConteoPrioritario).filter(ConteoPrioritario.id == conteo_id).first()
     if not c:
@@ -997,6 +1032,8 @@ def aprobar_discrepancia(conteo_id: int, aprobar: bool = True,
     p = db.query(Producto).filter(Producto.id == c.producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if aprobar and sede_activa is None:
+        raise HTTPException(status_code=400, detail="Debe seleccionar una sede específica para aprobar el conteo")
 
     c.aprobado_admin   = aprobar
     c.fecha_aprobacion = datetime.utcnow()
@@ -1005,6 +1042,11 @@ def aprobar_discrepancia(conteo_id: int, aprobar: bool = True,
         p.stock = c.stock_real
         p.auditado = True
         p.fecha_auditoria = datetime.utcnow()
+        ajustar_existencia_sede(
+            db, p.id, sede_activa,
+            tipo="fijar", valor=c.stock_real,
+            tiene_variante_activa=_tiene_variante_activa(p.id, db),
+        )
 
     db.commit()
 

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from database import get_db
-from models import Usuario, Sede
+from models import Usuario, Sede, ExistenciaSede
 from rutas.usuarios import get_current_user, security
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -93,6 +93,41 @@ def resolver_sede_activa_opcional(
     except HTTPException:
         return None
     return resolver_sede_activa(x_sede_id=x_sede_id, current_user=current_user, db=db)
+
+
+def ajustar_existencia_sede(db: Session, producto_id: int, sede_id: int,
+                             tipo: str, valor: float, tiene_variante_activa: bool) -> None:
+    """
+    Aplica a existencia_sede[producto_id, sede_id] el mismo movimiento que ya
+    se le aplico a productos.stock, para mantenerlos en lockstep.
+
+    - tiene_variante_activa=True -> no hace nada (esos productos siguen
+      frozen via variantes_producto.stock, fuera del alcance del multisede).
+    - tipo "agregar" | "restar" -> valor es la cantidad a sumar/restar
+      (restar nunca baja de 0, igual que productos.stock). Si no existe fila
+      y es "restar", no se crea (no hay de donde restar).
+    - tipo "fijar" -> valor es el valor absoluto final (crea la fila si no
+      existe, igual que un conteo/creacion establece la primera existencia).
+    """
+    if tiene_variante_activa:
+        return
+    es = db.query(ExistenciaSede).filter(
+        ExistenciaSede.producto_id == producto_id,
+        ExistenciaSede.sede_id == sede_id,
+    ).first()
+    if tipo == "fijar":
+        if es:
+            es.existencia = valor
+        else:
+            db.add(ExistenciaSede(producto_id=producto_id, sede_id=sede_id, existencia=valor))
+    elif tipo == "agregar":
+        if es:
+            es.existencia = float(es.existencia or 0) + valor
+        else:
+            db.add(ExistenciaSede(producto_id=producto_id, sede_id=sede_id, existencia=valor))
+    elif tipo == "restar":
+        if es:
+            es.existencia = max(0, float(es.existencia or 0) - valor)
 
 
 @router.get("/contexto-sede")

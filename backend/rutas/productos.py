@@ -525,9 +525,32 @@ def eliminar_oferta(
 # Registrados DESPUÉS de todas las rutas con segmentos literales
 # ============================================================================
 
+def _candidatos_stock_cero(db: Session, q):
+    """De los productos con stock (agregado) <= 0, descarta los que tengan
+    existencia real en ALGUNA sede o stock real en alguna variante activa —
+    no alcanza con mirar el agregado, porque productos.stock puede no
+    reflejar todavia una sede con stock (ej. Valera cuando empiece a tener)."""
+    from sqlalchemy import exists, and_
+    q = q.filter(
+        ~exists().where(and_(
+            ExistenciaSede.producto_id == Producto.id,
+            ExistenciaSede.existencia > 0,
+        ))
+    )
+    q = q.filter(
+        ~exists().where(and_(
+            VarianteProducto.producto_id == Producto.id,
+            VarianteProducto.activo == True,
+            VarianteProducto.stock > 0,
+        ))
+    )
+    return q.all()
+
+
 @router.delete("/stock-cero", dependencies=[Depends(require_admin)])
 def eliminar_productos_stock_cero(db: Session = Depends(get_db)):
-    productos = db.query(Producto).filter(Producto.stock <= 0).all()
+    q = db.query(Producto).filter(Producto.stock <= 0)
+    productos = _candidatos_stock_cero(db, q)
     cantidad = len(productos)
     for p in productos:
         db.delete(p)
@@ -542,13 +565,15 @@ class EliminarSeleccionados(BaseModel):
 @router.post("/stock-cero/eliminar-seleccionados", dependencies=[Depends(require_admin)])
 def eliminar_stock_cero_seleccionados(body: EliminarSeleccionados, db: Session = Depends(get_db)):
     """Elimina solo los productos seleccionados, validando que su stock siga en 0
-    (protege contra borrar algo que cambió de estado mientras estaba marcado)."""
+    en TODAS las sedes (protege contra borrar algo que cambió de estado
+    mientras estaba marcado, o que tiene stock real en otra sede)."""
     if not body.ids:
         return {"eliminados": 0}
-    productos = db.query(Producto).filter(
+    q = db.query(Producto).filter(
         Producto.id.in_(body.ids),
         Producto.stock <= 0,
-    ).all()
+    )
+    productos = _candidatos_stock_cero(db, q)
     cantidad = len(productos)
     for p in productos:
         db.delete(p)

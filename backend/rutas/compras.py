@@ -20,6 +20,7 @@ from models import (
     DevolucionProveedor, AliasProveedor,
 )
 from rutas.usuarios import require_admin
+from rutas.auth import ajustar_existencia_sede
 from rutas.productos import listar_productos as _listar_productos_completo
 from typing import Optional
 from datetime import datetime, date, timedelta
@@ -726,6 +727,11 @@ def registrar_recepcion(orden_id: int, datos: dict, db: Session = Depends(get_db
                 ).first() is not None
                 if not tiene_variantes:
                     producto.stock += int(cantidad)
+                    ajustar_existencia_sede(
+                        db, prod_id, orden.sede_id_destino,
+                        tipo="agregar", valor=int(cantidad),
+                        tiene_variante_activa=False,
+                    )
                 # producto con variantes sin variante_id especificada: no tocar nada
 
             # Actualizar costo en el producto padre (precio de compra siempre en el padre)
