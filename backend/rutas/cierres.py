@@ -11,8 +11,9 @@ from datetime import datetime
 from typing import Optional
 
 from database import get_db
-from models import Venta, PagoVenta, CierreCaja, CuentaBancaria, MovimientoBancario, MetodoPagoCuenta, METODOS_VALIDOS, DevolucionCliente, DetalleDevolucionCliente, Cliente
+from models import Venta, PagoVenta, CierreCaja, CuentaBancaria, MovimientoBancario, MetodoPagoCuenta, METODOS_VALIDOS, DevolucionCliente, DetalleDevolucionCliente, Cliente, Sede
 from rutas.usuarios import require_admin
+from rutas.auth import resolver_sede_activa
 
 router = APIRouter(prefix="/cierres", tags=["cierres"])
 
@@ -55,18 +56,25 @@ def _total_ventas_en_usd(ventas: list) -> float:
 
 
 @router.get("/resumen")
-def resumen_caja(usuario: Optional[str] = None, db: Session = Depends(get_db)):
+def resumen_caja(
+    usuario: Optional[str] = None,
+    db: Session = Depends(get_db),
+    sede_activa: Optional[int] = Depends(resolver_sede_activa),
+):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para ver el resumen de caja")
     ahora = datetime.now()
 
-    # Buscar el último cierre del usuario específico (o global si no hay usuario)
-    q_ultimo = db.query(CierreCaja)
+    # Buscar el último cierre de esa sede (y usuario específico, si aplica)
+    q_ultimo = db.query(CierreCaja).filter(CierreCaja.sede_id == sede_activa)
     if usuario:
         q_ultimo = q_ultimo.filter(CierreCaja.usuario == usuario)
     ultimo = q_ultimo.order_by(CierreCaja.id.desc()).first()
     desde  = ultimo.fecha_hasta if ultimo else None
 
-    # Filtrar ventas por usuario y período
-    q = db.query(Venta)
+    # Filtrar ventas por sede, usuario y período
+    q = db.query(Venta).filter(Venta.sede_id == sede_activa)
     if desde:
         q = q.filter(Venta.fecha > desde)
     if usuario:
@@ -185,19 +193,26 @@ def resumen_caja(usuario: Optional[str] = None, db: Session = Depends(get_db)):
 
 
 @router.post("/")
-def cerrar_caja(data: dict, db: Session = Depends(get_db)):
+def cerrar_caja(
+    data: dict,
+    db: Session = Depends(get_db),
+    sede_activa: Optional[int] = Depends(resolver_sede_activa),
+):
+    if sede_activa is None:
+        raise HTTPException(status_code=400,
+                            detail="Debe seleccionar una sede específica para cerrar caja")
     usuario_nombre = data.get("usuario", "")
     ahora = datetime.now()
 
-    # Último cierre del usuario
-    q_ultimo = db.query(CierreCaja)
+    # Último cierre de esa sede (y usuario, si aplica)
+    q_ultimo = db.query(CierreCaja).filter(CierreCaja.sede_id == sede_activa)
     if usuario_nombre:
         q_ultimo = q_ultimo.filter(CierreCaja.usuario == usuario_nombre)
     ultimo = q_ultimo.order_by(CierreCaja.id.desc()).first()
     desde  = ultimo.fecha_hasta if ultimo else None
 
-    # Ventas del usuario en el período
-    q = db.query(Venta)
+    # Ventas de esa sede (y usuario) en el período
+    q = db.query(Venta).filter(Venta.sede_id == sede_activa)
     if desde:
         q = q.filter(Venta.fecha > desde)
     if usuario_nombre:
@@ -264,6 +279,7 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
         cnt_punto_banesco    = float(contados.get("punto_banesco")    or 0),
         cnt_punto_provincial = float(contados.get("punto_provincial") or 0),
         observacion          = data.get("observacion", ""),
+        sede_id              = sede_activa,
     )
     db.add(cierre)
     db.flush()
@@ -305,6 +321,7 @@ def cerrar_caja(data: dict, db: Session = Depends(get_db)):
             categoria         = "ventas",
             referencia        = f"cierre_{cierre.id}",
             registrado_por    = usuario_nombre,
+            cierre_caja_id    = cierre.id,
         ))
 
     db.commit()
@@ -341,19 +358,22 @@ def revisar_cierre(cierre_id: int, datos: dict, db: Session = Depends(get_db)):
 @router.get("/")
 def listar_cierres(
     usuario: Optional[str] = None,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     q = db.query(CierreCaja)
     if usuario:
         q = q.filter(CierreCaja.usuario == usuario)
+    if sede_id:
+        q = q.filter(CierreCaja.sede_id == sede_id)
     cierres = q.order_by(CierreCaja.id.desc()).all()
     return [_serializar_cierre(c, db) for c in cierres]
 
 
 def _serializar_cierre(c: CierreCaja, db: Session) -> dict:
     """Desglose por cuenta bancaria real usando cuenta_destino_id de PagoVenta."""
-    # Ventas del período
-    q = db.query(Venta)
+    # Ventas de la sede del cierre, en el período
+    q = db.query(Venta).filter(Venta.sede_id == c.sede_id)
     if c.fecha_desde:
         q = q.filter(Venta.fecha > c.fecha_desde)
     q = q.filter(Venta.fecha <= c.fecha_hasta)
@@ -382,10 +402,14 @@ def _serializar_cierre(c: CierreCaja, db: Session) -> dict:
             desglose_cuentas[cid]["esperado"] + float(p.monto_original or 0), 2
         )
 
+    sede = db.query(Sede).filter(Sede.id == c.sede_id).first()
+
     return {
         "id":              c.id,
         "fecha":           c.fecha.isoformat() if c.fecha else None,
         "usuario":         c.usuario,
+        "sede_id":         c.sede_id,
+        "sede_nombre":     sede.nombre if sede else None,
         "cantidad_ventas": c.cantidad_ventas,
         "total_ventas_usd":c.total_ventas_usd,
         "observacion":     c.observacion,

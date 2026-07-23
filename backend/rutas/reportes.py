@@ -8,6 +8,7 @@ from models import (
     Departamento, Proveedor, OrdenCompra, DetalleOrdenCompra, RecepcionCompra,
     VendedorPerfil, ComisionVenta, Usuario,
     Area, Pasillo, Estante, UbicacionProducto, CuentaBancaria,
+    MovimientoBancario, Sede,
 )
 from datetime import datetime, timedelta, date
 from rutas.usuarios import require_admin, require_admin_o_gestionador
@@ -1271,6 +1272,63 @@ def reporte_comparativo_cierres(
         }
         for c in cierres
     ]
+
+
+@router.get("/bancos/movimientos-por-sede")
+def reporte_movimientos_por_sede(
+    sede_id:  Optional[int] = None,
+    desde:    Optional[str] = None,
+    hasta:    Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """
+    Movimientos bancarios filtrables por sede de origen.
+
+    movimientos_bancarios es global (misma cuenta para ambas sedes), asi que
+    la sede de origen se obtiene indirectamente: solo los movimientos que un
+    cierre de caja genero automaticamente (cierre_caja_id no nulo) tienen una
+    sede conocida, via cierres_caja.sede_id. Los movimientos sin cierre_caja_id
+    (pagos a proveedores, ajustes, gastos, etc.) no tienen sede de origen y se
+    devuelven con sede_id=None salvo que se filtre explicitamente por sede_id
+    (en cuyo caso quedan fuera).
+    """
+    q = db.query(MovimientoBancario, CierreCaja.sede_id, Sede.nombre).outerjoin(
+        CierreCaja, MovimientoBancario.cierre_caja_id == CierreCaja.id
+    ).outerjoin(
+        Sede, CierreCaja.sede_id == Sede.id
+    ).filter(MovimientoBancario.estado == "registrado")
+
+    q = _filtro_fecha(q, MovimientoBancario, desde, hasta)
+    if sede_id:
+        q = q.filter(CierreCaja.sede_id == sede_id)
+
+    filas = q.order_by(MovimientoBancario.fecha.desc()).all()
+
+    movimientos = []
+    total_por_sede = {}
+    for m, sede_id_origen, sede_nombre in filas:
+        movimientos.append({
+            "id":               m.id,
+            "fecha":            m.fecha.isoformat() if m.fecha else None,
+            "tipo":             m.tipo,
+            "monto":            round(float(m.monto or 0), 2),
+            "moneda":           m.moneda,
+            "concepto":         m.concepto,
+            "categoria":        m.categoria,
+            "registrado_por":   m.registrado_por,
+            "cierre_caja_id":   m.cierre_caja_id,
+            "sede_id":          sede_id_origen,
+            "sede_nombre":      sede_nombre,
+        })
+        clave = sede_nombre or "Sin sede (origen no rastreable)"
+        total_por_sede[clave] = round(total_por_sede.get(clave, 0) + float(m.monto or 0), 2)
+
+    return {
+        "movimientos":    movimientos,
+        "total_por_sede": total_por_sede,
+        "cantidad":       len(movimientos),
+    }
 
 
 @router.get("/clientes/resumen")

@@ -5,6 +5,9 @@
     <main class="contenido">
       <div class="top-bar">
         <h1>Cierre de caja</h1>
+        <select v-if="puedeAlternarSedes" v-model.number="sedeActivaId" class="sel-sede" @change="recargarTodo">
+          <option v-for="s in sedesDisponibles" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+        </select>
       </div>
 
       <div class="contenido-inner">
@@ -185,6 +188,7 @@
                   <th>#</th>
                   <th>Fecha</th>
                   <th>Usuario</th>
+                  <th v-if="puedeAlternarSedes">Sede</th>
                   <th>Ventas</th>
                   <th>Total USD</th>
                   <th>Estado</th>
@@ -196,6 +200,7 @@
                   <td>#{{ c.id }}</td>
                   <td>{{ formatFecha(c.fecha) }}</td>
                   <td>{{ c.usuario }}</td>
+                  <td v-if="puedeAlternarSedes">{{ c.sede_nombre || '—' }}</td>
                   <td>{{ c.cantidad_ventas }}</td>
                   <td>${{ (c.total_ventas_usd || 0).toFixed(2) }}</td>
                   <td>
@@ -244,6 +249,9 @@ export default {
       error: '',
       aprobando: null,
       observacion: '',
+      sedeActivaId: null,
+      sedesDisponibles: [],
+      puedeAlternarSedes: false,
       contados: {
         efectivo_usd: '',
         zelle: '',
@@ -280,20 +288,36 @@ export default {
     },
   },
   async mounted() {
-    await Promise.all([this.cargarResumen(), this.cargarHistorial()])
-    this.cargando = false
+    await this.cargarContextoSede()
+    await this.recargarTodo()
   },
   methods: {
+    async cargarContextoSede() {
+      try {
+        const res = await axios.get('/auth/contexto-sede')
+        this.sedesDisponibles   = res.data.sedes_disponibles || []
+        this.puedeAlternarSedes = !!res.data.puede_alternar_sedes
+        this.sedeActivaId       = res.data.sede_activa || res.data.sede_id || (this.sedesDisponibles[0] && this.sedesDisponibles[0].id)
+      } catch { /* si falla, los endpoints de cierre resuelven la sede home igual */ }
+    },
+    async recargarTodo() {
+      this.cargando = true
+      await Promise.all([this.cargarResumen(), this.cargarHistorial()])
+      this.cargando = false
+    },
+    _headersSede() {
+      return this.sedeActivaId ? { 'X-Sede-Id': this.sedeActivaId } : {}
+    },
     async cargarResumen() {
       const nombre = this.usuario.usuario || ''
       const params = this.esAdmin ? {} : { usuario: nombre }
-      const res = await axios.get('/cierres/resumen', { params })
+      const res = await axios.get('/cierres/resumen', { params, headers: this._headersSede() })
       this.resumen = res.data
     },
     async cargarHistorial() {
       const nombre = this.usuario.usuario || ''
       const params = this.esAdmin ? {} : { usuario: nombre }
-      const res = await axios.get('/cierres/', { params })
+      const res = await axios.get('/cierres/', { params, headers: this._headersSede() })
       this.historial = res.data
     },
     diferencia(key, moneda) {
@@ -320,7 +344,7 @@ export default {
           usuario: this.usuario.usuario || '',
           observacion: this.observacion,
           contados: this.contados,
-        })
+        }, { headers: this._headersSede() })
         this.cierreId = res.data.cierre_id
         this.exitoso = true
         this.observacion = ''
@@ -364,6 +388,11 @@ export default {
 </script>
 
 <style scoped>
+.sel-sede {
+  padding: 0.4rem 0.75rem; border-radius: 6px; border: 1px solid #1A1A1A44;
+  background: #FFFFFF; color: #1A1A1A; font-weight: 600; font-size: 0.9rem;
+}
+
 .sin-ventas {
   background: #FFFFFF; padding: 2rem; border-radius: 12px;
   color: var(--texto-sec); text-align: center; font-size: 1.1rem;

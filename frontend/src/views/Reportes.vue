@@ -52,6 +52,10 @@
               </div>
               <small v-if="fechaHasta" class="fecha-preview">{{ formatFechaPreview(fechaHasta) }}</small>
             </div>
+            <select v-if="tabKey === 'otros-bancos_sede'" v-model="filtroSedeId" class="input-fecha-anio" style="width:auto" @change="cargar">
+              <option value="">Todas las sedes</option>
+              <option v-for="s in sedesReporte" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            </select>
             <button class="btn-filtrar" @click="cargar">Filtrar</button>
             <button class="btn-rapido" @click="setHoy">Hoy</button>
             <button class="btn-rapido" @click="setAyer">Ayer</button>
@@ -763,6 +767,38 @@
           </div>
         </template>
 
+        <!-- Otros → Bancos por sede -->
+        <template v-if="tabMain === 'otros' && tabSub === 'bancos_sede' && !cargando && datos">
+          <div class="kpi-row">
+            <div v-for="(total, sede) in datos.total_por_sede" :key="sede" class="kpi-card">
+              <p class="kpi-label">{{ sede }}</p>
+              <p class="kpi-valor txt-verde">${{ total.toFixed(2) }}</p>
+            </div>
+          </div>
+          <div class="tabla-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Sede origen</th><th>Tipo</th><th>Concepto</th>
+                  <th>Monto</th><th>Categoría</th><th>Registrado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in datos.movimientos" :key="m.id">
+                  <td>{{ formatFecha(m.fecha) }}</td>
+                  <td>{{ m.sede_nombre || 'Sin sede' }}</td>
+                  <td>{{ m.tipo }}</td>
+                  <td>{{ m.concepto }}</td>
+                  <td>{{ m.moneda === 'USD' ? '$' : 'Bs.' }}{{ m.monto.toFixed(2) }}</td>
+                  <td>{{ m.categoria }}</td>
+                  <td>{{ m.registrado_por }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="!datos.movimientos || datos.movimientos.length === 0" class="sin-datos">Sin movimientos en el período</div>
+        </template>
+
       </div>
 
       <!-- ── Panel lateral de rotación ──────────────────────────────────── -->
@@ -937,8 +973,9 @@ const SUBTABS = {
     { key: 'conteos',      label: 'Conteos físicos' },
   ],
   otros: [
-    { key: 'cierres',  label: 'Cierres' },
-    { key: 'clientes', label: 'Clientes' },
+    { key: 'cierres',     label: 'Cierres' },
+    { key: 'clientes',    label: 'Clientes' },
+    { key: 'bancos_sede', label: 'Bancos por sede' },
   ],
 }
 
@@ -962,6 +999,7 @@ const URL_MAP = {
   'inventario-conteos':      '/ajustes/historial',
   'otros-cierres':           '/reportes/cierre/comparativo',
   'otros-clientes':          '/reportes/clientes/resumen',
+  'otros-bancos_sede':       '/reportes/bancos/movimientos-por-sede',
 }
 
 const CON_FILTROS = new Set([
@@ -969,6 +1007,7 @@ const CON_FILTROS = new Set([
   'ventas-proveedor', 'ventas-pareto', 'ventas-vendedor', 'ventas-top',
   'compras-proveedor', 'compras-departamento',
   'inventario-pareto', 'inventario-rotacion', 'inventario-conteos', 'otros-clientes',
+  'otros-bancos_sede',
 ])
 
 export default {
@@ -1005,6 +1044,8 @@ export default {
       MESES,
       diasEjecutivo:        90,
       descargandoEjecutivo: false,
+      sedesReporte:         [],
+      filtroSedeId:         '',
       MAIN_TABS_TODOS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
@@ -1070,6 +1111,12 @@ export default {
     if (guardada) {
       try { this.listaReposicion = JSON.parse(guardada) } catch {}
     }
+    if (this.esAdmin) {
+      try {
+        const res = await axios.get('/sedes/')
+        this.sedesReporte = res.data || []
+      } catch { this.sedesReporte = [] }
+    }
     await this.cargar()
   },
   methods: {
@@ -1102,6 +1149,9 @@ export default {
         }
         if (this.tabKey === 'inventario-valorizacion') {
           params.agrupar_por = this.agrupacion
+        }
+        if (this.tabKey === 'otros-bancos_sede' && this.filtroSedeId) {
+          params.sede_id = this.filtroSedeId
         }
         const res  = await axios.get(url, { params })
         this.datos    = res.data

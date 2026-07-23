@@ -360,6 +360,7 @@ class CierreCaja(Base):
     fecha_revision   = Column(DateTime, nullable=True)
     estado_revision  = Column(String,   default="pendiente")  # pendiente|aprobado|con_diferencias
     nota_revision    = Column(String,   nullable=True)
+    sede_id          = Column(Integer, nullable=False, default=1)  # FK → Sede
 
 
 class Deposito(Base):
@@ -583,6 +584,7 @@ class MovimientoBancario(Base):
     registrado_por    = Column(String)
     estado            = Column(String, default="registrado")  # registrado|anulado
     venta_id          = Column(Integer, nullable=True)        # si viene de una venta
+    cierre_caja_id    = Column(Integer, nullable=True)         # FK → CierreCaja — set cuando el cierre lo genera automatico
 
 
 # ---------------------------------------------------------------------------
