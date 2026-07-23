@@ -209,7 +209,7 @@ def _venta_diaria_90d(db: Session, producto_id: int, corte: datetime) -> float:
     return float(total_vendido) / 90
 
 
-def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
+def obtener_ficha_reposicion(db: Session, producto_id: int, existencia_override: float | None = None) -> dict | None:
     """
     Retorna None si el producto no existe.
     Retorna {"producto_id":.., "ficha_cargada": False, ...} si el producto existe
@@ -217,10 +217,18 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
     y filas sin cargar en la vista tabla). Igual trae código/descripción/existencia/
     venta_diaria_90d porque la vista tabla los necesita para ordenar y mostrar la
     fila aunque no haya ficha todavía.
+
+    existencia_override (Fase 1K): si se pasa (no None), se usa en vez de
+    producto.stock tanto para el campo "existencia" como para "disponible"
+    (el que alimenta el cálculo de reposición) — así la sugerencia de pedido
+    responde a la sede activa en vez del agregado global cuando el caller
+    filtra por sede. None (default) = comportamiento agregado de siempre.
     """
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if not producto:
         return None
+
+    existencia = float(producto.stock or 0) if existencia_override is None else existencia_override
 
     ficha = db.query(ProductoReposicion).filter(ProductoReposicion.producto_id == producto_id).first()
     if not ficha:
@@ -230,7 +238,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
             "ficha_cargada": False,
             "producto_codigo": producto.codigo,
             "producto_descripcion": producto.descripcion or producto.nombre,
-            "existencia": producto.stock,
+            "existencia": existencia,
             "costo_generico_usd": producto.costo_usd,
             "venta_diaria_90d": round(_venta_diaria_90d(db, producto_id, corte), 4),
         }
@@ -283,7 +291,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
     corte = datetime.now(timezone.utc).replace(tzinfo=None)
     venta_diaria = _venta_diaria_90d(db, producto_id, corte)
 
-    disponible = float(producto.stock or 0) - float(ficha.unidades_exhibicion or 0)
+    disponible = existencia - float(ficha.unidades_exhibicion or 0)
 
     pedido_vencido = False
     if principal:
@@ -311,7 +319,7 @@ def obtener_ficha_reposicion(db: Session, producto_id: int) -> dict | None:
         "ficha_cargada":  True,
         "producto_codigo": producto.codigo,
         "producto_descripcion": producto.descripcion or producto.nombre,
-        "existencia":     producto.stock,
+        "existencia":     existencia,
         "costo_generico_usd": producto.costo_usd,
         "modo_reposicion": ficha.modo_reposicion,
         "activo":         ficha.activo,

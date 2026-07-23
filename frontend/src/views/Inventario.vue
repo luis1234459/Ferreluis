@@ -111,6 +111,12 @@
               @click="toggleStockCero">
               {{ filtroStockCero ? '📦 Stock 0 activo' : '📦 Ver stock 0' }}
             </button>
+            <button
+              :class="['btn-toggle-inactivos', soloConExistencia ? 'activo' : '']"
+              @click="toggleSoloConExistencia"
+              title="Filtra a productos con existencia > 0 en la sede activa">
+              {{ soloConExistencia ? '✅ Solo con existencia' : '☐ Solo con existencia' }}
+            </button>
           </div>
 
           <!-- Barra de acciones masivas (solo en vista Stock 0) -->
@@ -1301,6 +1307,7 @@ import AppSidebar from '../components/AppSidebar.vue'
 import ReposicionTabla from '../components/ReposicionTabla.vue'
 import axios from 'axios'
 import { imprimirEtiqueta } from '../utils/zebra'
+import { sedeIdParaQuery, EVENTO_CAMBIO as EVENTO_SEDE_CAMBIADA } from '../utils/sede'
 
 export default {
   components: { AppSidebar, ReposicionTabla },
@@ -1424,6 +1431,7 @@ export default {
       // Visibilidad de inactivos (solo admin)
       mostrarInactivos: false,
       filtroStockCero:  false,
+      soloConExistencia: false,
       seleccionStock0:  new Set(),
 
       // Modo edición masiva
@@ -1548,10 +1556,12 @@ export default {
     ])
     if (this.esAdmin) this.activarModoEdicion()
     window.addEventListener('beforeunload', this._onBeforeUnload)
+    window.addEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
   },
 
   beforeUnmount() {
     window.removeEventListener('beforeunload', this._onBeforeUnload)
+    window.removeEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
   },
 
   beforeRouteLeave(to, from, next) {
@@ -1578,15 +1588,22 @@ export default {
       this.tasaBinance = r.data.tasa_binance
       this.factor      = r.data.factor || 1
     },
-    async cargarProductos() {
+    async cargarProductos({ resetearBorrador = false } = {}) {
       const params = { skip: (this.paginaActual - 1) * 100, limit: 100 }
       if (this.esAdmin && this.mostrarInactivos) params.incluir_inactivos = true
       if (this.esAdmin && this.filtroStockCero)  params.stock_cero        = true
+      if (this.soloConExistencia)  params.solo_con_existencia = true
       if (this.busqueda)           params.busqueda        = this.busqueda
       if (this.filtroMarca)        params.marca_id        = this.filtroMarca
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
       const res = await axios.get('/productos/', { params })
+      // resetearBorrador (Fase 1K, cambio de sede) se aplica en el MISMO tick
+      // que la reasignacion de productos, nunca antes del await — si se vacia
+      // el borrador antes de esperar la respuesta, Vue re-renderiza la tabla
+      // (todavia con los productos viejos) contra un borrador vacio y explota
+      // en el v-model de la fila (borradorEdicion[p.id].nombre).
+      if (resetearBorrador) this.borradorEdicion = {}
       this.productos      = res.data.productos
       this.totalProductos = res.data.total
       if (this.modoEdicion) this.sincronizarBorrador()
@@ -1792,7 +1809,9 @@ export default {
       this.cargandoReposicion = true
       this.errorReposicion    = ''
       try {
-        const res = await axios.get(`/productos/${this.form.id}/reposicion`)
+        const paramsRepo = {}
+        if (sedeIdParaQuery()) paramsRepo.sede_id = sedeIdParaQuery()
+        const res = await axios.get(`/productos/${this.form.id}/reposicion`, { params: paramsRepo })
         this.reposicion = res.data
         if (res.data.ficha_cargada) {
           this.repoForm = {
@@ -2039,6 +2058,11 @@ export default {
     },
     async toggleStockCero() {
       this.filtroStockCero = !this.filtroStockCero
+      this.paginaActual = 1
+      await this.cargarProductos()
+    },
+    async toggleSoloConExistencia() {
+      this.soloConExistencia = !this.soloConExistencia
       this.paginaActual = 1
       await this.cargarProductos()
     },
@@ -2520,6 +2544,23 @@ export default {
         e.preventDefault()
         e.returnValue = ''
       }
+    },
+    async _onSedeCambiada() {
+      // El borrador de edición masiva solo rellena huecos (sincronizarBorrador
+      // no pisa entradas existentes, a propósito, para no perder ediciones sin
+      // guardar al refiltrar). Pero al cambiar de sede el "stock" es un dato
+      // distinto de verdad (existencia_sede de otra sede) — si no se vacía el
+      // borrador, la tabla se queda mostrando el stock de la sede anterior.
+      if (this.modoEdicion && this.filasModificadas.size > 0) {
+        const ok = confirm(
+          `Tenés ${this.filasModificadas.size} producto(s) sin guardar. Cambiar de sede descarta ` +
+          `esos cambios (el stock puede ser distinto en la otra sede). ¿Continuar?`
+        )
+        if (!ok) return
+      }
+      this.filasModificadas = new Set()
+      this.paginaActual = 1
+      await this.cargarProductos({ resetearBorrador: this.modoEdicion })
     },
     async confirmarSalida() {
       await this.guardarEdicionMasiva()

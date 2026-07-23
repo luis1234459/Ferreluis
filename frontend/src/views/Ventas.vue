@@ -1110,6 +1110,7 @@ import AppSidebar from '../components/AppSidebar.vue'
 import ModalGarantia from '../components/ModalGarantia.vue'
 import axios from 'axios'
 import { exportarFacturaPDF } from '@/utils/facturaPDF.js'
+import { EVENTO_CAMBIO as EVENTO_SEDE_CAMBIADA } from '../utils/sede'
 
 const FRASES = [
   { texto: "Todo lo puedo en Cristo que me fortalece.", fuente: "Filipenses 4:13" },
@@ -1483,6 +1484,7 @@ export default {
     clearInterval(this._timerHora)
     clearInterval(this._burbujaVTimer)
     window.removeEventListener('popstate', this._onPopState)
+    window.removeEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
 
     // Si el componente se destruye con el modal de despacho abierto
     // (cierre de pestaña, logout, etc.), asegurar reset del carrito.
@@ -1506,6 +1508,7 @@ export default {
       history.pushState(null, '', window.location.href)
     }
     window.addEventListener('popstate', this._onPopState)
+    window.addEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
 
     await Promise.all([
       this.cargarProductos(),
@@ -1601,6 +1604,9 @@ export default {
       if (this.filtroCategoria)    params.categoria_id   = this.filtroCategoria
       const r = await axios.get('/productos/', { params })
       this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
+    },
+    async _onSedeCambiada() {
+      await this.cargarProductos()
     },
     async cargarCuentasPorMetodo() {
       try {

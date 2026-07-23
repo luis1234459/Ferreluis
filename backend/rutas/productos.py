@@ -591,6 +591,7 @@ def listar_productos(
     proveedor_id: Optional[int] = None,
     marca_id: Optional[int] = None,
     stock_cero: bool = False,
+    solo_con_existencia: bool = False,
     db: Session = Depends(get_db),
     sede_activa: Optional[int] = Depends(resolver_sede_activa_opcional),
 ):
@@ -629,6 +630,27 @@ def listar_productos(
         q = q.filter(Producto.marca_id == marca_id)
     if stock_cero:
         q = q.filter(Producto.stock <= 0)
+    if solo_con_existencia:
+        # Toggle "Solo con existencia" (Fase 1K, pedido de Luis): con sede
+        # activa resuelta, mira existencia_sede de esa sede (o stock de
+        # variante activa, que no vive en existencia_sede); sin sede activa
+        # (vista agregada), cae al stock global de siempre.
+        from sqlalchemy import exists, and_, or_
+        if sede_activa is not None:
+            q = q.filter(or_(
+                exists().where(and_(
+                    ExistenciaSede.producto_id == Producto.id,
+                    ExistenciaSede.sede_id == sede_activa,
+                    ExistenciaSede.existencia > 0,
+                )),
+                exists().where(and_(
+                    VarianteProducto.producto_id == Producto.id,
+                    VarianteProducto.activo == True,
+                    VarianteProducto.stock > 0,
+                )),
+            ))
+        else:
+            q = q.filter(Producto.stock > 0)
     total = q.count()
     bcv, binance = _tasas_actuales(db)
     q = q.order_by(func.length(Producto.nombre), Producto.nombre)

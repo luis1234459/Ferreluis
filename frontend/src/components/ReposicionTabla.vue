@@ -344,6 +344,7 @@
 
 <script>
 import axios from 'axios'
+import { sedeIdParaQuery, EVENTO_CAMBIO as EVENTO_SEDE_CAMBIADA } from '../utils/sede'
 
 const MODOS_NOMBRES = {
   stock_continuo:               'Stock continuo',
@@ -485,8 +486,15 @@ export default {
       this.deptoActivoId = guardado
       await this.cargarTabla()
     }
+    window.addEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
+  },
+  beforeUnmount() {
+    window.removeEventListener(EVENTO_SEDE_CAMBIADA, this._onSedeCambiada)
   },
   methods: {
+    async _onSedeCambiada() {
+      await this.cargarTabla()
+    },
     async cargarDeptos() {
       const res = await axios.get('/productos/reposicion/departamentos-resumen')
       this.deptos = res.data
@@ -524,6 +532,7 @@ export default {
       try {
         const params = { departamento_id: this.deptoActivoId }
         if (this.categoriaActivaId) params.categoria_id = this.categoriaActivaId
+        if (sedeIdParaQuery())      params.sede_id      = sedeIdParaQuery()
         const res = await axios.get('/productos/reposicion/tabla', { params })
         this.productos = res.data.productos
         this.reconstruirBorrador()

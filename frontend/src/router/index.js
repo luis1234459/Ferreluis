@@ -88,6 +88,7 @@ const routes = [
   { path: '/apartados',   name: 'Apartados',  component: () => import('../views/Apartados.vue'),  meta: { requiresAuth: true } },
   { path: '/transferencias', name: 'Transferencias', component: () => import('../views/Transferencias.vue'), meta: { soloAdmin: true } },
   { path: '/radar-demanda', name: 'RadarDemanda',  component: RadarDemanda, meta: { soloAdmin: true } },
+  { path: '/admin/sedes',   name: 'AdminSedes',    component: () => import('../views/Configuracion/Sedes.vue'), meta: { soloAdmin: true } },
   {
     path: '/orden-despacho/:id',
     name: 'OrdenDespacho',

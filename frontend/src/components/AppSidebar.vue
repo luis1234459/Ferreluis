@@ -162,12 +162,28 @@
     <div class="user-info">
       <p>{{ usuario.usuario }}</p>
       <span>{{ usuario.rol }}</span>
+
+      <!-- Sede activa (Fase 1K) -->
+      <div v-if="puedeAlternarSedes" class="sede-selector">
+        <label class="sede-label">Sede</label>
+        <select v-model="sedeSeleccionValue" class="sede-select" @change="cambiarSede">
+          <option v-for="s in sedesDisponibles" :key="s.id" :value="String(s.id)">{{ s.nombre }}</option>
+          <option value="todas">Todas las sedes</option>
+        </select>
+      </div>
+      <div v-else-if="sedeHomeNombre" class="sede-badge" :title="'Sede: ' + sedeHomeNombre">
+        📍 {{ sedeHomeNombre }}
+      </div>
+
       <button @click="salir">Salir</button>
     </div>
   </aside>
 </template>
 
 <script>
+import axios from 'axios'
+import { obtenerSedeActiva, fijarSedeActiva } from '../utils/sede'
+
 const GRUPOS = [
   {
     key: 'inventario',
@@ -275,9 +291,10 @@ const GRUPOS = [
     key: 'admin',
     icono: '⚙️',
     nombre: 'Admin',
-    rutas: ['/usuarios', '/configuracion', '/radar-demanda'],
+    rutas: ['/usuarios', '/configuracion', '/radar-demanda', '/admin/sedes'],
     items: [
       { ruta: '/usuarios',                       label: 'Usuarios',       soloAdmin: true },
+      { ruta: '/admin/sedes',                    label: '📍 Sedes',       soloAdmin: true },
       { ruta: '/radar-demanda',                  label: 'Radar Demanda',  soloAdmin: true },
       { ruta: '/configuracion/claves',          label: 'Claves Auth',    soloAdmin: true },
       { ruta: '/configuracion/garantias',       label: 'Garantías',      soloAdmin: true },
@@ -299,7 +316,13 @@ export default {
         ? true
         : (saved[g.key] !== undefined ? saved[g.key] : false)
     }
-    return { usuario, abiertos, menuAbierto: false }
+    return {
+      usuario, abiertos, menuAbierto: false,
+      puedeAlternarSedes: false,
+      sedesDisponibles:   [],
+      sedeHomeNombre:     '',
+      sedeSeleccionValue: obtenerSedeActiva() || '',
+    }
   },
   computed: {
     esAdmin() {
@@ -321,7 +344,27 @@ export default {
       }
     },
   },
+  async mounted() {
+    if (!this.usuario.usuario) return
+    try {
+      const res = await axios.get('/auth/contexto-sede')
+      this.puedeAlternarSedes = !!res.data.puede_alternar_sedes
+      this.sedesDisponibles   = res.data.sedes_disponibles || []
+      const home = this.sedesDisponibles.find(s => s.id === res.data.sede_id)
+      this.sedeHomeNombre = home ? home.nombre : ''
+
+      // Primera vez sin elección guardada -> default a la sede home (nunca
+      // "todas" por sorpresa). Si ya hay una guardada, se respeta tal cual.
+      if (!obtenerSedeActiva() && this.puedeAlternarSedes && res.data.sede_activa) {
+        this.sedeSeleccionValue = String(res.data.sede_activa)
+        fijarSedeActiva(this.sedeSeleccionValue)
+      }
+    } catch { /* sin sesion valida u otro error — sidebar sigue funcionando sin selector */ }
+  },
   methods: {
+    cambiarSede() {
+      fijarSedeActiva(this.sedeSeleccionValue)
+    },
     tienePermiso(modulo) {
       if (this.esAdmin) return true
       const p = this.usuario.permisos
@@ -366,6 +409,20 @@ export default {
   height: 100%;
   pointer-events: none;
   z-index: 0;
+}
+
+/* Sede activa (Fase 1K) */
+.sede-selector { margin: 0.6rem 0; display: flex; flex-direction: column; gap: 0.25rem; position: relative; z-index: 2; }
+.sede-label { color: rgba(255,255,255,0.5); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.sede-select {
+  background: #1A1A1A; color: #FFCC00; border: 1px solid #FFCC00;
+  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer;
+}
+.sede-badge {
+  margin: 0.6rem 0; align-self: flex-start; position: relative; z-index: 2;
+  background: rgba(255,204,0,0.12); color: #FFCC00; border: 1px solid rgba(255,204,0,0.4);
+  border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.78rem; font-weight: 700;
 }
 
 /* Grupos colapsables */

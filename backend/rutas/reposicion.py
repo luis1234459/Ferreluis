@@ -6,6 +6,7 @@ El CRUD de proveedores NO vive acá — ya existe en rutas/compras.py
 lead_time_dias_default y notas. Acá solo la ficha 1:1 + sus proveedores.
 """
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -18,6 +19,7 @@ from models import (
 )
 from reposicion import obtener_ficha_reposicion, MODOS_VALIDOS
 from rutas.usuarios import require_admin_o_gestionador
+from rutas.auth import mapa_existencia_por_sede
 
 router = APIRouter(prefix="/productos", tags=["reposicion"])
 
@@ -59,8 +61,12 @@ def _validar_payload(datos: dict):
 
 
 @router.get("/{producto_id}/reposicion")
-def get_reposicion(producto_id: int, db: Session = Depends(get_db)):
-    resultado = obtener_ficha_reposicion(db, producto_id)
+def get_reposicion(producto_id: int, sede_id: Optional[int] = None, db: Session = Depends(get_db)):
+    existencia_override = None
+    if sede_id:
+        mapa_ex = mapa_existencia_por_sede(db)
+        existencia_override = mapa_ex.get(producto_id, {}).get(sede_id, 0.0)
+    resultado = obtener_ficha_reposicion(db, producto_id, existencia_override=existencia_override)
     if resultado is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return resultado
@@ -134,14 +140,30 @@ def departamentos_resumen(db: Session = Depends(get_db)):
 def tabla_reposicion(
     departamento_id: int,
     categoria_id: int | None = None,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    """Fichas + cálculo de todos los productos activos de UN departamento (nunca del catálogo completo)."""
+    """Fichas + cálculo de todos los productos activos de UN departamento (nunca del catálogo completo).
+
+    sede_id (Fase 1K): si se pasa, "existencia"/"disponible" (y por lo tanto
+    la sugerencia de pedido) responden a existencia_sede de esa sede en vez
+    del agregado global — igual que el resto de reportes de inventario desde
+    la Fase 1J. Sin sede_id, comportamiento agregado de siempre, sin cambios.
+    """
     q = db.query(Producto.id).filter(Producto.activo == True, Producto.departamento_id == departamento_id)
     if categoria_id is not None:
         q = q.filter(Producto.categoria_id == categoria_id)
     ids = [row[0] for row in q.all()]
-    return {"productos": [obtener_ficha_reposicion(db, pid) for pid in ids]}
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
+    return {
+        "productos": [
+            obtener_ficha_reposicion(
+                db, pid,
+                existencia_override=mapa_ex.get(pid, {}).get(sede_id, 0.0) if sede_id else None,
+            )
+            for pid in ids
+        ]
+    }
 
 
 def _validar_ficha_para_guardar(db: Session, producto_id: int, datos: dict) -> tuple[str, list]:

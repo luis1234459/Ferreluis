@@ -6,6 +6,7 @@ import Aura from '@primevue/themes/aura'
 import 'primeicons/primeicons.css'
 import './assets/theme.css'
 import axios from 'axios'
+import { obtenerSedeActiva } from './utils/sede'
 
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
@@ -24,6 +25,13 @@ axios.interceptors.request.use(config => {
       if (u.id)      config.headers['X-Usuario-Id']     = String(u.id)
       if (u.usuario) config.headers['X-Usuario-Nombre'] = u.usuario
     } catch { /* ignorar */ }
+  }
+  // Sede activa (Fase 1K) — 'todas' o ausente = sin header, el backend
+  // resuelve la sede "home" del usuario por default (comportamiento previo
+  // a esta fase, sin cambios para quien no puede alternar sedes).
+  const sede = obtenerSedeActiva()
+  if (sede && !config.headers['X-Sede-Id']) {
+    config.headers['X-Sede-Id'] = sede
   }
   return config
 })
