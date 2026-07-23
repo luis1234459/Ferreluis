@@ -25,6 +25,10 @@
 
         <!-- Barra de filtros + exportar -->
         <div class="barra-acciones">
+          <select v-if="puedeAlternarSedes" v-model="filtroSedeId" class="sel-sede-reportes" @change="cargar">
+            <option value="">Todas las sedes</option>
+            <option v-for="s in sedesReporte" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
           <div class="filtros" v-if="tieneFiltros">
             <div class="field-inline">
               <label>Desde</label>
@@ -52,10 +56,6 @@
               </div>
               <small v-if="fechaHasta" class="fecha-preview">{{ formatFechaPreview(fechaHasta) }}</small>
             </div>
-            <select v-if="tabKey === 'otros-bancos_sede'" v-model="filtroSedeId" class="input-fecha-anio" style="width:auto" @change="cargar">
-              <option value="">Todas las sedes</option>
-              <option v-for="s in sedesReporte" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
             <button class="btn-filtrar" @click="cargar">Filtrar</button>
             <button class="btn-rapido" @click="setHoy">Hoy</button>
             <button class="btn-rapido" @click="setAyer">Ayer</button>
@@ -1046,6 +1046,7 @@ export default {
       descargandoEjecutivo: false,
       sedesReporte:         [],
       filtroSedeId:         '',
+      puedeAlternarSedes:   false,
       MAIN_TABS_TODOS: [
         { key: 'ventas',     label: 'Ventas' },
         { key: 'compras',    label: 'Compras' },
@@ -1111,12 +1112,11 @@ export default {
     if (guardada) {
       try { this.listaReposicion = JSON.parse(guardada) } catch {}
     }
-    if (this.esAdmin) {
-      try {
-        const res = await axios.get('/sedes/')
-        this.sedesReporte = res.data || []
-      } catch { this.sedesReporte = [] }
-    }
+    try {
+      const res = await axios.get('/auth/contexto-sede')
+      this.puedeAlternarSedes = !!res.data.puede_alternar_sedes
+      this.sedesReporte       = res.data.sedes_disponibles || []
+    } catch { /* sin sesion valida u otro error — se mantiene sin filtro de sede */ }
     await this.cargar()
   },
   methods: {
@@ -1150,7 +1150,7 @@ export default {
         if (this.tabKey === 'inventario-valorizacion') {
           params.agrupar_por = this.agrupacion
         }
-        if (this.tabKey === 'otros-bancos_sede' && this.filtroSedeId) {
+        if (this.filtroSedeId) {
           params.sede_id = this.filtroSedeId
         }
         const res  = await axios.get(url, { params })
@@ -1226,6 +1226,7 @@ export default {
         if (this.imprimirDeptoId) params.departamento_id = this.imprimirDeptoId
         if (this.imprimirDesde)   params.desde_nombre    = this.imprimirDesde
         if (this.imprimirHasta)   params.hasta_nombre    = this.imprimirHasta
+        if (this.filtroSedeId)    params.sede_id         = this.filtroSedeId
         const res = await axios.get('/reportes/inventario/no-auditados/pdf', {
           params,
           responseType: 'blob',
@@ -1243,8 +1244,10 @@ export default {
     async descargarEjecutivo() {
       this.descargandoEjecutivo = true
       try {
+        const params = { dias: this.diasEjecutivo }
+        if (this.filtroSedeId) params.sede_id = this.filtroSedeId
         const res = await axios.get('/reportes/ejecutivo/pdf', {
-          params:       { dias: this.diasEjecutivo },
+          params,
           responseType: 'blob',
         })
         const url  = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
@@ -1357,6 +1360,11 @@ export default {
 .btn-rapido:hover { background: #333; }
 .btn-exportar { margin-left: auto; background: transparent; color: var(--texto-sec); border: 1px solid var(--borde); padding: 0.45rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; align-self: flex-end; }
 .btn-exportar:hover { background: var(--fondo-sidebar); }
+.sel-sede-reportes {
+  padding: 0.45rem 0.7rem; border: 1px solid #1A1A1A;
+  border-radius: 6px; font-size: 0.82rem; font-weight: 600;
+  background: #FFCC00; color: #1A1A1A; align-self: flex-start;
+}
 .ejecutivo-wrap { display: flex; gap: 0.4rem; align-items: center; }
 .sel-dias-ejecutivo {
   padding: 0.45rem 0.5rem; border: 1px solid var(--borde);

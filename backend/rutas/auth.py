@@ -130,6 +130,21 @@ def ajustar_existencia_sede(db: Session, producto_id: int, sede_id: int,
             es.existencia = max(0, float(es.existencia or 0) - valor)
 
 
+def mapa_existencia_por_sede(db: Session) -> dict:
+    """
+    producto_id -> {sede_id: existencia}, para reportes que filtran stock por
+    sede (Fase 1J). Sin fila para un producto/sede = 0 (mismo criterio que
+    ajustar_existencia_sede: ausencia de fila no es "desconocido", es "no hay
+    registro de existencia ahi"). Productos con variante activa no pasan por
+    aca: su stock sigue viniendo de variantes_producto, frozen, igual que en
+    el resto del multisede.
+    """
+    mapa: dict = {}
+    for es in db.query(ExistenciaSede).all():
+        mapa.setdefault(es.producto_id, {})[es.sede_id] = float(es.existencia or 0)
+    return mapa
+
+
 @router.get("/contexto-sede")
 def contexto_sede(
     sede_activa_id: int = Depends(resolver_sede_activa),

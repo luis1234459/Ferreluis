@@ -12,6 +12,7 @@ from models import (
 )
 from datetime import datetime, timedelta, date
 from rutas.usuarios import require_admin, require_admin_o_gestionador
+from rutas.auth import mapa_existencia_por_sede
 from typing import Optional
 
 def require_admin_o_vendedor(
@@ -332,6 +333,7 @@ def ventas_por_vendedor(
 def ventas_resumen_dia(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin_o_vendedor),
     x_usuario_rol: Optional[str] = Header(None),
@@ -341,6 +343,7 @@ def ventas_resumen_dia(
     q = db.query(Venta)
     if desde: q = q.filter(Venta.fecha >= desde)
     if hasta: q = q.filter(Venta.fecha <= hasta)
+    if sede_id: q = q.filter(Venta.sede_id == sede_id)
     ventas = q.filter(Venta.estado != 'anulada').all()
 
     if not ventas:
@@ -528,6 +531,7 @@ def ventas_resumen_dia(
     todas_ventas = db.query(Venta)
     if desde: todas_ventas = todas_ventas.filter(Venta.fecha >= desde)
     if hasta: todas_ventas = todas_ventas.filter(Venta.fecha <= hasta)
+    if sede_id: todas_ventas = todas_ventas.filter(Venta.sede_id == sede_id)
     todas_ventas = todas_ventas.all()
     todos_ids = {v.id for v in todas_ventas}
 
@@ -688,6 +692,7 @@ def top_productos(
 
 @router.get("/inventario")
 def reporte_inventario(
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -695,6 +700,7 @@ def reporte_inventario(
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     resultado = []
     for p in productos:
@@ -716,15 +722,16 @@ def reporte_inventario(
                     "activo":           v.activo,
                 })
         else:
+            stock = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
             resultado.append({
                 "id":               p.id,
                 "variante_id":      None,
                 "nombre":           p.nombre,
                 "categoria":        p.categoria,
-                "stock":            p.stock,
+                "stock":            stock,
                 "costo_usd":        round(float(p.costo_usd or 0), 2),
-                "valor_inventario": round(float(p.costo_usd or 0) * int(p.stock or 0), 2),
-                "alerta_stock":     p.stock < 5,
+                "valor_inventario": round(float(p.costo_usd or 0) * stock, 2),
+                "alerta_stock":     stock < 5,
                 "activo":           p.activo,
             })
     return resultado
@@ -736,6 +743,7 @@ def reporte_inventario(
 
 @router.get("/inventario/por-departamento")
 def inventario_por_departamento(
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -744,6 +752,7 @@ def inventario_por_departamento(
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     grupos: dict = {}
     for p in productos:
@@ -769,10 +778,11 @@ def inventario_por_departamento(
                 if stock < 5:
                     grupos[dept_id]["productos_bajo_stock"] += 1
         else:
+            stock = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
             grupos[dept_id]["cantidad_productos"]   += 1
-            grupos[dept_id]["stock_total"]          += int(p.stock or 0)
-            grupos[dept_id]["valor_usd"]            += float(p.costo_usd or 0) * int(p.stock or 0)
-            if (p.stock or 0) < 5:
+            grupos[dept_id]["stock_total"]          += stock
+            grupos[dept_id]["valor_usd"]            += float(p.costo_usd or 0) * stock
+            if stock < 5:
                 grupos[dept_id]["productos_bajo_stock"] += 1
 
     resultado = sorted(grupos.values(), key=lambda x: x["valor_usd"], reverse=True)
@@ -783,6 +793,7 @@ def inventario_por_departamento(
 
 @router.get("/inventario/por-proveedor")
 def inventario_por_proveedor(
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -791,6 +802,7 @@ def inventario_por_proveedor(
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     grupos: dict = {}
     for p in productos:
@@ -813,9 +825,10 @@ def inventario_por_proveedor(
                 grupos[prov_id]["stock_total"]        += stock
                 grupos[prov_id]["valor_usd"]          += costo * stock
         else:
+            stock = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
             grupos[prov_id]["cantidad_productos"] += 1
-            grupos[prov_id]["stock_total"]        += int(p.stock or 0)
-            grupos[prov_id]["valor_usd"]          += float(p.costo_usd or 0) * int(p.stock or 0)
+            grupos[prov_id]["stock_total"]        += stock
+            grupos[prov_id]["valor_usd"]          += float(p.costo_usd or 0) * stock
 
     resultado = sorted(grupos.values(), key=lambda x: x["valor_usd"], reverse=True)
     for g in resultado:
@@ -827,10 +840,12 @@ def inventario_por_proveedor(
 def inventario_pareto(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
     productos_clave = db.query(Producto).filter(Producto.es_producto_clave == True).order_by(Producto.nombre).all()
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     detalles = _detalles_en_periodo(db, desde, hasta)
     ventas_por_prod: dict = {}
@@ -840,7 +855,7 @@ def inventario_pareto(
 
     resultado = []
     for p in productos_clave:
-        stock    = int(p.stock or 0)
+        stock    = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
         unidades = ventas_por_prod.get(p.id, 0)
         rotacion = round(unidades / stock, 2) if stock > 0 else None
         resultado.append({
@@ -859,6 +874,7 @@ def inventario_pareto(
 def inventario_rotacion(
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -868,6 +884,7 @@ def inventario_rotacion(
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     detalles = _detalles_en_periodo(db, desde, hasta)
     ventas_por_prod: dict = {}
@@ -899,7 +916,7 @@ def inventario_rotacion(
                     "dias_agotamiento":  dias_agotamiento,
                 })
         else:
-            stock    = int(p.stock or 0)
+            stock    = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
             unidades = ventas_por_prod.get(p.id, 0)
             rotacion = round(unidades / stock, 2) if stock > 0 else None
             dias_agotamiento = round(stock * dias_periodo / unidades) if (unidades > 0 and stock > 0) else None
@@ -919,15 +936,22 @@ def inventario_rotacion(
 @router.get("/inventario/valorizacion")
 def valorizacion_inventario(
     agrupar_por: Optional[str] = "departamento",
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
     from models import Categoria
 
-    productos = db.query(Producto).filter(
-        Producto.activo == True,
-        Producto.stock > 0,
-    ).order_by(Producto.nombre).all()
+    if sede_id:
+        # el filtro de stock > 0 se aplica sobre la existencia de la sede,
+        # no sobre el agregado global — se evalua en Python mas abajo.
+        productos = db.query(Producto).filter(Producto.activo == True).order_by(Producto.nombre).all()
+    else:
+        productos = db.query(Producto).filter(
+            Producto.activo == True,
+            Producto.stock > 0,
+        ).order_by(Producto.nombre).all()
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     deptos = {d.id: d.nombre for d in db.query(Departamento).all()}
     cats   = {c.id: c.nombre for c in db.query(Categoria).all()}
@@ -937,6 +961,10 @@ def valorizacion_inventario(
 
     grupos: dict = {}
     for p in productos:
+        stock = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
+        if sede_id and stock <= 0:
+            continue  # mismo filtro "stock > 0" de siempre, ahora evaluado por sede
+
         gid = (p.proveedor_id or 0) if por_proveedor else (p.departamento_id or 0)
         if gid not in grupos:
             if por_proveedor:
@@ -955,7 +983,6 @@ def valorizacion_inventario(
         costo       = float(p.costo_usd or 0)
         margen      = float(p.margen or 0.30)
         precio_base = round(costo * (1 + margen), 4)
-        stock       = int(p.stock or 0)
         valor_costo  = round(costo * stock, 2)
         valor_precio = round(precio_base * stock, 2)
         ganancia     = round((precio_base - costo) * stock, 2)
@@ -994,6 +1021,7 @@ def pdf_no_auditados(
     departamento_id: Optional[int] = None,
     desde_nombre:    Optional[str] = None,
     hasta_nombre:    Optional[str] = None,
+    sede_id:         Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -1014,6 +1042,7 @@ def pdf_no_auditados(
         q = q.filter(Producto.departamento_id == departamento_id)
 
     productos = q.order_by(Producto.nombre).all()
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     if desde_nombre:
         productos = [p for p in productos if p.nombre.upper() >= desde_nombre.upper()]
@@ -1044,12 +1073,13 @@ def pdf_no_auditados(
         headers = ['#', 'Producto', 'Departamento', 'Categoría', 'Stock', 'Costo USD']
         data = [headers]
         for i, p in enumerate(productos, 1):
+            stock = int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
             data.append([
                 str(i),
                 p.nombre[:50],
                 deptos.get(p.departamento_id, '—'),
                 cats.get(p.categoria_id, '—'),
-                str(int(p.stock or 0)),
+                str(stock),
                 f"${float(p.costo_usd or 0):.2f}",
             ])
 
@@ -1563,6 +1593,7 @@ def actualizar_credito_real(
 @router.get("/ejecutivo/pdf")
 def reporte_ejecutivo_pdf(
     dias: int = 90,
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -1626,10 +1657,13 @@ def reporte_ejecutivo_pdf(
     elements.append(HRFlowable(width="100%", thickness=2, color=AMARILLO, spaceAfter=12))
 
     # ── 1. KPIs generales ─────────────────────────────────────────────────
-    ventas = db.query(Venta).filter(
+    q_ventas = db.query(Venta).filter(
         Venta.fecha >= desde,
         Venta.estado != 'anulada',
-    ).all()
+    )
+    if sede_id:
+        q_ventas = q_ventas.filter(Venta.sede_id == sede_id)
+    ventas = q_ventas.all()
     total_usd = sum(float(v.total or 0) for v in ventas if v.moneda_venta == 'USD')
     total_bs  = sum(float(v.total or 0) for v in ventas if v.moneda_venta != 'USD')
     tasa_prom = 0.0
@@ -1638,9 +1672,12 @@ def reporte_ejecutivo_pdf(
         tasa_prom = sum(float(v.tasa_bcv) for v in ventas_bs) / len(ventas_bs)
     total_equiv = total_usd + (total_bs / tasa_prom if tasa_prom > 0 else 0)
     ticket_prom = total_equiv / len(ventas) if ventas else 0
-    unidades = db.query(func.sum(DetalleVenta.cantidad)).join(
+    q_unidades = db.query(func.sum(DetalleVenta.cantidad)).join(
         Venta, Venta.id == DetalleVenta.venta_id
-    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada').scalar() or 0
+    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada')
+    if sede_id:
+        q_unidades = q_unidades.filter(Venta.sede_id == sede_id)
+    unidades = q_unidades.scalar() or 0
 
     elements.append(Paragraph("1. Resumen General", seccion_style))
     kpi_data = [
@@ -1657,11 +1694,15 @@ def reporte_ejecutivo_pdf(
 
     # ── 2. Ventas por departamento ─────────────────────────────────────────
     elements.append(Paragraph("2. Ventas por Departamento", seccion_style))
-    detalles  = db.query(DetalleVenta).join(
+    q_detalles = db.query(DetalleVenta).join(
         Venta, Venta.id == DetalleVenta.venta_id
-    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada').all()
+    ).filter(Venta.fecha >= desde, Venta.estado != 'anulada')
+    if sede_id:
+        q_detalles = q_detalles.filter(Venta.sede_id == sede_id)
+    detalles  = q_detalles.all()
     productos_map = {p.id: p for p in db.query(Producto).all()}
     deptos_map    = {d.id: d.nombre for d in db.query(Departamento).all()}
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     grupos_dept: dict = {}
     for d in detalles:
@@ -1750,16 +1791,20 @@ def reporte_ejecutivo_pdf(
     # ── 6. Inventario snapshot ────────────────────────────────────────────
     elements.append(Paragraph("6. Snapshot de Inventario", seccion_style))
     todos_prods = list(productos_map.values())
-    valor_inv   = sum(float(p.costo_usd or 0) * int(p.stock or 0) for p in todos_prods)
-    sin_stock   = sum(1 for p in todos_prods if (p.stock or 0) <= 0)
-    bajo_stock  = sum(1 for p in todos_prods if 0 < (p.stock or 0) <= 5)
+
+    def _stock_p(p):
+        return int(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else int(p.stock or 0)
+
+    valor_inv   = sum(float(p.costo_usd or 0) * _stock_p(p) for p in todos_prods)
+    sin_stock   = sum(1 for p in todos_prods if _stock_p(p) <= 0)
+    bajo_stock  = sum(1 for p in todos_prods if 0 < _stock_p(p) <= 5)
 
     inv_data = [['Métrica', 'Valor'],
         ['Total SKUs activos',       f'{len(todos_prods):,}'],
         ['Valor inventario (costo)', f'${valor_inv:,.2f}'],
         ['SKUs sin stock',           str(sin_stock)],
         ['SKUs stock bajo (≤5)',     str(bajo_stock)],
-        ['SKUs Pareto sin stock',    str(sum(1 for p in prods_pareto if (p.stock or 0) <= 0))],
+        ['SKUs Pareto sin stock',    str(sum(1 for p in prods_pareto if _stock_p(p) <= 0))],
     ]
     elements.append(tabla(inv_data, [3.5*inch, 3.5*inch]))
 

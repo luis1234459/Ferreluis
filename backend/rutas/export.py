@@ -7,6 +7,7 @@ recalibrar Pareto externamente y definir el surtido de la sede nueva.
 import csv
 import io
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,7 @@ from models import (
     Venta, DetalleVenta, DevolucionCliente, DetalleDevolucionCliente,
 )
 from rutas.usuarios import require_admin
+from rutas.auth import mapa_existencia_por_sede
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -32,6 +34,7 @@ def export_catalogo(
     dias_corto: int = Query(90, gt=0, le=730),
     dias_largo: int = Query(365, gt=0, le=1825),
     formato: str = Query("json", pattern="^(json|csv)$"),
+    sede_id: Optional[int] = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
@@ -44,24 +47,28 @@ def export_catalogo(
     departamentos = db.query(Departamento).all()
     categorias    = db.query(Categoria).all()
     marcas        = db.query(Marca).all()
+    mapa_ex       = mapa_existencia_por_sede(db) if sede_id else {}
 
     # ── Última venta por producto, sin límite de ventana ────────────────────
-    ultima_venta_map = dict(
+    q_ultima = (
         db.query(DetalleVenta.producto_id, func.max(Venta.fecha))
         .join(Venta, Venta.id == DetalleVenta.venta_id)
         .filter(Venta.estado != 'anulada')
-        .group_by(DetalleVenta.producto_id)
-        .all()
     )
+    if sede_id:
+        q_ultima = q_ultima.filter(Venta.sede_id == sede_id)
+    ultima_venta_map = dict(q_ultima.group_by(DetalleVenta.producto_id).all())
 
     # ── Líneas de venta dentro de la ventana larga (incluye la corta) ──────
-    filas_venta = (
+    q_filas_venta = (
         db.query(DetalleVenta.producto_id, DetalleVenta.cantidad,
                   DetalleVenta.precio_unitario, Venta.id, Venta.fecha)
         .join(Venta, Venta.id == DetalleVenta.venta_id)
         .filter(Venta.fecha >= d_largo, Venta.fecha < corte, Venta.estado != 'anulada')
-        .all()
     )
+    if sede_id:
+        q_filas_venta = q_filas_venta.filter(Venta.sede_id == sede_id)
+    filas_venta = q_filas_venta.all()
 
     agregados: dict = {}
     tickets_90d_global = set()
@@ -88,13 +95,19 @@ def export_catalogo(
             tickets_90d_global.add(venta_id)
 
     # ── Devoluciones dentro de la ventana larga: se restan ──────────────────
-    filas_dev = (
+    # DevolucionCliente no tiene sede_id propio (igual que movimientos_bancarios,
+    # ver Fase 1I) pero si tiene venta_id — con filtro de sede, solo se restan
+    # las devoluciones de ventas de esa sede (join a Venta.sede_id), para no
+    # contaminar el neto de una sede con devoluciones de otra.
+    q_filas_dev = (
         db.query(DetalleDevolucionCliente.producto_id, DetalleDevolucionCliente.cantidad,
                   DetalleDevolucionCliente.precio_unitario, DevolucionCliente.fecha)
         .join(DevolucionCliente, DevolucionCliente.id == DetalleDevolucionCliente.devolucion_id)
         .filter(DevolucionCliente.fecha >= d_largo, DevolucionCliente.fecha < corte)
-        .all()
     )
+    if sede_id:
+        q_filas_dev = q_filas_dev.join(Venta, Venta.id == DevolucionCliente.venta_id).filter(Venta.sede_id == sede_id)
+    filas_dev = q_filas_dev.all()
     for producto_id, cantidad, precio_unitario, fecha in filas_dev:
         a = _agregado(producto_id)
         monto = _num(precio_unitario) * _num(cantidad)
@@ -140,7 +153,7 @@ def export_catalogo(
             "tickets_90d":       len(a.get('tk_90d', ())),
             "tickets_12m":       len(a.get('tk_12m', ())),
             "ultima_venta":      ultima.date().isoformat() if ultima else None,
-            "existencia_sistema":_num(p.stock),
+            "existencia_sistema":mapa_ex.get(p.id, {}).get(sede_id, 0.0) if sede_id else _num(p.stock),
             "stock_auditado":    bool(p.auditado),
             "fecha_auditoria":   p.fecha_auditoria.isoformat() if p.fecha_auditoria else None,
         }

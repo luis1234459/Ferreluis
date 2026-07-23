@@ -3,23 +3,28 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from datetime import date, datetime, timedelta
+from typing import Optional
 import models
+from rutas.auth import mapa_existencia_por_sede
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/resumen")
-def resumen_dashboard(db: Session = Depends(get_db)):
+def resumen_dashboard(sede_id: Optional[int] = None, db: Session = Depends(get_db)):
     hoy = date.today()
     inicio_hoy = datetime.combine(hoy, datetime.min.time())
     fin_hoy    = datetime.combine(hoy, datetime.max.time())
 
     # ── Ventas de hoy ─────────────────────────────────────────────────────────
-    ventas_hoy_list = db.query(models.Venta).filter(
+    q_ventas_hoy = db.query(models.Venta).filter(
         models.Venta.fecha >= inicio_hoy,
         models.Venta.fecha <= fin_hoy,
         models.Venta.estado != "anulada",
-    ).all()
+    )
+    if sede_id:
+        q_ventas_hoy = q_ventas_hoy.filter(models.Venta.sede_id == sede_id)
+    ventas_hoy_list = q_ventas_hoy.all()
 
     ventas_hoy_count    = len(ventas_hoy_list)
     total_hoy_usd       = sum(v.total for v in ventas_hoy_list if v.moneda_venta == "USD")
@@ -47,10 +52,15 @@ def resumen_dashboard(db: Session = Depends(get_db)):
 
     # ── Inventario ────────────────────────────────────────────────────────────
     productos = db.query(models.Producto).all()
+    mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
+
+    def _stock_p(p):
+        return float(mapa_ex.get(p.id, {}).get(sede_id, 0.0)) if sede_id else float(p.stock or 0)
+
     total_productos       = len(productos)
-    productos_stock_bajo  = sum(1 for p in productos if 0 < (p.stock or 0) < 5)
-    productos_sin_stock   = sum(1 for p in productos if (p.stock or 0) <= 0)
-    valor_inventario_usd  = sum((p.costo_usd or 0) * (p.stock or 0) for p in productos)
+    productos_stock_bajo  = sum(1 for p in productos if 0 < _stock_p(p) < 5)
+    productos_sin_stock   = sum(1 for p in productos if _stock_p(p) <= 0)
+    valor_inventario_usd  = sum((p.costo_usd or 0) * _stock_p(p) for p in productos)
 
     # ── Comisiones pendientes ─────────────────────────────────────────────────
     comisiones_pendientes = db.query(func.sum(models.PeriodoComision.total_comision)).filter(
@@ -112,11 +122,11 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         {
             "id":        p.id,
             "nombre":    p.nombre,
-            "stock":     p.stock or 0,
+            "stock":     _stock_p(p),
             "categoria": p.categoria or "—",
         }
-        for p in sorted(productos, key=lambda x: x.stock or 0)[:10]
-        if (p.stock or 0) < 5
+        for p in sorted(productos, key=_stock_p)[:10]
+        if _stock_p(p) < 5
     ]
 
     # ── Facturas de proveedores pendientes ────────────────────────────────────
