@@ -31,12 +31,12 @@ from models import (
     Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
-    GarantiaVenta, PlantillaGarantia, Proveedor, ExistenciaSede,
+    GarantiaVenta, PlantillaGarantia, Proveedor,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
 from rutas.usuarios import require_admin, get_current_user
-from rutas.auth import resolver_sede_activa
+from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
 
 router = APIRouter()
 
@@ -538,12 +538,11 @@ def registrar_venta(
             d["variante"].stock = float(d["variante"].stock or 0) - d["cantidad"]
         else:
             d["producto"].stock = float(d["producto"].stock or 0) - d["cantidad"]
-            existencia = db.query(ExistenciaSede).filter(
-                ExistenciaSede.producto_id == d["producto_id"],
-                ExistenciaSede.sede_id == sede_activa,
-            ).first()
-            if existencia:
-                existencia.existencia = float(existencia.existencia or 0) - d["cantidad"]
+            ajustar_existencia_sede(
+                db, d["producto_id"], sede_activa,
+                tipo="restar", valor=d["cantidad"],
+                tiene_variante_activa=False,
+            )
 
     db.commit()
 

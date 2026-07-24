@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 from rutas.usuarios import require_admin, require_admin_o_gestionador
-from rutas.auth import resolver_sede_activa_opcional
+from rutas.auth import resolver_sede_activa_opcional, resolver_sede_activa, ajustar_existencia_sede
 import io
 import re
 import pandas as pd
@@ -852,6 +852,7 @@ def crear_producto(
     producto: ProductoSchema,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
+    sede_activa: Optional[int] = Depends(resolver_sede_activa),
 ):
     if producto.codigo:
         existe = db.query(Producto).filter(Producto.codigo == producto.codigo).first()
@@ -860,10 +861,20 @@ def crear_producto(
     datos = producto.dict()
     if not datos.get("codigo"):
         datos["codigo"] = generar_codigo(producto.nombre, db)
+    if datos.get("stock"):
+        if sede_activa is None:
+            raise HTTPException(status_code=400, detail="Debe seleccionar una sede específica para crear un producto con stock inicial")
     nuevo = Producto(**datos)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
+    if datos.get("stock") and sede_activa is not None:
+        ajustar_existencia_sede(
+            db, nuevo.id, sede_activa,
+            tipo="fijar", valor=int(datos["stock"]),
+            tiene_variante_activa=False,
+        )
+        db.commit()
     bcv, binance = _tasas_actuales(db)
     policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(nuevo, db)
     return _enriquecer(nuevo, bcv, binance, plantilla=_plantilla_de(nuevo, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
@@ -1006,7 +1017,14 @@ def actualizar_producto(
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    for key, value in datos.dict().items():
+    datos_dict = datos.dict()
+    if datos_dict.get("stock") != p.stock:
+        raise HTTPException(
+            status_code=400,
+            detail="Los cambios de stock no se hacen desde edición de producto. Usá Ajustes → Stock, que exige motivo y deja historial.",
+        )
+    datos_dict.pop("stock", None)
+    for key, value in datos_dict.items():
         setattr(p, key, value)
     db.commit()
     db.refresh(p)

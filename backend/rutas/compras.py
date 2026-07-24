@@ -868,6 +868,12 @@ def devolucion_total_recepcion(recepcion_id: int, datos: dict, db: Session = Dep
             ).first() is not None
             if not tiene_variantes:
                 prod.stock = max(0, int(prod.stock or 0) - int(cantidad))
+                if orden:
+                    ajustar_existencia_sede(
+                        db, prod.id, orden.sede_id_destino,
+                        tipo="restar", valor=int(cantidad),
+                        tiene_variante_activa=False,
+                    )
 
         if d.actualizo_costo and d.costo_anterior is not None:
             prod.costo_usd = d.costo_anterior

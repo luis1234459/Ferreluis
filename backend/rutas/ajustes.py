@@ -583,9 +583,12 @@ def autorizar_faltante(
     producto_id: int,
     db: Session  = Depends(get_db),
     _:  None     = Depends(require_admin),
+    sede_activa: int = Depends(resolver_sede_activa),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
     from fastapi import HTTPException
+    if sede_activa is None:
+        raise HTTPException(status_code=400, detail="Debe seleccionar una sede específica para autorizar el faltante")
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(404, "Producto no encontrado")
@@ -600,6 +603,11 @@ def autorizar_faltante(
     p.auditoria_pendiente  = False
     p.conteo_pendiente     = None
     p.diferencia_pendiente = None
+    ajustar_existencia_sede(
+        db, p.id, sede_activa,
+        tipo="fijar", valor=p.stock,
+        tiene_variante_activa=_tiene_variante_activa(p.id, db),
+    )
     db.commit()
 
     _guardar_historial(

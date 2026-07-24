@@ -505,7 +505,8 @@
               </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
-                <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="esVendedor" />
+                <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="esVendedor || editando" />
+                <span v-if="editando" class="label-hint">Los cambios de stock se hacen desde Ajustes → Stock</span>
               </div>
               <div class="field" v-else>
                 <label>Stock</label>
