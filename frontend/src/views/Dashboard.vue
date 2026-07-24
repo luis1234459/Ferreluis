@@ -417,7 +417,6 @@ export default {
       usuario:      JSON.parse(localStorage.getItem('usuario') || '{}'),
       tipoPrecio:   localStorage.getItem('tipoPrecio') || 'referencial',
       cargando:     true,
-      marcandoPago: null,
       // Liquidez prudente
       liquidez:         null,
       cargandoLiquidez: false,
@@ -494,18 +493,6 @@ export default {
         await this.cargarLiquidez()
       } catch (e) {
         console.error('Error actualizando crédito real', e)
-      }
-    },
-    async marcarPagada(recepcionId) {
-      if (!confirm('¿Marcar esta factura como pagada?')) return
-      this.marcandoPago = recepcionId
-      try {
-        await axios.put(`/compras/facturas/${recepcionId}/pagar`)
-        await this.cargar()
-      } catch (e) {
-        alert(e?.response?.data?.detail || 'Error al marcar como pagada')
-      } finally {
-        this.marcandoPago = null
       }
     },
     fmt(n) { return n != null ? Number(n).toFixed(2) : '0.00' },

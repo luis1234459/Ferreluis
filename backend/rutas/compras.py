@@ -11,7 +11,7 @@ Flujo de estado:
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from database import get_db
 from models import (
     Proveedor, CatalogoProveedor, OrdenCompra, DetalleOrdenCompra,
@@ -22,6 +22,7 @@ from models import (
 from rutas.usuarios import require_admin
 from rutas.auth import ajustar_existencia_sede
 from rutas.productos import listar_productos as _listar_productos_completo
+from pagos_proveedor import recalcular_estado_pago
 from typing import Optional
 from datetime import datetime, date, timedelta
 
@@ -773,7 +774,7 @@ def registrar_recepcion(orden_id: int, datos: dict, db: Session = Depends(get_db
     if dias_credito > 0:
         recepcion.fecha_vencimiento_pago = date.today() + timedelta(days=dias_credito)
         recepcion.monto_factura          = recepcion.total_recibido
-        recepcion.estado_pago            = "pendiente"
+        recalcular_estado_pago(db, recepcion)
     recepcion.numero_factura = datos.get("numero_factura")
 
     # Determinar si la recepción fue total o parcial
@@ -874,6 +875,7 @@ def devolucion_total_recepcion(recepcion_id: int, datos: dict, db: Session = Dep
         items_revertidos += 1
 
     recepcion.devuelta = True
+    recalcular_estado_pago(db, recepcion)
 
     # Recalcular estado de la orden
     if orden:
@@ -900,10 +902,7 @@ def devolucion_total_recepcion(recepcion_id: int, datos: dict, db: Session = Dep
 def facturas_pendientes(db: Session = Depends(get_db)):
     recs = db.query(RecepcionCompra).filter(
         RecepcionCompra.fecha_vencimiento_pago.isnot(None),
-        or_(
-            RecepcionCompra.estado_pago == "pendiente",
-            RecepcionCompra.estado_pago == "vencido",
-        )
+        RecepcionCompra.estado_pago.in_(["pendiente", "vencido", "pago_parcial"]),
     ).order_by(RecepcionCompra.fecha_vencimiento_pago).all()
     return [_serializar_factura(r, db) for r in recs]
 
@@ -916,34 +915,19 @@ def listar_facturas(db: Session = Depends(get_db)):
     return [_serializar_factura(r, db) for r in recs]
 
 
-@router.put("/facturas/{recepcion_id}/pagar")
-def marcar_factura_pagada(
-    recepcion_id: int,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
-):
-    r = db.query(RecepcionCompra).filter(RecepcionCompra.id == recepcion_id).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="Recepción no encontrada")
-    r.estado_pago   = "pagado"
-    r.fecha_pago_real = datetime.now()
-    db.commit()
-    return {"mensaje": "Factura marcada como pagada", "id": r.id}
-
-
 @router.post("/facturas/actualizar-estados")
 def actualizar_estados_facturas(db: Session = Depends(get_db)):
-    """Marca como 'vencido' todas las facturas pendientes cuya fecha ya pasó."""
-    hoy = date.today()
+    """Recalcula estado_pago de todas las facturas de crédito no pagadas (pendiente/vencido/parcial)."""
     pendientes = db.query(RecepcionCompra).filter(
-        RecepcionCompra.estado_pago == "pendiente",
+        RecepcionCompra.estado_pago.in_(["pendiente", "vencido", "pago_parcial"]),
         RecepcionCompra.fecha_vencimiento_pago.isnot(None),
-        RecepcionCompra.fecha_vencimiento_pago < hoy,
     ).all()
     count = 0
     for r in pendientes:
-        r.estado_pago = "vencido"
-        count += 1
+        antes = r.estado_pago
+        recalcular_estado_pago(db, r)
+        if r.estado_pago != antes:
+            count += 1
     db.commit()
     return {"actualizadas": count}
 

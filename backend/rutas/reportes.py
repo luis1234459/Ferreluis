@@ -1235,7 +1235,7 @@ def compras_facturas_pendientes(
     hoy = date.today()
     recs = db.query(RecepcionCompra).filter(
         RecepcionCompra.fecha_vencimiento_pago.isnot(None),
-        RecepcionCompra.estado_pago.in_(["pendiente", "vencido"]),
+        RecepcionCompra.estado_pago.in_(["pendiente", "vencido", "pago_parcial"]),
     ).order_by(RecepcionCompra.fecha_vencimiento_pago).all()
 
     proveedores = {p.id: p for p in db.query(Proveedor).all()}

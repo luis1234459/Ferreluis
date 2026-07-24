@@ -588,6 +588,55 @@ class MovimientoBancario(Base):
 
 
 # ---------------------------------------------------------------------------
+# Pagos a proveedores — reparto explícito contra recepciones
+# ---------------------------------------------------------------------------
+
+class PagoProveedor(Base):
+    __tablename__ = "pagos_proveedor"
+
+    id                      = Column(Integer,  primary_key=True, index=True)
+    proveedor_id            = Column(Integer,  index=True)
+    fecha                   = Column(DateTime, default=datetime.now)
+    tipo                    = Column(String)    # pago | ajuste_manual | legacy_sin_movimiento
+    monto                   = Column(Float)     # en moneda original
+    moneda                  = Column(String)    # USD | Bs
+    tasa_cambio             = Column(Float,   nullable=True)
+    monto_usd               = Column(Float)     # canónico, mismo criterio que monto_convertido en MovimientoBancario
+    cuenta_id               = Column(Integer,  nullable=True)  # FK → CuentaBancaria, null si ajuste/legacy
+    referencia              = Column(String,   nullable=True)
+    concepto                = Column(String)
+    registrado_por          = Column(String)
+    estado                  = Column(String,   default="registrado")  # registrado | anulado
+    movimiento_bancario_id  = Column(Integer,  nullable=True)  # trazabilidad al ledger bancario
+    anulado_motivo          = Column(String,   nullable=True)
+    anulado_por             = Column(String,   nullable=True)
+    anulado_fecha           = Column(DateTime, nullable=True)
+
+
+class PagoProveedorAplicacion(Base):
+    __tablename__ = "pago_proveedor_aplicacion"
+
+    id                  = Column(Integer,  primary_key=True, index=True)
+    pago_id             = Column(Integer,  index=True)   # FK → PagoProveedor
+    recepcion_id        = Column(Integer,  index=True)   # FK → RecepcionCompra
+    monto_aplicado_usd  = Column(Float)
+    fecha_aplicacion    = Column(DateTime, default=datetime.now)
+    tipo_aplicacion     = Column(String)   # cascada_automatica | manual
+
+
+class SaldoFavorProveedorMovimiento(Base):
+    __tablename__ = "saldo_favor_proveedor"
+
+    id              = Column(Integer,  primary_key=True, index=True)
+    proveedor_id    = Column(Integer,  index=True)
+    monto_usd       = Column(Float)    # signed: + genera saldo, - lo consume/libera
+    tipo            = Column(String)   # generado | consumido | liberado
+    pago_origen_id  = Column(Integer,  nullable=True)  # pago que generó/consumió/liberó el movimiento
+    fecha           = Column(DateTime, default=datetime.now)
+    nota            = Column(String,   nullable=True)
+
+
+# ---------------------------------------------------------------------------
 # Módulo de Clientes y Fidelidad
 # ---------------------------------------------------------------------------
 

@@ -93,7 +93,7 @@ def resumen_dashboard(sede_id: Optional[int] = None, db: Session = Depends(get_d
         models.RecepcionCompra.fecha_vencimiento_pago.isnot(None),
         models.RecepcionCompra.fecha_vencimiento_pago >= hoy,
         models.RecepcionCompra.fecha_vencimiento_pago <= prox,
-        models.RecepcionCompra.estado_pago == "pendiente",
+        models.RecepcionCompra.estado_pago.in_(["pendiente", "pago_parcial"]),
     ).count()
     if facturas_proximas > 0:
         alertas.append({"tipo": "factura_proxima", "mensaje": f"{facturas_proximas} factura(s) vencen en los próximos 5 días"})
@@ -136,7 +136,7 @@ def resumen_dashboard(sede_id: Optional[int] = None, db: Session = Depends(get_d
         models.Proveedor, models.OrdenCompra.proveedor_id == models.Proveedor.id
     ).filter(
         models.RecepcionCompra.fecha_vencimiento_pago.isnot(None),
-        models.RecepcionCompra.estado_pago.in_(["pendiente", "vencido"]),
+        models.RecepcionCompra.estado_pago.in_(["pendiente", "vencido", "pago_parcial"]),
     ).order_by(models.RecepcionCompra.fecha_vencimiento_pago).all()
 
     facturas_pendientes = []

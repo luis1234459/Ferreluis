@@ -12,9 +12,10 @@ from models import (
     OrdenCompra, DetalleOrdenCompra,
     RecepcionCompra, DetalleRecepcion,
     Producto, VarianteProducto, Proveedor, CatalogoProveedor, AliasProveedor,
-    MovimientoBancario, TasaCambio, ExistenciaSede,
+    MovimientoBancario, TasaCambio, ExistenciaSede, PagoProveedor,
 )
 from rutas.auth import resolver_sede_activa, resolver_sede_activa_opcional, ajustar_existencia_sede
+from pagos_proveedor import recalcular_estado_pago, aplicar_pago
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -604,21 +605,18 @@ def confirmar_compra(
                 es_producto_nuevo   = False,
             ))
 
-    # ── Estado de pago ────────────────────────────────────────────────────────
+    # ── Estado de pago (estimado para la respuesta — el real lo fija recalcular_estado_pago) ──
     if condicion_pago == "contado":
-        estado_pago       = "pagado"
         abonado_real      = total_factura
         saldo_pend        = 0.0
         fecha_vencimiento = None
     elif condicion_pago == "credito_parcial":
-        estado_pago  = "pendiente"
         abonado_real = monto_abonado
         saldo_pend   = round(total_factura - monto_abonado, 2)
         prov_obj     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
         dias         = (prov_obj.dias_credito or 30) if prov_obj else 30
         fecha_vencimiento = (fecha + timedelta(days=dias)).date()
     else:  # credito_completo
-        estado_pago  = "pendiente"
         abonado_real = 0.0
         saldo_pend   = total_factura
         prov_obj     = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first() if proveedor_id else None
@@ -633,7 +631,6 @@ def confirmar_compra(
         observacion             = f"Factura: {numero_factura}",
         total_recibido          = round(subtotal, 2),
         monto_factura           = round(total_factura, 2),
-        estado_pago             = estado_pago,
         numero_factura          = numero_factura,
         fecha_vencimiento_pago  = fecha_vencimiento,
     )
@@ -750,8 +747,12 @@ def confirmar_compra(
                 if not existente_catalogo.rif_proveedor and rif_prov:
                     existente_catalogo.rif_proveedor = rif_prov
 
-    # ── Movimientos bancarios por cada pago ──────────────────────────────────
-    pagos_data = datos.get("pagos", [])
+    # ── Movimientos bancarios + pagos_proveedor por cada pago ────────────────
+    # Cada pago se aplica manualmente a ESTA recepción (no cascada FIFO general del
+    # proveedor) — es plata que el usuario declaró para esta factura puntual. Lo que
+    # sobre por encima del monto_factura queda como saldo a favor del proveedor.
+    pagos_data     = datos.get("pagos", [])
+    aplicado_acum  = 0.0
     if pagos_data and abonado_real > 0:
         tasa_rec = db.query(TasaCambio).order_by(TasaCambio.fecha.desc()).first()
         tasa     = float(tasa_rec.tasa if tasa_rec else 1.0)
@@ -762,21 +763,49 @@ def confirmar_compra(
             cuenta_id_p = pago.get("cuenta_id")
             if monto_pago <= 0:
                 continue
-            db.add(MovimientoBancario(
+            monto_usd = round(monto_pago / tasa, 2) if moneda_pago == "Bs" and tasa > 0 else monto_pago
+
+            mov = MovimientoBancario(
                 fecha            = datetime.now(),
                 tipo             = "pago_proveedor",
                 cuenta_origen_id = int(cuenta_id_p) if cuenta_id_p else None,
                 monto            = monto_pago,
                 moneda           = moneda_pago,
                 tasa_cambio      = tasa if moneda_pago == "Bs" else None,
-                monto_convertido = round(monto_pago / tasa, 2) if moneda_pago == "Bs" and tasa > 0 else monto_pago,
+                monto_convertido = monto_usd,
                 concepto         = f"Pago factura {numero_factura}",
                 beneficiario     = prov.nombre if prov else "",
                 categoria        = "proveedores",
                 proveedor_id     = proveedor_id,
                 orden_compra_id  = orden.id,
                 registrado_por   = usuario,
-            ))
+            )
+            db.add(mov)
+            db.flush()
+
+            pago_prov = PagoProveedor(
+                proveedor_id           = proveedor_id,
+                fecha                  = datetime.now(),
+                tipo                   = "pago",
+                monto                  = monto_pago,
+                moneda                 = moneda_pago,
+                tasa_cambio            = tasa if moneda_pago == "Bs" else None,
+                monto_usd              = monto_usd,
+                cuenta_id              = int(cuenta_id_p) if cuenta_id_p else None,
+                concepto               = f"Pago factura {numero_factura}",
+                registrado_por         = usuario,
+                movimiento_bancario_id = mov.id,
+            )
+            db.add(pago_prov)
+            db.flush()
+
+            pendiente_recepcion = round(max(float(recepcion.monto_factura or 0) - aplicado_acum, 0), 2)
+            monto_a_aplicar     = round(min(monto_usd, pendiente_recepcion), 2)
+            aplicaciones = [{"recepcion_id": recepcion.id, "monto": monto_a_aplicar}] if monto_a_aplicar > 0.01 else []
+            aplicar_pago(db, pago_prov, aplicaciones_manuales=aplicaciones)
+            aplicado_acum += monto_a_aplicar
+
+    recalcular_estado_pago(db, recepcion)
 
     # ── Si era OC existente, actualizar su estado ─────────────────────────────
     if orden_id_existente:

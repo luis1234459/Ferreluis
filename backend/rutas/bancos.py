@@ -8,9 +8,13 @@ from database import get_db
 from models import (
     CuentaBancaria, MetodoPagoCuenta, MovimientoBancario,
     PagoVenta, Proveedor, OrdenCompra, DetalleOrdenCompra,
-    CierreCaja,
+    CierreCaja, PagoProveedor, PagoProveedorAplicacion,
 )
 from rutas.usuarios import require_admin
+from pagos_proveedor import (
+    aplicar_pago, anular_pago, resumen_deuda_proveedor,
+    pendiente_recepcion, recepciones_credito_proveedor, ErrorMotorPagos,
+)
 from typing import Optional
 from datetime import datetime
 
@@ -390,30 +394,16 @@ def deuda_proveedores(db: Session = Depends(get_db)):
     proveedores = db.query(Proveedor).filter(Proveedor.activo == True).all()
     resultado = []
     for p in proveedores:
-        ordenes = db.query(OrdenCompra).filter(
-            OrdenCompra.proveedor_id == p.id,
-            OrdenCompra.estado.in_(["recibida_parcial", "cerrada"]),
-        ).all()
-        total_comprado = sum(float(o.total or 0) for o in ordenes)
-        if total_comprado == 0:
+        resumen = resumen_deuda_proveedor(db, p.id)
+        if resumen["total_facturado"] == 0:
             continue
-        pagos_prov = db.query(MovimientoBancario).filter(
-            MovimientoBancario.proveedor_id == p.id,
-            MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
-            MovimientoBancario.estado == "registrado",
-        ).all()
-        pagado = sum(
-            float(m.monto_convertido or 0) if m.moneda == "Bs"
-            else float(m.monto or 0)
-            for m in pagos_prov
-        )
-        saldo = round(total_comprado - float(pagado), 2)
         resultado.append({
             "proveedor_id":    p.id,
             "proveedor":       p.nombre,
-            "total_comprado":  round(total_comprado, 2),
-            "total_pagado":    round(float(pagado), 2),
-            "saldo_pendiente": saldo,
+            "total_comprado":  resumen["total_facturado"],
+            "total_pagado":    resumen["total_aplicado"],
+            "saldo_favor":     resumen["saldo_favor"],
+            "saldo_pendiente": resumen["saldo_pendiente"],
         })
     return resultado
 
@@ -437,6 +427,7 @@ def pagar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(get_db
         monto_convertido = round(monto / tasa, 4)
     else:
         monto_convertido = None
+    monto_usd = monto_convertido if moneda == "Bs" else monto
 
     m = MovimientoBancario(
         tipo              = "pago_proveedor",
@@ -454,9 +445,63 @@ def pagar_proveedor(proveedor_id: int, datos: dict, db: Session = Depends(get_db
         registrado_por    = datos.get("registrado_por", "admin"),
     )
     db.add(m)
+    db.flush()
+
+    pago = PagoProveedor(
+        proveedor_id           = proveedor_id,
+        tipo                   = "pago",
+        monto                  = monto,
+        moneda                 = moneda,
+        tasa_cambio            = tasa if tasa > 0 else None,
+        monto_usd              = round(float(monto_usd), 2),
+        cuenta_id              = datos.get("cuenta_id"),
+        referencia             = datos.get("referencia"),
+        concepto               = f"Pago a proveedor: {proveedor.nombre}",
+        registrado_por         = datos.get("registrado_por", "admin"),
+        movimiento_bancario_id = m.id,
+    )
+    db.add(pago)
+    db.flush()
+
+    aplicaciones_manuales = datos.get("aplicaciones")  # opcional: [{"recepcion_id", "monto"}]
+    try:
+        resultado_reparto = aplicar_pago(db, pago, aplicaciones_manuales=aplicaciones_manuales)
+    except ErrorMotorPagos as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     db.commit()
     db.refresh(m)
-    return _serializar_movimiento(m, db)
+    resp = _serializar_movimiento(m, db)
+    resp["pago_proveedor_id"] = pago.id
+    resp["reparto"] = resultado_reparto
+    return resp
+
+
+@router.post("/proveedores/pagos/{pago_id}/anular", dependencies=[Depends(require_admin)])
+def anular_pago_proveedor(
+    pago_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    x_usuario_nombre: Optional[str] = Header(None),
+):
+    pago = db.query(PagoProveedor).filter(PagoProveedor.id == pago_id).first()
+    if not pago:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    motivo = datos.get("motivo") or "Anulación manual"
+    try:
+        anular_pago(db, pago, motivo, x_usuario_nombre or "admin")
+    except ErrorMotorPagos as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if pago.movimiento_bancario_id:
+        mov = db.query(MovimientoBancario).filter(MovimientoBancario.id == pago.movimiento_bancario_id).first()
+        if mov:
+            mov.estado = "anulado"
+
+    db.commit()
+    return {"ok": True, "pago_id": pago.id}
 
 
 @router.post("/proveedores/{proveedor_id}/ajuste-deuda", dependencies=[Depends(require_admin)])
@@ -473,7 +518,8 @@ def ajuste_deuda_proveedor(
     if monto <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
     motivo = datos.get("motivo") or "Ajuste manual de deuda"
-    db.add(MovimientoBancario(
+
+    mov = MovimientoBancario(
         tipo              = "ajuste_deuda_proveedor",
         monto             = monto,
         moneda            = "USD",
@@ -484,9 +530,31 @@ def ajuste_deuda_proveedor(
         registrado_por    = x_usuario_nombre or "admin",
         referencia        = "AJUSTE-DEUDA",
         monto_convertido  = monto,
-    ))
+    )
+    db.add(mov)
+    db.flush()
+
+    pago = PagoProveedor(
+        proveedor_id           = proveedor_id,
+        tipo                   = "ajuste_manual",
+        monto                  = monto,
+        moneda                 = "USD",
+        monto_usd              = round(monto, 2),
+        concepto               = f"Ajuste deuda: {motivo}",
+        registrado_por         = x_usuario_nombre or "admin",
+        movimiento_bancario_id = mov.id,
+    )
+    db.add(pago)
+    db.flush()
+
+    try:
+        aplicar_pago(db, pago)
+    except ErrorMotorPagos as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     db.commit()
-    return {"ok": True, "monto_ajustado": monto}
+    return {"ok": True, "monto_ajustado": monto, "pago_proveedor_id": pago.id}
 
 
 @router.get("/proveedores/{proveedor_id}/estado/", dependencies=[Depends(require_admin)])
@@ -495,24 +563,48 @@ def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
     ordenes = db.query(OrdenCompra).filter(OrdenCompra.proveedor_id == proveedor_id).all()
-    pagos   = db.query(MovimientoBancario).filter(
-        MovimientoBancario.proveedor_id == proveedor_id,
-        MovimientoBancario.tipo.in_(["pago_proveedor", "ajuste_deuda_proveedor"]),
-        MovimientoBancario.estado == "registrado",
-    ).order_by(MovimientoBancario.fecha.desc()).all()
-    total_comprado = sum(float(o.total or 0) for o in ordenes if o.estado in ("recibida_parcial", "cerrada"))
-    total_pagado   = sum(
-        float(m.monto_convertido or 0) if m.moneda == "Bs"
-        else float(m.monto or 0)
-        for m in pagos
-    )
+    pagos   = db.query(PagoProveedor).filter(
+        PagoProveedor.proveedor_id == proveedor_id,
+    ).order_by(PagoProveedor.fecha.desc()).all()
+    resumen = resumen_deuda_proveedor(db, proveedor_id)
+
+    recepciones = recepciones_credito_proveedor(db, proveedor_id)
     return {
         "proveedor":       p.nombre,
-        "total_comprado":  round(total_comprado, 2),
-        "total_pagado":    round(total_pagado,   2),
-        "saldo_pendiente": round(total_comprado - total_pagado, 2),
+        "total_comprado":  resumen["total_facturado"],
+        "total_pagado":    resumen["total_aplicado"],
+        "saldo_favor":     resumen["saldo_favor"],
+        "saldo_pendiente": resumen["saldo_pendiente"],
         "ordenes": [{"id": o.id, "numero": o.numero, "estado": o.estado, "total": o.total} for o in ordenes],
-        "pagos":   [_serializar_movimiento(m, db) for m in pagos],
+        "recepciones": [
+            {
+                "id":               r.id,
+                "numero_factura":   r.numero_factura,
+                "fecha_recepcion":  r.fecha_recepcion.isoformat() if r.fecha_recepcion else None,
+                "monto_factura":    r.monto_factura,
+                "pendiente":        pendiente_recepcion(db, r),
+                "estado_pago":      r.estado_pago,
+            }
+            for r in recepciones
+        ],
+        "pagos": [
+            {
+                "id":              pg.id,
+                "fecha":           pg.fecha.isoformat() if pg.fecha else None,
+                "tipo":            pg.tipo,
+                "monto":           pg.monto,
+                "moneda":          pg.moneda,
+                "monto_usd":       pg.monto_usd,
+                "concepto":        pg.concepto,
+                "estado":          pg.estado,
+                "registrado_por":  pg.registrado_por,
+                "aplicaciones": [
+                    {"recepcion_id": a.recepcion_id, "monto_aplicado_usd": a.monto_aplicado_usd, "tipo": a.tipo_aplicacion}
+                    for a in db.query(PagoProveedorAplicacion).filter(PagoProveedorAplicacion.pago_id == pg.id).all()
+                ],
+            }
+            for pg in pagos
+        ],
     }
 
 
