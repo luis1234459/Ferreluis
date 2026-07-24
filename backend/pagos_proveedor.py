@@ -87,6 +87,39 @@ def recepciones_credito_proveedor(db: Session, proveedor_id: int):
     )
 
 
+def recepciones_pendientes_por_vencimiento(db: Session, proveedor_id: int):
+    """Recepciones con saldo pendiente, ordenadas para la propuesta de reparto:
+    fecha_vencimiento_pago asc (sin vencimiento al final), luego fecha_recepcion asc."""
+    recepciones = recepciones_credito_proveedor(db, proveedor_id)
+    pendientes = [(r, pendiente_recepcion(db, r)) for r in recepciones]
+    pendientes = [(r, p) for r, p in pendientes if p > 0.01]
+    pendientes.sort(key=lambda rp: (
+        rp[0].fecha_vencimiento_pago is None,
+        rp[0].fecha_vencimiento_pago or rp[0].fecha_recepcion.date(),
+        rp[0].fecha_recepcion,
+    ))
+    return pendientes
+
+
+def propuesta_reparto(db: Session, proveedor_id: int, monto_usd: float) -> dict:
+    """Propone cómo repartir monto_usd contra las recepciones pendientes del proveedor,
+    en cascada por fecha_vencimiento_pago asc / fecha_recepcion asc. No escribe nada."""
+    disponible = round(float(monto_usd or 0), 2)
+    filas = []
+    for recepcion, pendiente in recepciones_pendientes_por_vencimiento(db, proveedor_id):
+        monto_propuesto = round(min(pendiente, max(disponible, 0)), 2)
+        filas.append({
+            "recepcion_id":         recepcion.id,
+            "numero_factura":       recepcion.numero_factura,
+            "fecha_vencimiento_pago": recepcion.fecha_vencimiento_pago.isoformat() if recepcion.fecha_vencimiento_pago else None,
+            "fecha_recepcion":      recepcion.fecha_recepcion.isoformat() if recepcion.fecha_recepcion else None,
+            "pendiente":            pendiente,
+            "monto_propuesto":      monto_propuesto,
+        })
+        disponible = round(disponible - monto_propuesto, 2)
+    return {"filas": filas, "sobrante": max(disponible, 0)}
+
+
 def aplicar_pago(db: Session, pago: PagoProveedor, aplicaciones_manuales: list | None = None) -> dict:
     """
     Reparte pago.monto_usd contra las recepciones pendientes del proveedor.

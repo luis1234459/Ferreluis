@@ -12,27 +12,61 @@
         <div class="tabla-container">
           <table>
             <thead>
-              <tr><th>Proveedor</th><th>Total comprado</th><th>Total pagado</th><th>Saldo pendiente</th><th></th></tr>
+              <tr><th>Proveedor</th><th>Total comprado</th><th>Total pagado</th><th>Saldo pendiente</th><th>Saldo a favor</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="p in deuda" :key="p.proveedor_id"
-                :class="{ 'sin-deuda': p.saldo_pendiente <= 0 }">
-                <td style="font-weight:600">{{ p.proveedor }}</td>
-                <td>${{ p.total_comprado.toFixed(2) }}</td>
-                <td class="txt-verde">${{ p.total_pagado.toFixed(2) }}</td>
-                <td :class="p.saldo_pendiente > 0 ? 'txt-rojo' : 'txt-verde'">
-                  ${{ p.saldo_pendiente.toFixed(2) }}
-                </td>
-                <td>
-                  <button class="btn-pagar" @click="abrirPago(p)" :disabled="p.saldo_pendiente <= 0">
-                    Registrar pago
-                  </button>
-                  <button class="btn-historial" @click="verHistorial(p.proveedor_id)">Historial</button>
-                  <button class="btn-ajuste-deuda" @click="abrirAjusteDeuda(p)">✏️ Ajustar deuda</button>
-                </td>
-              </tr>
+              <template v-for="p in deuda" :key="p.proveedor_id">
+                <tr :class="{ 'sin-deuda': p.saldo_pendiente <= 0 }">
+                  <td style="font-weight:600">{{ p.proveedor }}</td>
+                  <td>${{ p.total_comprado.toFixed(2) }}</td>
+                  <td class="txt-verde">${{ p.total_pagado.toFixed(2) }}</td>
+                  <td :class="p.saldo_pendiente > 0 ? 'txt-rojo' : 'txt-verde'">
+                    ${{ p.saldo_pendiente.toFixed(2) }}
+                  </td>
+                  <td>
+                    <button class="btn-saldo-favor" @click="toggleSaldoFavor(p.proveedor_id)"
+                      :disabled="p.saldo_a_favor_total <= 0">
+                      ${{ p.saldo_a_favor_total.toFixed(2) }}
+                      <span v-if="p.saldo_a_favor_total > 0">{{ saldoFavorExpandido === p.proveedor_id ? '▲' : '▼' }}</span>
+                    </button>
+                  </td>
+                  <td>
+                    <button class="btn-pagar" @click="abrirPago(p)" :disabled="p.saldo_pendiente <= 0">
+                      Registrar pago
+                    </button>
+                    <button class="btn-historial" @click="verHistorial(p.proveedor_id)">Historial</button>
+                    <button class="btn-ajuste-deuda" @click="abrirAjusteDeuda(p)">✏️ Ajustar deuda</button>
+                  </td>
+                </tr>
+                <tr v-if="saldoFavorExpandido === p.proveedor_id" class="fila-desglose">
+                  <td colspan="6">
+                    <div v-if="cargandoSaldoFavor" class="txt-muted">Cargando desglose...</div>
+                    <div v-else-if="saldoFavorDetalle[p.proveedor_id]" class="desglose-saldo-favor">
+                      <div class="desglose-linea">
+                        <span>Crédito manual (histórico, devoluciones)</span>
+                        <span class="txt-verde">${{ saldoFavorDetalle[p.proveedor_id].credito_disponible.toFixed(2) }}</span>
+                      </div>
+                      <div class="desglose-linea">
+                        <span>Saldo a favor generado por pagos (sobrantes)</span>
+                        <span class="txt-verde">${{ p.saldo_favor.toFixed(2) }}</span>
+                      </div>
+                      <div v-if="saldoFavorDetalle[p.proveedor_id].movimientos.length > 0" class="desglose-movimientos">
+                        <div class="desglose-mov-titulo">Movimientos de saldo a favor generado</div>
+                        <div v-for="m in saldoFavorDetalle[p.proveedor_id].movimientos" :key="m.id" class="desglose-mov-fila">
+                          <span class="txt-muted">{{ formatFecha(m.fecha) }}</span>
+                          <span :class="'badge-mov badge-mov-' + m.tipo">{{ m.tipo }}</span>
+                          <span :class="m.monto_usd >= 0 ? 'txt-verde' : 'txt-rojo'">
+                            {{ m.monto_usd >= 0 ? '+' : '' }}${{ m.monto_usd.toFixed(2) }}
+                          </span>
+                          <span class="txt-muted">{{ m.nota || '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="deuda.length === 0">
-                <td colspan="5" class="sin-datos">Sin deuda con proveedores</td>
+                <td colspan="6" class="sin-datos">Sin deuda con proveedores</td>
               </tr>
             </tbody>
           </table>
@@ -142,12 +176,12 @@
                 <div class="moneda-toggle">
                   <button
                     :class="['btn-moneda', formPago.moneda === 'USD' ? 'activo' : '']"
-                    @click="formPago.moneda = 'USD'; formPago.cuenta_id = ''; formPago.tasa_cambio = ''"
+                    @click="formPago.moneda = 'USD'; formPago.cuenta_id = ''; formPago.tasa_cambio = ''; refrescarPropuesta()"
                     type="button"
                   >💵 USD</button>
                   <button
                     :class="['btn-moneda', formPago.moneda === 'Bs' ? 'activo' : '']"
-                    @click="formPago.moneda = 'Bs'; formPago.cuenta_id = ''"
+                    @click="formPago.moneda = 'Bs'; formPago.cuenta_id = ''; refrescarPropuesta()"
                     type="button"
                   >🇻🇪 Bolívares</button>
                 </div>
@@ -160,6 +194,7 @@
                   v-model.number="formPago.tasa_cambio"
                   type="number" min="0" step="0.01"
                   placeholder="Ej: 92.50"
+                  @blur="refrescarPropuesta()"
                 />
                 <span class="field-hint">
                   Ingresa la tasa BCV o acordada del día que se realizó el pago
@@ -190,6 +225,7 @@
                   :placeholder="formPago.moneda === 'USD'
                     ? 'Máx. $' + proveedorPago.saldo_pendiente.toFixed(2)
                     : 'Monto en Bs'"
+                  @blur="refrescarPropuesta()"
                 />
                 <span v-if="formPago.moneda === 'Bs' && montoUSDEquivalente" class="equiv-usd">
                   ≈ ${{ montoUSDEquivalente }} USD
@@ -205,22 +241,62 @@
                 <label>Referencia bancaria</label>
                 <input v-model="formPago.referencia" placeholder="Nro. operación" />
               </div>
+            </div>
 
-              <!-- Orden de compra -->
-              <div class="field">
-                <label>Orden de compra (opcional)</label>
-                <select v-model="formPago.orden_compra_id">
-                  <option value="">— Sin asociar —</option>
-                  <option v-for="o in ordenesProveedor" :key="o.id" :value="o.id">
-                    {{ o.numero }}
-                    (${{ o.total.toFixed ? o.total.toFixed(2) : o.total }})
-                  </option>
-                </select>
+            <!-- Reparto editable -->
+            <div class="reparto-box" v-if="montoUSDEquivalente">
+              <div class="reparto-header">
+                <h3 class="subtitulo-hist" style="margin:0">Reparto contra facturas</h3>
+                <button type="button" class="btn-recalcular" @click="refrescarPropuesta(true)" :disabled="cargandoReparto">
+                  ↻ Recalcular cascada
+                </button>
+              </div>
+              <p v-if="cargandoReparto" class="txt-muted" style="font-size:0.85rem">Calculando propuesta...</p>
+              <table v-else-if="repartoFilas.length > 0">
+                <thead>
+                  <tr><th>Factura</th><th>Vencimiento</th><th>Saldo pendiente</th><th>Monto a aplicar</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in repartoFilas" :key="f.recepcion_id"
+                    :class="{ 'fila-excedida': f.monto_aplicar > f.pendiente + 0.01 }">
+                    <td>{{ f.numero_factura || ('Recepción #' + f.recepcion_id) }}</td>
+                    <td class="txt-muted">{{ f.fecha_vencimiento_pago ? formatFecha(f.fecha_vencimiento_pago) : 'sin vencimiento' }}</td>
+                    <td>${{ f.pendiente.toFixed(2) }}</td>
+                    <td>
+                      <input type="number" min="0" :max="f.pendiente" step="0.01"
+                        v-model.number="f.monto_aplicar" @input="repartoTocado = true"
+                        class="input-reparto" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="txt-muted" style="font-size:0.85rem">
+                Este proveedor no tiene facturas pendientes — todo el monto quedará como saldo a favor.
+              </p>
+
+              <div class="reparto-resumen">
+                <div class="reparto-linea">
+                  <span>Monto del pago (USD)</span>
+                  <span>${{ Number(montoUSDEquivalente).toFixed(2) }}</span>
+                </div>
+                <div class="reparto-linea">
+                  <span>Total repartido</span>
+                  <span>${{ totalAplicado.toFixed(2) }}</span>
+                </div>
+                <div class="reparto-linea" v-if="diferenciaReparto > 0.01">
+                  <span>Sobrante → saldo a favor</span>
+                  <span class="txt-verde">${{ diferenciaReparto.toFixed(2) }}</span>
+                </div>
+                <div class="reparto-linea reparto-error" v-if="diferenciaReparto < -0.01">
+                  <span>El reparto excede el monto del pago por</span>
+                  <span class="txt-rojo">${{ Math.abs(diferenciaReparto).toFixed(2) }}</span>
+                </div>
               </div>
             </div>
+
             <div class="form-botones">
               <button class="btn-cancelar" @click="cerrarPago">Cancelar</button>
-              <button class="btn-confirmar" @click="confirmarPago" :disabled="pagando">
+              <button class="btn-confirmar" @click="confirmarPago" :disabled="pagando || diferenciaReparto < -0.01">
                 {{ pagando ? 'Procesando...' : 'Confirmar pago' }}
               </button>
             </div>
@@ -253,26 +329,85 @@
             </table>
             <h3 class="subtitulo-hist">Pagos realizados</h3>
             <table>
-              <thead><tr><th>Fecha</th><th>Monto</th><th>Referencia</th></tr></thead>
+              <thead><tr><th></th><th>Fecha</th><th>Monto</th><th>Referencia</th><th>Estado</th><th></th></tr></thead>
               <tbody>
-                <tr v-for="p in historial.pagos" :key="p.id">
-                  <td>{{ formatFecha(p.fecha) }}</td>
-                  <td class="txt-verde">
-                    {{ p.moneda === 'Bs' ? 'Bs.' : '$' }}{{ p.monto.toFixed(2) }}
-                    <span v-if="p.moneda === 'Bs' && p.monto_convertido" class="equiv-hist">
-                      ≈ ${{ Number(p.monto_convertido).toFixed(2) }}
-                    </span>
-                    <span v-if="p.moneda === 'Bs' && p.tasa_cambio" class="tasa-hist">
-                      @{{ p.tasa_cambio }}
-                    </span>
-                  </td>
-                  <td>{{ p.referencia || '—' }}</td>
-                </tr>
+                <template v-for="p in historial.pagos" :key="p.id">
+                  <tr :class="{ 'fila-anulada': p.estado === 'anulado' }">
+                    <td>
+                      <button class="btn-toggle-fila" @click="toggleHistorialPago(p.id)">
+                        {{ pagoExpandido === p.id ? '▲' : '▼' }}
+                      </button>
+                    </td>
+                    <td>{{ formatFecha(p.fecha) }}</td>
+                    <td class="txt-verde">
+                      {{ p.moneda === 'Bs' ? 'Bs.' : '$' }}{{ p.monto.toFixed(2) }}
+                      <span v-if="p.moneda === 'Bs' && p.monto_usd" class="equiv-hist">
+                        ≈ ${{ Number(p.monto_usd).toFixed(2) }}
+                      </span>
+                      <span v-if="p.moneda === 'Bs' && p.tasa_cambio" class="tasa-hist">
+                        @{{ p.tasa_cambio }}
+                      </span>
+                    </td>
+                    <td>{{ p.referencia || '—' }}</td>
+                    <td><span :class="'badge badge-' + p.estado">{{ p.estado }}</span></td>
+                    <td>
+                      <button v-if="p.estado === 'registrado'" class="btn-anular" @click="abrirAnular(p)">
+                        Anular
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="pagoExpandido === p.id" class="fila-desglose">
+                    <td colspan="6">
+                      <div class="desglose-aplicaciones">
+                        <div v-if="p.tipo" class="desglose-linea">
+                          <span>Tipo</span><span>{{ p.tipo }}</span>
+                        </div>
+                        <div class="desglose-mov-titulo">Aplicado contra facturas</div>
+                        <div v-for="a in p.aplicaciones" :key="a.recepcion_id" class="desglose-mov-fila">
+                          <span>{{ numeroFacturaDe(a.recepcion_id) }}</span>
+                          <span class="txt-muted">{{ a.tipo }}</span>
+                          <span class="txt-verde">${{ a.monto_aplicado_usd.toFixed(2) }}</span>
+                        </div>
+                        <div v-if="p.aplicaciones.length === 0" class="txt-muted" style="font-size:0.82rem">
+                          Sin aplicaciones — el monto completo quedó como saldo a favor
+                        </div>
+                        <div v-if="p.estado === 'anulado'" class="desglose-linea" style="margin-top:0.5rem">
+                          <span class="txt-rojo">Anulado por {{ p.anulado_por }} el {{ formatFecha(p.anulado_fecha) }}</span>
+                          <span class="txt-muted">{{ p.anulado_motivo }}</span>
+                        </div>
+                      </div>
+                      <div v-if="anulandoPagoId === p.id" class="anular-form">
+                        <input v-model="anulandoMotivo" placeholder="Motivo de la anulación" class="input-field" />
+                        <button class="btn-cancelar" @click="cancelarAnular">Cancelar</button>
+                        <button class="btn-confirmar-anular" @click="confirmarAnular(p)" :disabled="anulando">
+                          {{ anulando ? 'Anulando...' : 'Confirmar anulación' }}
+                        </button>
+                        <p class="msg-error" v-if="errorAnular">{{ errorAnular }}</p>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
                 <tr v-if="historial.pagos.length === 0">
-                  <td colspan="3" class="sin-datos">Sin pagos registrados</td>
+                  <td colspan="6" class="sin-datos">Sin pagos registrados</td>
                 </tr>
               </tbody>
             </table>
+
+            <h3 class="subtitulo-hist">Movimientos de saldo a favor</h3>
+            <table v-if="historial.saldo_favor_movimientos && historial.saldo_favor_movimientos.length > 0">
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Nota</th></tr></thead>
+              <tbody>
+                <tr v-for="m in historial.saldo_favor_movimientos" :key="m.id">
+                  <td>{{ formatFecha(m.fecha) }}</td>
+                  <td><span :class="'badge-mov badge-mov-' + m.tipo">{{ m.tipo }}</span></td>
+                  <td :class="m.monto_usd >= 0 ? 'txt-verde' : 'txt-rojo'">
+                    {{ m.monto_usd >= 0 ? '+' : '' }}${{ m.monto_usd.toFixed(2) }}
+                  </td>
+                  <td class="txt-muted">{{ m.nota || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="sin-datos" style="text-align:left">Sin movimientos de saldo a favor</p>
           </div>
         </div>
         <!-- Modal ajuste de deuda -->
@@ -326,8 +461,8 @@ export default {
       deuda:            [],
       cuentas:          [],
       proveedorPago:    null,
-      ordenesProveedor: [],
       historial:        null,
+      historialProveedorId: null,
       pagando:          false,
       errorPago:        '',
       modalAjusteDeuda: false,
@@ -343,10 +478,25 @@ export default {
         cuenta_id:       '',
         monto:           '',
         referencia:      '',
-        orden_compra_id: '',
         moneda:          'USD',
         tasa_cambio:     '',
       },
+      // Reparto editable del pago
+      repartoFilas:     [],
+      repartoSobrante:  0,
+      repartoTocado:    false,
+      cargandoReparto:  false,
+      preseleccion:     { proveedorId: null, recepcionId: null, pendiente: null },
+      // Saldo a favor (columna expandible)
+      saldoFavorExpandido: null,
+      saldoFavorDetalle:   {},
+      cargandoSaldoFavor:  false,
+      // Historial expandible + anular pago
+      pagoExpandido:    null,
+      anulandoPagoId:   null,
+      anulandoMotivo:   '',
+      anulando:         false,
+      errorAnular:      '',
     }
   },
   computed: {
@@ -370,10 +520,18 @@ export default {
       if (!tasa || tasa <= 0 || !this.formPago.monto) return null
       return (parseFloat(this.formPago.monto) / tasa).toFixed(2)
     },
+    totalAplicado() {
+      return Math.round(this.repartoFilas.reduce((s, f) => s + (parseFloat(f.monto_aplicar) || 0), 0) * 100) / 100
+    },
+    diferenciaReparto() {
+      const montoUSD = parseFloat(this.montoUSDEquivalente) || 0
+      return Math.round((montoUSD - this.totalAplicado) * 100) / 100
+    },
   },
   async mounted() {
     await Promise.all([this.cargar(), this.cargarCuentas()])
     this.cargarLiquidez()
+    await this.abrirPagoDesdeQuery()
   },
   methods: {
     async cargar() {
@@ -384,16 +542,68 @@ export default {
       const res = await axios.get('/bancos/cuentas/')
       this.cuentas = res.data
     },
-    async abrirPago(p) {
-      this.proveedorPago    = p
-      this.errorPago        = ''
-      this.formPago         = { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '', moneda: 'USD', tasa_cambio: '' }
-      const res             = await axios.get(`/bancos/proveedores/${p.proveedor_id}/estado/`)
-      this.ordenesProveedor = res.data.ordenes.filter(o => ['recibida_parcial','cerrada'].includes(o.estado))
+    abrirPago(p) {
+      this.proveedorPago  = p
+      this.errorPago      = ''
+      this.formPago       = { cuenta_id: '', monto: '', referencia: '', moneda: 'USD', tasa_cambio: '' }
+      this.repartoFilas   = []
+      this.repartoSobrante = 0
+      this.repartoTocado  = false
     },
     cerrarPago() {
-      this.proveedorPago = null
-      this.formPago = { cuenta_id: '', monto: '', referencia: '', orden_compra_id: '', moneda: 'USD', tasa_cambio: '' }
+      this.proveedorPago  = null
+      this.formPago       = { cuenta_id: '', monto: '', referencia: '', moneda: 'USD', tasa_cambio: '' }
+      this.repartoFilas   = []
+      this.repartoSobrante = 0
+      this.repartoTocado  = false
+      this.preseleccion   = { proveedorId: null, recepcionId: null, pendiente: null }
+    },
+    async abrirPagoDesdeQuery() {
+      const q = this.$route.query
+      if (!q.proveedor_id || !q.recepcion_id) return
+      const proveedorId = Number(q.proveedor_id)
+      const p = this.deuda.find(d => d.proveedor_id === proveedorId)
+      if (!p) return
+      this.abrirPago(p)
+      this.preseleccion = {
+        proveedorId,
+        recepcionId: Number(q.recepcion_id),
+        pendiente:   q.pendiente ? Number(q.pendiente) : null,
+      }
+      if (this.preseleccion.pendiente) {
+        this.formPago.monto = this.preseleccion.pendiente
+        await this.refrescarPropuesta(true)
+      }
+      this.$router.replace({ query: {} })
+    },
+    async refrescarPropuesta(forzar = false) {
+      if (!this.proveedorPago) return
+      if (!forzar && this.repartoTocado) return
+      const montoUSD = parseFloat(this.montoUSDEquivalente)
+      if (!montoUSD || montoUSD <= 0) { this.repartoFilas = []; this.repartoSobrante = 0; return }
+      this.cargandoReparto = true
+      try {
+        const res = await axios.get(
+          `/bancos/proveedores/${this.proveedorPago.proveedor_id}/reparto-propuesto/`,
+          { params: { monto_usd: montoUSD } }
+        )
+        let filas = res.data.filas.map(f => ({ ...f, monto_aplicar: f.monto_propuesto }))
+        if (this.preseleccion.recepcionId) {
+          filas = filas.map(f => ({
+            ...f,
+            monto_aplicar: f.recepcion_id === this.preseleccion.recepcionId
+              ? Math.min(f.pendiente, montoUSD)
+              : 0,
+          }))
+        }
+        this.repartoFilas = filas
+        this.repartoSobrante = res.data.sobrante
+        this.repartoTocado = false
+      } catch (e) {
+        console.error('Error calculando propuesta de reparto', e)
+      } finally {
+        this.cargandoReparto = false
+      }
     },
     async confirmarPago() {
       if (!this.formPago.cuenta_id) { this.errorPago = 'Selecciona la cuenta bancaria'; return }
@@ -401,18 +611,30 @@ export default {
       if (this.formPago.moneda === 'Bs' && !this.formPago.tasa_cambio) {
         this.errorPago = 'Ingresa la tasa de cambio para pagos en Bs'; return
       }
+      if (this.diferenciaReparto < -0.01) {
+        this.errorPago = `El reparto excede el monto del pago por $${Math.abs(this.diferenciaReparto).toFixed(2)}`
+        return
+      }
+      const filaExcedida = this.repartoFilas.find(f => f.monto_aplicar > f.pendiente + 0.01)
+      if (filaExcedida) {
+        this.errorPago = `La factura ${filaExcedida.numero_factura || filaExcedida.recepcion_id} recibe más de su saldo pendiente`
+        return
+      }
       this.pagando = true; this.errorPago = ''
       try {
+        const aplicaciones = this.repartoFilas
+          .filter(f => (parseFloat(f.monto_aplicar) || 0) > 0.009)
+          .map(f => ({ recepcion_id: f.recepcion_id, monto: Math.round(parseFloat(f.monto_aplicar) * 100) / 100 }))
         await axios.post(
           `/bancos/proveedores/${this.proveedorPago.proveedor_id}/pago/`,
           {
-            cuenta_id:       this.formPago.cuenta_id,
-            monto:           this.formPago.monto,
-            moneda:          this.formPago.moneda,
-            tasa_cambio:     this.formPago.moneda === 'Bs' ? this.formPago.tasa_cambio : null,
-            referencia:      this.formPago.referencia,
-            orden_compra_id: this.formPago.orden_compra_id || null,
-            registrado_por:  this.usuario.usuario || 'admin',
+            cuenta_id:      this.formPago.cuenta_id,
+            monto:          this.formPago.monto,
+            moneda:         this.formPago.moneda,
+            tasa_cambio:    this.formPago.moneda === 'Bs' ? this.formPago.tasa_cambio : null,
+            referencia:     this.formPago.referencia,
+            registrado_por: this.usuario.usuario || 'admin',
+            aplicaciones,
           }
         )
         await Promise.all([this.cargar(), this.cargarCuentas()])
@@ -423,7 +645,57 @@ export default {
         this.pagando = false
       }
     },
+    async toggleSaldoFavor(proveedorId) {
+      if (this.saldoFavorExpandido === proveedorId) { this.saldoFavorExpandido = null; return }
+      this.saldoFavorExpandido = proveedorId
+      if (this.saldoFavorDetalle[proveedorId]) return
+      this.cargandoSaldoFavor = true
+      try {
+        const res = await axios.get(`/bancos/proveedores/${proveedorId}/saldo-favor/`)
+        this.saldoFavorDetalle = { ...this.saldoFavorDetalle, [proveedorId]: res.data }
+      } catch (e) {
+        console.error('Error cargando desglose de saldo a favor', e)
+      } finally {
+        this.cargandoSaldoFavor = false
+      }
+    },
+    toggleHistorialPago(pagoId) {
+      this.pagoExpandido = this.pagoExpandido === pagoId ? null : pagoId
+    },
+    numeroFacturaDe(recepcionId) {
+      if (!this.historial) return `Recepción #${recepcionId}`
+      const r = this.historial.recepciones.find(r => r.id === recepcionId)
+      return r ? (r.numero_factura || `Recepción #${recepcionId}`) : `Recepción #${recepcionId}`
+    },
+    abrirAnular(pago) {
+      this.anulandoPagoId = pago.id
+      this.anulandoMotivo = ''
+      this.errorAnular = ''
+      this.pagoExpandido = pago.id
+    },
+    cancelarAnular() {
+      this.anulandoPagoId = null
+      this.anulandoMotivo = ''
+      this.errorAnular = ''
+    },
+    async confirmarAnular(pago) {
+      this.anulando = true; this.errorAnular = ''
+      try {
+        await axios.post(
+          `/bancos/proveedores/pagos/${pago.id}/anular`,
+          { motivo: this.anulandoMotivo || 'Anulación manual' },
+          { headers: { 'x-usuario-nombre': this.usuario.usuario || '' } }
+        )
+        this.cancelarAnular()
+        await Promise.all([this.cargar(), this.verHistorial(this.historialProveedorId)])
+      } catch (e) {
+        this.errorAnular = e?.response?.data?.detail || 'Error al anular el pago'
+      } finally {
+        this.anulando = false
+      }
+    },
     async verHistorial(proveedorId) {
+      this.historialProveedorId = proveedorId
       const res = await axios.get(`/bancos/proveedores/${proveedorId}/estado/`)
       this.historial = res.data
     },
@@ -550,4 +822,40 @@ export default {
 .lp-abono { font-size:0.75rem; margin-left:auto; }
 .txt-verde { color:#16A34A; }
 .txt-rojo  { color:#DC2626; }
+
+/* ── Saldo a favor: columna + desglose ── */
+.btn-saldo-favor { background: transparent; border: 1px solid var(--borde); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.82rem; cursor: pointer; color: #16A34A; font-weight: 600; }
+.btn-saldo-favor:disabled { color: var(--texto-muted); opacity: 0.6; cursor: not-allowed; }
+.fila-desglose td { background: var(--borde-suave); padding: 0.75rem 1rem; }
+.desglose-saldo-favor, .desglose-aplicaciones { display: flex; flex-direction: column; gap: 0.4rem; }
+.desglose-linea { display: flex; justify-content: space-between; font-size: 0.85rem; gap: 1rem; }
+.desglose-movimientos { margin-top: 0.4rem; border-top: 1px dashed var(--borde); padding-top: 0.4rem; }
+.desglose-mov-titulo { font-size: 0.75rem; font-weight: 700; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.3rem; }
+.desglose-mov-fila { display: flex; gap: 0.75rem; font-size: 0.8rem; padding: 0.15rem 0; align-items: center; }
+.badge-mov { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.7rem; font-weight: 700; }
+.badge-mov-generado  { background: #16A34A1A; color: #16A34A; }
+.badge-mov-consumido { background: #FFCC0033; color: #996600; }
+.badge-mov-liberado  { background: #DC26261A; color: #DC2626; }
+
+/* ── Reparto editable ── */
+.reparto-box { margin-top: 1.25rem; border-top: 1px solid var(--borde); padding-top: 1rem; }
+.reparto-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.btn-recalcular { background: transparent; border: 1px solid var(--borde); border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.78rem; cursor: pointer; color: var(--texto-sec); }
+.btn-recalcular:hover { border-color: #FFCC00; background: #FFFDF0; }
+.input-reparto { width: 100px; border: 1px solid var(--borde); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.85rem; text-align: right; }
+.input-reparto:focus { outline: none; border-color: #FFCC00; }
+.fila-excedida td { background: #DC262610; }
+.reparto-resumen { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.reparto-linea { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 0.2rem 0; }
+.reparto-linea.reparto-error { color: #DC2626; font-weight: 600; }
+
+/* ── Historial: expandir pago / anular ── */
+.btn-toggle-fila { background: transparent; border: none; cursor: pointer; font-size: 0.8rem; color: var(--texto-sec); }
+.fila-anulada td { opacity: 0.5; text-decoration: line-through; }
+.btn-anular { background: transparent; border: 1px solid #DC2626; color: #DC2626; border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.78rem; cursor: pointer; }
+.btn-anular:hover { background: #DC26261A; }
+.anular-form { margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px dashed var(--borde); padding-top: 0.6rem; }
+.anular-form .input-field { width: auto; flex: 1; min-width: 200px; }
+.btn-confirmar-anular { background: #DC2626; color: white; border: none; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.82rem; }
+.btn-confirmar-anular:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

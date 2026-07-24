@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 import models
 from rutas.auth import mapa_existencia_por_sede
+from pagos_proveedor import pendiente_recepcion
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -150,10 +151,12 @@ def resumen_dashboard(sede_id: Optional[int] = None, db: Session = Depends(get_d
             alerta = "ok"
         facturas_pendientes.append({
             "recepcion_id":      rec.id,
+            "proveedor_id":      prov.id,
             "proveedor":         prov.nombre,
             "numero_factura":    rec.numero_factura or "—",
             "orden":             orden.numero,
             "monto_factura":     round(rec.monto_factura or 0, 2),
+            "pendiente":         pendiente_recepcion(db, rec),
             "fecha_vencimiento": rec.fecha_vencimiento_pago.isoformat() if rec.fecha_vencimiento_pago else None,
             "dias_restantes":    dias_restantes,
             "estado_pago":       rec.estado_pago,

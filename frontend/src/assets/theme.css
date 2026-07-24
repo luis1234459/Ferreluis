@@ -148,8 +148,10 @@ input:focus, select:focus, textarea:focus {
 .badge { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
 .badge-pagado,.badge-completado,.badge-aprobada,.badge-cerrada,.badge-activo { background: #16A34A1A; color: #16A34A; }
 .badge-pendiente { background: #FFCC0033; color: #996600; }
-.badge-anulado,.badge-cancelado,.badge-credito { background: #DC26261A; color: #DC2626; }
-.badge-parcial,.badge-recibida_parcial { background: #FFCC0033; color: #996600; }
+.badge-anulado,.badge-anulada,.badge-cancelado,.badge-credito { background: #DC26261A; color: #DC2626; }
+.badge-registrado { background: #16A34A1A; color: #16A34A; }
+.badge-parcial,.badge-recibida_parcial,.badge-pago_parcial { background: #FFCC0033; color: #996600; }
+.badge-vencido { background: #DC26261A; color: #DC2626; }
 .badge-borrador { background: #8888881A; color: #555555; }
 
 /* ─── Overlays y diálogos ─── */

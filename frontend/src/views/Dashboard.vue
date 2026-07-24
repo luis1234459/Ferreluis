@@ -287,6 +287,40 @@
           </div>
           <!-- fin WIDGET LIQUIDEZ -->
 
+          <!-- ══ FACTURAS DE PROVEEDOR PENDIENTES ══ -->
+          <div class="seccion-facturas" style="margin-top:1.5rem" v-if="d.facturas_pendientes && d.facturas_pendientes.length > 0">
+            <h2 class="panel-titulo">🧾 Facturas de proveedor pendientes</h2>
+            <div class="tabla-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Proveedor</th><th>Nº Factura</th><th>Orden</th>
+                    <th>Monto</th><th>Pendiente</th><th>Vence</th><th>Estado</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in d.facturas_pendientes" :key="f.recepcion_id"
+                    :class="f.alerta === 'vencida' ? 'fila-vencida' : (f.alerta === 'proxima' ? 'fila-proxima' : '')">
+                    <td style="font-weight:600">{{ f.proveedor }}</td>
+                    <td class="txt-muted">{{ f.numero_factura }}</td>
+                    <td class="txt-muted">{{ f.orden }}</td>
+                    <td>${{ fmt(f.monto_factura) }}</td>
+                    <td class="txt-rojo">${{ fmt(f.pendiente) }}</td>
+                    <td class="txt-muted">
+                      {{ fmtFecha(f.fecha_vencimiento) }}
+                      <span v-if="f.dias_restantes != null" :class="'badge-dias badge-dias-' + f.alerta">
+                        {{ f.dias_restantes < 0 ? Math.abs(f.dias_restantes) + 'd venc.' : f.dias_restantes + 'd' }}
+                      </span>
+                    </td>
+                    <td><span :class="'badge badge-' + f.estado_pago">{{ f.estado_pago }}</span></td>
+                    <td><button class="btn-pagar-factura" @click="pagarFactura(f)">Pagar</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- fin FACTURAS PROVEEDOR -->
+
           </template>
           <!-- fin DASHBOARD ADMIN -->
 
@@ -494,6 +528,12 @@ export default {
       } catch (e) {
         console.error('Error actualizando crédito real', e)
       }
+    },
+    pagarFactura(f) {
+      this.$router.push({
+        name: 'PagosProveedores',
+        query: { proveedor_id: f.proveedor_id, recepcion_id: f.recepcion_id, pendiente: f.pendiente },
+      })
     },
     fmt(n) { return n != null ? Number(n).toFixed(2) : '0.00' },
     fmtFecha(iso) {

@@ -9,11 +9,13 @@ from models import (
     CuentaBancaria, MetodoPagoCuenta, MovimientoBancario,
     PagoVenta, Proveedor, OrdenCompra, DetalleOrdenCompra,
     CierreCaja, PagoProveedor, PagoProveedorAplicacion,
+    SaldoFavorProveedorMovimiento,
 )
 from rutas.usuarios import require_admin
 from pagos_proveedor import (
     aplicar_pago, anular_pago, resumen_deuda_proveedor,
     pendiente_recepcion, recepciones_credito_proveedor, ErrorMotorPagos,
+    propuesta_reparto,
 )
 from typing import Optional
 from datetime import datetime
@@ -395,17 +397,52 @@ def deuda_proveedores(db: Session = Depends(get_db)):
     resultado = []
     for p in proveedores:
         resumen = resumen_deuda_proveedor(db, p.id)
-        if resumen["total_facturado"] == 0:
+        credito_disponible = round(float(p.credito_disponible or 0), 2)
+        if resumen["total_facturado"] == 0 and credito_disponible == 0 and resumen["saldo_favor"] == 0:
             continue
         resultado.append({
-            "proveedor_id":    p.id,
-            "proveedor":       p.nombre,
-            "total_comprado":  resumen["total_facturado"],
-            "total_pagado":    resumen["total_aplicado"],
-            "saldo_favor":     resumen["saldo_favor"],
-            "saldo_pendiente": resumen["saldo_pendiente"],
+            "proveedor_id":       p.id,
+            "proveedor":          p.nombre,
+            "total_comprado":     resumen["total_facturado"],
+            "total_pagado":       resumen["total_aplicado"],
+            "saldo_favor":        resumen["saldo_favor"],
+            "credito_disponible": credito_disponible,
+            "saldo_a_favor_total": round(resumen["saldo_favor"] + credito_disponible, 2),
+            "saldo_pendiente":    resumen["saldo_pendiente"],
         })
     return resultado
+
+
+@router.get("/proveedores/{proveedor_id}/reparto-propuesto/", dependencies=[Depends(require_admin)])
+def reparto_propuesto(proveedor_id: int, monto_usd: float, db: Session = Depends(get_db)):
+    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+    if not proveedor:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    return propuesta_reparto(db, proveedor_id, monto_usd)
+
+
+@router.get("/proveedores/{proveedor_id}/saldo-favor/", dependencies=[Depends(require_admin)])
+def saldo_favor_proveedor_detalle(proveedor_id: int, db: Session = Depends(get_db)):
+    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+    if not proveedor:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    movimientos = db.query(SaldoFavorProveedorMovimiento).filter(
+        SaldoFavorProveedorMovimiento.proveedor_id == proveedor_id,
+    ).order_by(SaldoFavorProveedorMovimiento.fecha.desc()).all()
+    return {
+        "credito_disponible": round(float(proveedor.credito_disponible or 0), 2),
+        "movimientos": [
+            {
+                "id":             m.id,
+                "monto_usd":      m.monto_usd,
+                "tipo":           m.tipo,
+                "pago_origen_id": m.pago_origen_id,
+                "fecha":          m.fecha.isoformat() if m.fecha else None,
+                "nota":           m.nota,
+            }
+            for m in movimientos
+        ],
+    }
 
 
 @router.post("/proveedores/{proveedor_id}/pago/", dependencies=[Depends(require_admin)])
@@ -569,18 +606,34 @@ def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
     resumen = resumen_deuda_proveedor(db, proveedor_id)
 
     recepciones = recepciones_credito_proveedor(db, proveedor_id)
+    saldo_favor_movs = db.query(SaldoFavorProveedorMovimiento).filter(
+        SaldoFavorProveedorMovimiento.proveedor_id == proveedor_id,
+    ).order_by(SaldoFavorProveedorMovimiento.fecha.desc()).all()
     return {
-        "proveedor":       p.nombre,
-        "total_comprado":  resumen["total_facturado"],
-        "total_pagado":    resumen["total_aplicado"],
-        "saldo_favor":     resumen["saldo_favor"],
-        "saldo_pendiente": resumen["saldo_pendiente"],
+        "proveedor":          p.nombre,
+        "total_comprado":     resumen["total_facturado"],
+        "total_pagado":       resumen["total_aplicado"],
+        "saldo_favor":        resumen["saldo_favor"],
+        "credito_disponible": round(float(p.credito_disponible or 0), 2),
+        "saldo_pendiente":    resumen["saldo_pendiente"],
+        "saldo_favor_movimientos": [
+            {
+                "id":             m.id,
+                "monto_usd":      m.monto_usd,
+                "tipo":           m.tipo,
+                "pago_origen_id": m.pago_origen_id,
+                "fecha":          m.fecha.isoformat() if m.fecha else None,
+                "nota":           m.nota,
+            }
+            for m in saldo_favor_movs
+        ],
         "ordenes": [{"id": o.id, "numero": o.numero, "estado": o.estado, "total": o.total} for o in ordenes],
         "recepciones": [
             {
                 "id":               r.id,
                 "numero_factura":   r.numero_factura,
                 "fecha_recepcion":  r.fecha_recepcion.isoformat() if r.fecha_recepcion else None,
+                "fecha_vencimiento_pago": r.fecha_vencimiento_pago.isoformat() if r.fecha_vencimiento_pago else None,
                 "monto_factura":    r.monto_factura,
                 "pendiente":        pendiente_recepcion(db, r),
                 "estado_pago":      r.estado_pago,
@@ -594,10 +647,15 @@ def estado_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
                 "tipo":            pg.tipo,
                 "monto":           pg.monto,
                 "moneda":          pg.moneda,
+                "tasa_cambio":     pg.tasa_cambio,
                 "monto_usd":       pg.monto_usd,
+                "referencia":      pg.referencia,
                 "concepto":        pg.concepto,
                 "estado":          pg.estado,
                 "registrado_por":  pg.registrado_por,
+                "anulado_motivo":  pg.anulado_motivo,
+                "anulado_por":     pg.anulado_por,
+                "anulado_fecha":   pg.anulado_fecha.isoformat() if pg.anulado_fecha else None,
                 "aplicaciones": [
                     {"recepcion_id": a.recepcion_id, "monto_aplicado_usd": a.monto_aplicado_usd, "tipo": a.tipo_aplicacion}
                     for a in db.query(PagoProveedorAplicacion).filter(PagoProveedorAplicacion.pago_id == pg.id).all()
