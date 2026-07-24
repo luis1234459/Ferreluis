@@ -971,7 +971,12 @@ def edicion_masiva(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    CAMPOS = {"nombre", "stock", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id", "proveedor_id", "marca_id", "es_producto_clave", "es_delicado", "plantilla_garantia_id", "unidad_medida", "unidades_por_paquete", "nombre_paquete"}
+    CAMPOS = {"nombre", "costo_usd", "margen", "descripcion", "activo", "departamento_id", "categoria_id", "proveedor_id", "marca_id", "es_producto_clave", "es_delicado", "plantilla_garantia_id", "unidad_medida", "unidades_por_paquete", "nombre_paquete"}
+    if any("stock" in item for item in items):
+        raise HTTPException(
+            status_code=400,
+            detail="Los cambios de stock no se hacen desde edición masiva. Usá Ajustes → Stock, que exige motivo y deja historial.",
+        )
     actualizados = 0
     errores      = []
     for item in items:

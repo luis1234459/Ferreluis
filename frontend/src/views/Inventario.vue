@@ -210,9 +210,7 @@
                       </div>
                     </template>
                     <template v-else-if="modoEdicion">
-                      <input class="celda-input celda-num" type="number" min="0"
-                        v-model.number="borradorEdicion[p.id].stock"
-                        @input="marcarModificado(p.id)" />
+                      <span :class="{ 'txt-rojo': p.stock < 5 }" title="Los cambios de stock se hacen desde Ajustes → Stock">{{ p.stock }}</span>
                     </template>
                     <template v-else>
                       <span :class="{ 'txt-rojo': p.stock < 5 }">{{ p.stock }}</span>
@@ -1436,7 +1434,7 @@ export default {
 
       // Modo edición masiva
       modoEdicion:      false,
-      borradorEdicion:  {},   // { [id]: { nombre, stock, costo_usd, margen_pct, descripcion, activo } }
+      borradorEdicion:  {},   // { [id]: { nombre, costo_usd, margen_pct, descripcion, activo } }
       filasModificadas: new Set(),
       guardandoMasivo:  false,
       toastMasivo:      '',
@@ -1960,7 +1958,6 @@ export default {
       for (const p of this.productos) {
         borrador[p.id] = {
           nombre:          p.nombre,
-          stock:           p.stock,
           costo_usd:       Number(p.costo_usd),
           margen_pct:      Math.round(Number(p.margen) * 100),
           descripcion:     p.descripcion || '',
@@ -2002,7 +1999,6 @@ export default {
           return {
             id,
             nombre:          b.nombre,
-            stock:           Number(b.stock),
             costo_usd:       Number(b.costo_usd),
             margen:          Number(b.margen_pct) / 100,
             descripcion:     b.descripcion
@@ -2528,7 +2524,6 @@ export default {
         if (!this.borradorEdicion[p.id]) {
           this.borradorEdicion[p.id] = {
             nombre:          p.nombre,
-            stock:           p.stock,
             costo_usd:       Number(p.costo_usd),
             margen_pct:      Math.round(Number(p.margen) * 100),
             descripcion:     p.descripcion || '',
