@@ -168,6 +168,42 @@
                 </div>
               </div>
 
+              <!-- Modal posible proveedor duplicado -->
+              <div v-if="modalDuplicado" class="modal-overlay" @click.self="modalDuplicado = false">
+                <div class="modal-box">
+                  <div class="modal-header">
+                    <h3>Posible proveedor duplicado</h3>
+                    <button class="btn-cerrar-modal" @click="modalDuplicado = false">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <p style="color:var(--texto-sec);font-size:0.9rem;margin:0 0 0.75rem">
+                      La factura indica <strong class="txt-amarillo">"{{ proveedorNombreIA }}"</strong>
+                      <span v-if="rifProveedorIA">(RIF {{ rifProveedorIA }})</span>,
+                      que no coincide exacto con ningún proveedor, pero se parece a:
+                    </p>
+                    <div v-for="c in duplicadoCandidatos" :key="c.id" class="renombrar-comparacion" style="margin-bottom:0.5rem">
+                      <div class="renombrar-fila">
+                        <span class="renombrar-etiqueta">{{ Math.round(c.similitud * 100) }}% parecido</span>
+                        <span class="renombrar-valor">{{ c.nombre }}<small v-if="c.rif"> · {{ c.rif }}</small></span>
+                      </div>
+                      <button class="btn-confirmar" style="width:100%;margin-top:0.5rem;padding:0.5rem"
+                        :disabled="resolviendoDuplicado" @click="usarProveedorDuplicado(c)">
+                        Usar este proveedor
+                      </button>
+                    </div>
+                    <p style="color:var(--texto-sec);font-size:0.88rem;margin:0.75rem 0 0">
+                      Si ninguno es el mismo proveedor, crea uno nuevo. Esto evita que se acumulen
+                      proveedores fantasma con nombres distintos para la misma empresa.
+                    </p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn-condicion" :disabled="resolviendoDuplicado" @click="crearProveedorNuevoForzado">
+                      Ninguno, crear proveedor nuevo
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Modal producto nuevo -->
               <div v-if="modalNuevoProd" class="modal-overlay" @click.self="modalNuevoProd = false">
                 <div class="modal-box">
@@ -781,6 +817,10 @@ export default {
       rifProveedorIA:     '',
       modalRenombrar:     false,
       proveedorPendiente: null,
+      // Posible proveedor duplicado (resolver-proveedor devolvió candidatos, no creó nada)
+      modalDuplicado:       false,
+      duplicadoCandidatos:  [],
+      resolviendoDuplicado: false,
       // Selector OC existente
       ordenesDisponibles: [],
       ordenSeleccionada: null,
@@ -1097,12 +1137,22 @@ export default {
       setTimeout(() => { this.provAbierta = false }, 200)
     },
 
-    async resolverProveedorAutomatico(nombre, rif) {
+    async resolverProveedorAutomatico(nombre, rif, forzarNuevo = false) {
       try {
         const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
         const { data } = await axios.post('/facturas/resolver-proveedor', {
-          nombre, rif, usuario
+          nombre, rif, usuario, forzar_nuevo: forzarNuevo,
         })
+
+        if (data.requiere_confirmacion) {
+          // No se creó ni se asignó nada todavía: el nombre no coincide exacto con
+          // ninguno pero se parece a proveedores existentes. Que Luis confirme antes
+          // de crear un fantasma (esto es lo que faltaba y generó duplicados como PRV-0057).
+          this.duplicadoCandidatos = data.candidatos
+          this.modalDuplicado      = true
+          return
+        }
+
         this.proveedorId   = data.id
         this.proveedorBusq = data.nombre
 
@@ -1123,6 +1173,36 @@ export default {
         this.cargarOrdenesPendientes(data.id)
       } catch {
         // Si falla, dejar campo manual como estaba
+      }
+    },
+    async usarProveedorDuplicado(candidato) {
+      this.resolviendoDuplicado = true
+      try {
+        // Ya sabemos el proveedor exacto que Luis eligió: usarlo directo y enseñarle
+        // el alias al sistema para que la próxima vez esta factura resuelva sola.
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}').nombre || ''
+        if (this.proveedorNombreIA) {
+          await axios.post('/facturas/guardar-alias', {
+            alias: this.proveedorNombreIA, proveedor_id: candidato.id, usuario,
+          }).catch(() => {})
+        }
+        this.proveedorId   = candidato.id
+        this.proveedorBusq = candidato.nombre
+        this.modalDuplicado = false
+        this.duplicadoCandidatos = []
+        this.cargarOrdenesPendientes(candidato.id)
+      } finally {
+        this.resolviendoDuplicado = false
+      }
+    },
+    async crearProveedorNuevoForzado() {
+      this.resolviendoDuplicado = true
+      try {
+        this.modalDuplicado = false
+        await this.resolverProveedorAutomatico(this.proveedorNombreIA, this.rifProveedorIA, true)
+      } finally {
+        this.duplicadoCandidatos  = []
+        this.resolviendoDuplicado = false
       }
     },
 

@@ -77,6 +77,7 @@ def _normalizar(texto: str) -> str:
     texto = re.sub(r'\s+', ' ', texto)
     for palabra in ['C.A', 'C.A.', 'S.A', 'S.A.', 'CA', 'SA', 'COMPANIA', 'EMPRESA', 'GRUPO', 'COMERCIAL']:
         texto = texto.replace(palabra, '')
+    texto = re.sub(r'[.,]', '', texto)  # residuos de puntuación tras quitar sufijos (ej. "NOMBRE, .")
     texto = re.sub(r'\s+', ' ', texto).strip()
     return texto
 
@@ -252,23 +253,45 @@ def guardar_alias(datos: dict, db: Session = Depends(get_db)):
     return {"guardado": False, "razon": "alias ya existe"}
 
 
+def _candidatos_proveedor_similar(db: Session, nombre_norm: str, umbral: float = 0.80, top: int = 3):
+    """Proveedores activos cuyo nombre normalizado es parecido (no idéntico) a nombre_norm."""
+    import difflib
+    activos = db.query(Proveedor).filter(Proveedor.activo == True).all()
+    candidatos = []
+    for p in activos:
+        ratio = difflib.SequenceMatcher(None, nombre_norm, _normalizar(p.nombre)).ratio()
+        if ratio >= umbral:
+            candidatos.append((p, ratio))
+    candidatos.sort(key=lambda c: c[1], reverse=True)
+    return candidatos[:top]
+
+
 @router.post("/resolver-proveedor")
 def resolver_proveedor(datos: dict, db: Session = Depends(get_db)):
     """
-    Busca proveedor por RIF exacto.
-    Si encuentra → devuelve el proveedor y actualiza nombre si cambió.
-    Si no encuentra → crea proveedor nuevo y lo devuelve.
+    Resuelve el proveedor de una factura escaneada, en orden de confianza:
+    1. RIF exacto → usa ese proveedor (y renombra si el nombre de la IA cambió).
+    2. Alias ya aprendido (guardado cuando un humano confirmó antes un match).
+    3. Nombre normalizado idéntico a un único proveedor existente.
+    4. Nombre normalizado parecido (no idéntico) a uno o más existentes → NO crea nada,
+       devuelve candidatos para que el humano confirme (evita duplicados fantasma
+       como PRV-0057, que se creó por esto: RIF no coincidió y nunca se comparó el nombre).
+    5. Sin ninguna señal → crea proveedor nuevo.
+
+    `forzar_nuevo: true` en el body salta los pasos 2-4 (se usa cuando el humano
+    ya vio los candidatos del paso 4 y eligió "crear proveedor nuevo" de todos modos).
     """
-    nombre  = (datos.get("nombre") or "").strip()
-    rif     = (datos.get("rif") or "").strip()
-    usuario = datos.get("usuario", "")
+    nombre       = (datos.get("nombre") or "").strip()
+    rif          = (datos.get("rif") or "").strip()
+    usuario      = datos.get("usuario", "")
+    forzar_nuevo = bool(datos.get("forzar_nuevo"))
 
     if not nombre and not rif:
         raise HTTPException(status_code=400, detail="Se requiere nombre o RIF")
 
     proveedor = None
 
-    # Buscar por RIF exacto primero
+    # 1. Buscar por RIF exacto primero
     if rif:
         proveedor = db.query(Proveedor).filter(
             Proveedor.rif == rif,
@@ -300,7 +323,66 @@ def resolver_proveedor(datos: dict, db: Session = Depends(get_db)):
             "actualizo_nombre": False,
         }
 
-    # No encontró → crear proveedor nuevo
+    nombre_norm = _normalizar(nombre) if nombre else ""
+
+    # 2. Alias ya aprendido (un humano ya confirmó antes que este nombre de IA = este proveedor)
+    if not forzar_nuevo and nombre_norm:
+        alias = db.query(AliasProveedor).filter(
+            AliasProveedor.alias_normalizado == nombre_norm,
+        ).first()
+        if alias:
+            proveedor = db.query(Proveedor).filter(
+                Proveedor.id == alias.proveedor_id,
+                Proveedor.activo == True,
+            ).first()
+
+    # 3. Nombre normalizado idéntico a un único proveedor existente
+    if not proveedor and not forzar_nuevo and nombre_norm:
+        activos = db.query(Proveedor).filter(Proveedor.activo == True).all()
+        exactos = [p for p in activos if _normalizar(p.nombre) == nombre_norm]
+        if len(exactos) == 1:
+            proveedor = exactos[0]
+
+    if proveedor:
+        # Backfill de RIF si el proveedor no tenía y esta factura sí trae uno
+        if rif and not proveedor.rif:
+            proveedor.rif = rif
+        # Guardar el alias para que la próxima vez matchee directo por el paso 2
+        ya_alias = db.query(AliasProveedor).filter(
+            AliasProveedor.alias_normalizado == nombre_norm,
+            AliasProveedor.proveedor_id == proveedor.id,
+        ).first()
+        if not ya_alias:
+            db.add(AliasProveedor(
+                proveedor_id=proveedor.id, alias=nombre, alias_normalizado=nombre_norm,
+                creado_por=usuario,
+            ))
+        db.commit()
+        db.refresh(proveedor)
+        return {
+            "id":               proveedor.id,
+            "nombre":           proveedor.nombre,
+            "rif":              proveedor.rif or "",
+            "es_nuevo":         False,
+            "actualizo_nombre": False,
+        }
+
+    # 4. Nombre parecido (no idéntico) a uno o más existentes → pedir confirmación humana,
+    #    sin crear nada todavía
+    if not forzar_nuevo and nombre_norm:
+        candidatos = _candidatos_proveedor_similar(db, nombre_norm)
+        if candidatos:
+            return {
+                "requiere_confirmacion": True,
+                "nombre_ia": nombre,
+                "rif_ia":    rif,
+                "candidatos": [
+                    {"id": p.id, "nombre": p.nombre, "rif": p.rif or "", "similitud": round(ratio, 2)}
+                    for p, ratio in candidatos
+                ],
+            }
+
+    # 5. Sin ninguna señal (o el humano ya confirmó que es nuevo) → crear proveedor nuevo
     nuevo = Proveedor(
         nombre         = nombre or f"Proveedor {rif}",
         rif            = rif or None,
