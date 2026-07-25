@@ -163,10 +163,6 @@
 
             <!-- Panel de filtros colapsable -->
             <div v-if="filtrosAbiertos" class="filtros-panel">
-              <select v-model="filtroMarca" class="filtro-sel" @change="cargarProductos()">
-                <option :value="null">Todas las marcas</option>
-                <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
-              </select>
               <select v-model="filtroDepartamento" class="filtro-sel" @change="alCambiarDepartamento">
                 <option :value="null">Todos los dept.</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -174,6 +170,10 @@
               <select v-model="filtroCategoria" class="filtro-sel" ref="selectCategoria" @change="cargarProductos()">
                 <option :value="null">Todas las cat.</option>
                 <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+              </select>
+              <select v-model="filtroMarca" class="filtro-sel" @change="cargarProductos()">
+                <option :value="null">Todas las marcas</option>
+                <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
               </select>
               <button v-if="filtroMarca || filtroDepartamento || filtroCategoria" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
               <button :class="['btn-empuje', filtroEmpuje ? 'btn-empuje-activo' : '']"

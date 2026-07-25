@@ -84,10 +84,6 @@
           <!-- Filtros -->
           <div class="filtros">
             <input v-model="busqueda" placeholder="Buscar producto..." class="buscador" />
-            <select v-model="filtroMarca">
-              <option value="">Todas las marcas</option>
-              <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
-            </select>
             <select v-model="filtroDepartamento" @change="filtroCategoria = ''">
               <option value="">Todos los departamentos</option>
               <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
@@ -95,6 +91,10 @@
             <select v-model="filtroCategoria">
               <option value="">Todas las categorías</option>
               <option v-for="c in categoriasFiltradas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+            <select v-model="filtroMarca">
+              <option value="">Todas las marcas</option>
+              <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
             </select>
             <select v-model="filtroTipo">
               <option value="">Todos los tipos</option>

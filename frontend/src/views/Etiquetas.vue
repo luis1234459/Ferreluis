@@ -9,13 +9,6 @@
         placeholder="🔍 Buscar producto o código..."
         class="filtro-input" />
 
-      <select v-model="filtroMarca" @change="cargarProductos">
-        <option value="">Todas las marcas</option>
-        <option v-for="m in marcas" :key="m.id" :value="m.id">
-          {{ m.nombre }}
-        </option>
-      </select>
-
       <select v-model="filtroDepto" @change="cargarCategorias">
         <option value="">Todos los departamentos</option>
         <option v-for="d in departamentos" :key="d.id" :value="d.id">
@@ -27,6 +20,13 @@
         <option value="">Todas las categorías</option>
         <option v-for="c in categorias" :key="c.id" :value="c.id">
           {{ c.nombre }}
+        </option>
+      </select>
+
+      <select v-model="filtroMarca" @change="cargarProductos">
+        <option value="">Todas las marcas</option>
+        <option v-for="m in marcas" :key="m.id" :value="m.id">
+          {{ m.nombre }}
         </option>
       </select>
     </div>
@@ -312,12 +312,15 @@ export default {
       const miId = ++this._requestId
       try {
         // /ajustes/productos usa filtro_tipo + filtro_id, no nombre de campo directo.
-        // Prioridad: departamento > marca > todos. busqueda se aplica client-side.
+        // Departamento/Categoria y Marca se combinan (AND) via marca_id aparte;
+        // si no hay departamento, Marca sola filtra sin restriccion.
+        // busqueda se aplica client-side.
         const params = { filtro_tipo: 'todos' }
         if (this.filtroDepto) {
           params.filtro_tipo = 'departamento'
           params.filtro_id   = this.filtroDepto
           if (this.filtroCategoria) params.categoria_id = this.filtroCategoria
+          if (this.filtroMarca) params.marca_id = this.filtroMarca
         } else if (this.filtroMarca) {
           params.filtro_tipo = 'marca'
           params.filtro_id   = this.filtroMarca

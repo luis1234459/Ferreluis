@@ -143,10 +143,13 @@ def listar_productos_ajuste(
     filtro_tipo:  str           = "todos",
     filtro_id:    Optional[int] = None,
     categoria_id: Optional[int] = None,
+    marca_id:     Optional[int] = None,
     db: Session   = Depends(get_db),
     _: None       = Depends(require_admin_o_gestionador),
 ):
     productos     = _filtrar_productos(db, filtro_tipo, filtro_id, categoria_id)
+    if marca_id and filtro_tipo != "marca":
+        productos = [p for p in productos if p.marca_id == marca_id]
     bcv, binance  = _tasas(db)
 
     deptos_map  = {d.id: d for d in db.query(Departamento).all()}
