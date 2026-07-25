@@ -514,9 +514,6 @@
               :disabled="gestionCargando">
               {{ gestionCargando ? 'Cargando...' : 'Cargar productos' }}
             </button>
-            <button class="btn-sugerir-pareto" @click="sugerirPareto" :disabled="cargandoSugerencia">
-              {{ cargandoSugerencia ? 'Calculando...' : '🤖 Sugerir Pareto auto' }}
-            </button>
             <button class="btn-enviar-conteo" @click="abrirModalEnviarConteo"
               :disabled="seleccionados.size === 0">
               📋 Enviar a conteo ({{ seleccionados.size }})
@@ -591,8 +588,6 @@
                       @change="toggleSeleccionarTodos" />
                   </th>
                   <th>Marca</th>
-                  <th>⭐ Pareto</th>
-                  <th>🎯 Delicado</th>
                   <th>Stock</th>
                   <th>Auditoría</th>
                   <th>Acciones</th>
@@ -614,14 +609,6 @@
                       @change="toggleSeleccion(p.id)" />
                   </td>
                   <td class="txt-muted">{{ p.marca_nombre }}</td>
-                  <td style="text-align:center">
-                    <input type="checkbox" :checked="p.es_producto_clave"
-                      @change="togglePareto(p.id, $event.target.checked)" />
-                  </td>
-                  <td style="text-align:center">
-                    <input type="checkbox" :checked="p.es_delicado"
-                      @change="toggleDelicado(p.id, $event.target.checked)" />
-                  </td>
                   <td>{{ p.stock }}</td>
                   <td>
                     <span v-if="p.auditoria_pendiente" class="badge-audit-pendiente">⚠ Pendiente</span>
