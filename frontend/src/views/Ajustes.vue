@@ -1941,15 +1941,17 @@ export default {
         }
         const res = await axios.post('/ajustes/productos/mover-departamento', payload,
           { headers: this._headers() })
-        this.msgGestion =
+        const mensajeExito =
           `✓ ${res.data.productos_afectados} producto(s) movidos correctamente`
-        this.gestionSeleccion = []
         this.gestionDeptDestino = ''
         this.gestionCatDestino = ''
         this.gestionSubcatDestino = ''
         this.gestionSubcategoriasDestino = []
         this.marcaDestino = ''
+        // cargarProductosGestion() limpia msgGestion al recargar la tabla —
+        // se restaura despues para que el mensaje de exito no desaparezca.
         await this.cargarProductosGestion()
+        this.msgGestion = mensajeExito
       } catch (e) {
         this.msgGestion = e?.response?.data?.detail || 'Error al mover productos'
       } finally {
