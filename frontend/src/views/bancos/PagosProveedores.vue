@@ -194,7 +194,6 @@
                   v-model.number="formPago.tasa_cambio"
                   type="number" min="0" step="0.01"
                   placeholder="Ej: 92.50"
-                  @blur="refrescarPropuesta()"
                 />
                 <span class="field-hint">
                   Ingresa la tasa BCV o acordada del día que se realizó el pago
@@ -225,7 +224,6 @@
                   :placeholder="formPago.moneda === 'USD'
                     ? 'Máx. $' + proveedorPago.saldo_pendiente.toFixed(2)
                     : 'Monto en Bs'"
-                  @blur="refrescarPropuesta()"
                 />
                 <span v-if="formPago.moneda === 'Bs' && montoUSDEquivalente" class="equiv-usd">
                   ≈ ${{ montoUSDEquivalente }} USD
@@ -270,8 +268,11 @@
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="txt-muted" style="font-size:0.85rem">
+              <p v-else-if="repartoIntentado" class="txt-muted" style="font-size:0.85rem">
                 Este proveedor no tiene facturas pendientes — todo el monto quedará como saldo a favor.
+              </p>
+              <p v-else class="txt-muted" style="font-size:0.85rem">
+                Ingresa el monto para calcular el reparto contra facturas.
               </p>
 
               <div class="reparto-resumen">
@@ -296,7 +297,7 @@
 
             <div class="form-botones">
               <button class="btn-cancelar" @click="cerrarPago">Cancelar</button>
-              <button class="btn-confirmar" @click="confirmarPago" :disabled="pagando || diferenciaReparto < -0.01">
+              <button class="btn-confirmar" @click="confirmarPago" :disabled="pagando || cargandoReparto || diferenciaReparto < -0.01">
                 {{ pagando ? 'Procesando...' : 'Confirmar pago' }}
               </button>
             </div>
@@ -485,6 +486,7 @@ export default {
       repartoFilas:     [],
       repartoSobrante:  0,
       repartoTocado:    false,
+      repartoIntentado: false,
       cargandoReparto:  false,
       preseleccion:     { proveedorId: null, recepcionId: null, pendiente: null },
       // Saldo a favor (columna expandible)
@@ -528,6 +530,10 @@ export default {
       return Math.round((montoUSD - this.totalAplicado) * 100) / 100
     },
   },
+  watch: {
+    'formPago.monto'() { this.debounceRefrescarPropuesta() },
+    'formPago.tasa_cambio'() { this.debounceRefrescarPropuesta() },
+  },
   async mounted() {
     await Promise.all([this.cargar(), this.cargarCuentas()])
     this.cargarLiquidez()
@@ -549,14 +555,23 @@ export default {
       this.repartoFilas   = []
       this.repartoSobrante = 0
       this.repartoTocado  = false
+      this.repartoIntentado = false
     },
     cerrarPago() {
+      clearTimeout(this._repartoTimer)
       this.proveedorPago  = null
       this.formPago       = { cuenta_id: '', monto: '', referencia: '', moneda: 'USD', tasa_cambio: '' }
       this.repartoFilas   = []
       this.repartoSobrante = 0
       this.repartoTocado  = false
+      this.repartoIntentado = false
       this.preseleccion   = { proveedorId: null, recepcionId: null, pendiente: null }
+    },
+    debounceRefrescarPropuesta() {
+      clearTimeout(this._repartoTimer)
+      const montoUSD = parseFloat(this.montoUSDEquivalente)
+      if (montoUSD && montoUSD > 0 && !this.repartoTocado) this.cargandoReparto = true
+      this._repartoTimer = setTimeout(() => this.refrescarPropuesta(), 400)
     },
     async abrirPagoDesdeQuery() {
       const q = this.$route.query
@@ -580,7 +595,10 @@ export default {
       if (!this.proveedorPago) return
       if (!forzar && this.repartoTocado) return
       const montoUSD = parseFloat(this.montoUSDEquivalente)
-      if (!montoUSD || montoUSD <= 0) { this.repartoFilas = []; this.repartoSobrante = 0; return }
+      if (!montoUSD || montoUSD <= 0) {
+        this.repartoFilas = []; this.repartoSobrante = 0; this.repartoIntentado = false
+        return
+      }
       this.cargandoReparto = true
       try {
         const res = await axios.get(
@@ -599,6 +617,7 @@ export default {
         this.repartoFilas = filas
         this.repartoSobrante = res.data.sobrante
         this.repartoTocado = false
+        this.repartoIntentado = true
       } catch (e) {
         console.error('Error calculando propuesta de reparto', e)
       } finally {
