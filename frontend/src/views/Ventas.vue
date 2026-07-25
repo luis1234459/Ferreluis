@@ -135,7 +135,7 @@
         </div>
 
         <!-- ── Grid 50/50 ── -->
-        <div v-if="clienteSeleccionado" class="venta-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;">
+        <div v-if="clienteSeleccionado" class="venta-grid" style="display:grid;grid-template-columns:70fr 30fr;gap:1rem;width:100%;">
 
           <!-- ── Columna izq: Catálogo ── -->
           <div class="catalogo" style="width:100%;min-width:0;">
@@ -167,21 +167,25 @@
                 <option :value="null">Todos los dept.</option>
                 <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
               </select>
-              <select v-model="filtroCategoria" class="filtro-sel" ref="selectCategoria" @change="cargarProductos()">
+              <select v-model="filtroCategoria" class="filtro-sel" ref="selectCategoria" @change="alCambiarCategoria">
                 <option :value="null">Todas las cat.</option>
                 <option v-for="c in categoriasDeFiltro" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+              </select>
+              <select v-model="filtroSubcategoria" class="filtro-sel" @change="cargarProductos()">
+                <option :value="null">Todas las subcat.</option>
+                <option v-for="s in subcategoriasDeFiltro" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
               <select v-model="filtroMarca" class="filtro-sel" @change="cargarProductos()">
                 <option :value="null">Todas las marcas</option>
                 <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
               </select>
-              <button v-if="filtroMarca || filtroDepartamento || filtroCategoria" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
+              <button v-if="filtroMarca || filtroDepartamento || filtroCategoria || filtroSubcategoria" class="btn-limpiar-filtros" @click="limpiarFiltros">✕ Limpiar</button>
               <button :class="['btn-empuje', filtroEmpuje ? 'btn-empuje-activo' : '']"
                 @click="filtroEmpuje = !filtroEmpuje; cargarProductos()">🔥 Empuje</button>
             </div>
 
             <!-- Acceso rápido -->
-            <div v-if="!busqueda && !filtroMarca && !filtroDepartamento && !filtroCategoria && !filtroEmpuje" class="acceso-rapido">
+            <div v-if="!busqueda && !filtroMarca && !filtroDepartamento && !filtroCategoria && !filtroSubcategoria && !filtroEmpuje" class="acceso-rapido">
               <div v-if="masVendidos.length" class="ar-grupo">
                 <span class="ar-titulo">Más vendidos</span>
                 <div class="ar-chips">
@@ -265,7 +269,7 @@
                   >📋</button>
                 </span>
               </div>
-              <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroProveedor || filtroMarca)" class="prod-sin-res">Sin resultados</div>
+              <div v-if="productosFiltrados.length === 0 && (busqueda.length >= 2 || filtroDepartamento || filtroCategoria || filtroSubcategoria || filtroProveedor || filtroMarca)" class="prod-sin-res">Sin resultados</div>
               <div v-else-if="productosFiltrados.length === 0" class="prod-sin-res">Escribe 2+ caracteres para buscar</div>
             </div>
           </div>
@@ -1165,9 +1169,11 @@ export default {
       filtrosAbiertos:    false,
       departamentos:      [],
       categorias:         [],
+      subcategorias:      [],
       marcas:             [],
       filtroDepartamento: null,
       filtroCategoria:    null,
+      filtroSubcategoria: null,
       filtroMarca:        null,
       filtroEmpuje:       false,
       masVendidos:        [],
@@ -1314,7 +1320,7 @@ export default {
     },
     productosFiltrados() {
       const q = this.busqueda.trim().toLowerCase()
-      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroProveedor || this.filtroMarca || this.filtroEmpuje
+      const tienesFiltro = this.filtroDepartamento || this.filtroCategoria || this.filtroSubcategoria || this.filtroProveedor || this.filtroMarca || this.filtroEmpuje
       if (q.length < 2 && !tienesFiltro) return []
       let lista = this.productos
       if (this.filtroEmpuje) {
@@ -1379,6 +1385,10 @@ export default {
     categoriasDeFiltro() {
       if (!this.filtroDepartamento) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
+    },
+    subcategoriasDeFiltro() {
+      if (!this.filtroCategoria) return this.subcategorias
+      return this.subcategorias.filter(s => s.categoria_id === this.filtroCategoria)
     },
     categoriasSugeridas() {
       if (this.busqueda.length < 2) return []
@@ -1516,6 +1526,7 @@ export default {
       this.cargarCuentasPorMetodo(),
       this.cargarDepartamentos(),
       this.cargarCategorias(),
+      this.cargarSubcategorias(),
       this.cargarMarcas(),
       this.cargarMasVendidos(),
     ])
@@ -1602,6 +1613,7 @@ export default {
       if (this.filtroMarca)        params.marca_id        = this.filtroMarca
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       if (this.filtroCategoria)    params.categoria_id   = this.filtroCategoria
+      if (this.filtroSubcategoria) params.subcategoria_id = this.filtroSubcategoria
       const r = await axios.get('/productos/', { params })
       this.productos = Array.isArray(r.data) ? r.data : (r.data.productos || [])
     },
@@ -2392,6 +2404,12 @@ export default {
         this.categorias = r.data
       } catch { this.categorias = [] }
     },
+    async cargarSubcategorias() {
+      try {
+        const r = await axios.get('/productos/subcategorias')
+        this.subcategorias = r.data
+      } catch { this.subcategorias = [] }
+    },
     async cargarMarcas() {
       try {
         const r = await axios.get('/marcas/')
@@ -2421,10 +2439,12 @@ export default {
       this.filtroEmpuje       = false
       this.filtroDepartamento = null
       this.filtroCategoria    = null
+      this.filtroSubcategoria = null
       this.cargarProductos()
     },
     alCambiarDepartamento() {
-      this.filtroCategoria = null
+      this.filtroCategoria    = null
+      this.filtroSubcategoria = null
       this.cargarProductos()
       if (this.filtroDepartamento) {
         this.filtrosAbiertos = true
@@ -2433,9 +2453,14 @@ export default {
         })
       }
     },
+    alCambiarCategoria() {
+      this.filtroSubcategoria = null
+      this.cargarProductos()
+    },
     irACategoria(cat) {
       this.filtroDepartamento = cat.departamento_id
       this.filtroCategoria    = cat.id
+      this.filtroSubcategoria = null
       this.busqueda           = ''
       this.filtrosAbiertos    = true
       this.cargarProductos()
@@ -2535,10 +2560,10 @@ export default {
 .aviso-sin-cliente { background: var(--fondo-tabla-alt); border: 1px dashed var(--borde); color: var(--texto-sec); border-radius: 8px; padding: 1.5rem; text-align: center; margin-bottom: 1rem; font-size: 0.95rem; }
 .aviso-sin-cliente strong { color: var(--texto-principal); }
 
-/* ── Grid 50/50 ── */
+/* ── Grid 70/30 (escritorio) ── */
 .venta-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 70fr 30fr;
   gap: 1rem;
   align-items: start;
 }

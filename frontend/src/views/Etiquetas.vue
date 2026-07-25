@@ -16,10 +16,17 @@
         </option>
       </select>
 
-      <select v-model="filtroCategoria" :disabled="!filtroDepto" @change="cargarProductos">
+      <select v-model="filtroCategoria" :disabled="!filtroDepto" @change="cargarSubcategorias">
         <option value="">Todas las categorías</option>
         <option v-for="c in categorias" :key="c.id" :value="c.id">
           {{ c.nombre }}
+        </option>
+      </select>
+
+      <select v-model="filtroSubcategoria" :disabled="!filtroCategoria" @change="cargarProductos">
+        <option value="">Todas las subcategorías</option>
+        <option v-for="s in subcategorias" :key="s.id" :value="s.id">
+          {{ s.nombre }}
         </option>
       </select>
 
@@ -234,10 +241,12 @@ export default {
       marcas:          [],
       departamentos:   [],
       categorias:      [],
+      subcategorias:   [],
       busqueda:        '',
-      filtroMarca:     '',
-      filtroDepto:     '',
-      filtroCategoria: '',
+      filtroMarca:        '',
+      filtroDepto:        '',
+      filtroCategoria:    '',
+      filtroSubcategoria: '',
       seleccionados:         [],
       modalGenerar:          false,
       tipoEtiqueta:          '',
@@ -289,7 +298,9 @@ export default {
       } catch {}
     },
     async cargarCategorias() {
-      this.filtroCategoria = ''
+      this.filtroCategoria    = ''
+      this.filtroSubcategoria = ''
+      this.subcategorias      = []
       if (!this.filtroDepto) {
         this.categorias = []
         this.cargarProductos()
@@ -300,6 +311,20 @@ export default {
           { params: { departamento_id: this.filtroDepto } })
         this.categorias = res.data
       } catch { this.categorias = [] }
+      this.cargarProductos()
+    },
+    async cargarSubcategorias() {
+      this.filtroSubcategoria = ''
+      if (!this.filtroCategoria) {
+        this.subcategorias = []
+        this.cargarProductos()
+        return
+      }
+      try {
+        const res = await axios.get('/productos/subcategorias',
+          { params: { categoria_id: this.filtroCategoria } })
+        this.subcategorias = res.data
+      } catch { this.subcategorias = [] }
       this.cargarProductos()
     },
     _headers() {
@@ -320,6 +345,7 @@ export default {
           params.filtro_tipo = 'departamento'
           params.filtro_id   = this.filtroDepto
           if (this.filtroCategoria) params.categoria_id = this.filtroCategoria
+          if (this.filtroSubcategoria) params.subcategoria_id = this.filtroSubcategoria
           if (this.filtroMarca) params.marca_id = this.filtroMarca
         } else if (this.filtroMarca) {
           params.filtro_tipo = 'marca'

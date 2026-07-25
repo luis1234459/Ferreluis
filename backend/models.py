@@ -50,6 +50,14 @@ class Categoria(Base):
     descuento_max_pct = Column(Float, nullable=True)  # límite de descuento en ventas (fracción, ej. 0.20 = 20%)
 
 
+class Subcategoria(Base):
+    __tablename__ = "subcategorias"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    nombre        = Column(String, nullable=False)
+    categoria_id  = Column(Integer, ForeignKey("categorias.id"), nullable=False)
+
+
 class Marca(Base):
     __tablename__ = "marcas"
 
@@ -73,6 +81,7 @@ class Producto(Base):
     # ── Nuevos campos ────────────────────────────────────────────────────────
     departamento_id         = Column(Integer, nullable=True)   # FK → Departamento
     categoria_id            = Column(Integer, nullable=True)   # FK → Categoria
+    subcategoria_id         = Column(Integer, nullable=True)   # FK → Subcategoria
     proveedor_id            = Column(Integer, nullable=True)   # FK → Proveedor
     es_producto_clave       = Column(Boolean, default=False)   # producto Pareto
     es_delicado             = Column(Boolean, default=False)   # producto delicado — prioridad alta en auditorías

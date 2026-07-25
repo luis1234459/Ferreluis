@@ -36,6 +36,9 @@
                   <button class="btn-edit-depto"
                     @click.stop="abrirModalDepto(d)"
                     title="Editar">✏️</button>
+                  <button class="btn-edit-depto"
+                    @click.stop="eliminarDepto(d)"
+                    title="Eliminar">🗑</button>
                 </div>
               </div>
 
@@ -43,12 +46,20 @@
                 <div v-if="d.categorias.length === 0" class="cat-vacia">Sin categorías</div>
                 <div v-else class="cats-columnas">
                   <div v-for="(col, ci) in columnasCategoria(d.categorias)" :key="ci" class="cats-col">
-                    <div v-for="c in col" :key="c.id" class="cat-item">
+                    <div v-for="c in col" :key="c.id" class="cat-item"
+                      :class="{ 'cat-item-activa': catExpandida === c.id }"
+                      @click="catExpandida = catExpandida === c.id ? null : c.id">
                       <span class="cat-bullet">›</span>
                       {{ c.nombre }}
+                      <span class="cat-sub-badge" v-if="c.subcategorias.length">
+                        {{ c.subcategorias.length }}
+                      </span>
                       <button v-if="esAdmin" class="btn-edit-cat"
-                        @click="abrirModalCat(d.id, c)"
+                        @click.stop="abrirModalCat(d.id, c)"
                         title="Editar">✏️</button>
+                      <button v-if="esAdmin" class="btn-edit-cat"
+                        @click.stop="eliminarCat(c)"
+                        title="Eliminar">🗑</button>
                     </div>
                   </div>
                 </div>
@@ -56,6 +67,32 @@
                   @click="abrirModalCat(d.id, null)">
                   + Categoría
                 </button>
+
+                <!-- Subcategorías de la categoría expandida -->
+                <div v-if="categoriaExpandidaEn(d)" class="subcats-panel">
+                  <div class="subcats-titulo">
+                    Subcategorías de «{{ categoriaExpandidaEn(d).nombre }}»
+                  </div>
+                  <div v-if="categoriaExpandidaEn(d).subcategorias.length === 0" class="cat-vacia">
+                    Sin subcategorías
+                  </div>
+                  <div v-else class="subcats-lista">
+                    <div v-for="s in categoriaExpandidaEn(d).subcategorias" :key="s.id" class="subcat-item">
+                      <span class="cat-bullet">›</span>
+                      {{ s.nombre }}
+                      <button v-if="esAdmin" class="btn-edit-cat"
+                        @click="abrirModalSubcat(categoriaExpandidaEn(d).id, s)"
+                        title="Editar">✏️</button>
+                      <button v-if="esAdmin" class="btn-edit-cat"
+                        @click="eliminarSubcat(s)"
+                        title="Eliminar">🗑</button>
+                    </div>
+                  </div>
+                  <button v-if="esAdmin" class="btn-nueva-cat"
+                    @click="abrirModalSubcat(categoriaExpandidaEn(d).id, null)">
+                    + Subcategoría
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -147,6 +184,27 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal subcategoría -->
+    <div v-if="modalSubcat" class="mapa-overlay"
+      @click.self="modalSubcat = false">
+      <div class="mapa-modal">
+        <h3>{{ formSubcat.id ? 'Editar' : 'Nueva' }} subcategoría</h3>
+        <input v-model="formSubcat.nombre"
+          placeholder="Nombre de la subcategoría"
+          class="mapa-input" ref="inputSubcat"
+        />
+        <div class="mapa-modal-botones">
+          <button class="btn-cancelar"
+            @click="modalSubcat = false">Cancelar</button>
+          <button class="btn-guardar"
+            @click="guardarSubcat"
+            :disabled="guardandoSubcat || !formSubcat.nombre.trim()">
+            {{ guardandoSubcat ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -174,6 +232,10 @@ export default {
       modalMarca:     false,
       formMarca:      { id: null, nombre: '' },
       guardandoMarca: false,
+      catExpandida:   null,
+      modalSubcat:    false,
+      formSubcat:     { id: null, nombre: '', categoria_id: null },
+      guardandoSubcat: false,
     }
   },
   computed: {
@@ -212,6 +274,64 @@ export default {
         : { id: null, nombre: '', departamento_id: deptoId }
       this.modalCat = true
       this.$nextTick(() => this.$refs.inputCat?.focus())
+    },
+    categoriaExpandidaEn(d) {
+      if (!this.catExpandida) return null
+      return d.categorias.find(c => c.id === this.catExpandida) || null
+    },
+    abrirModalSubcat(categoriaId, s) {
+      this.formSubcat = s
+        ? { id: s.id, nombre: s.nombre, categoria_id: categoriaId }
+        : { id: null, nombre: '', categoria_id: categoriaId }
+      this.modalSubcat = true
+      this.$nextTick(() => this.$refs.inputSubcat?.focus())
+    },
+    async guardarSubcat() {
+      this.guardandoSubcat = true
+      try {
+        if (this.formSubcat.id) {
+          await axios.put(
+            `/productos/subcategorias/${this.formSubcat.id}`,
+            { nombre: this.formSubcat.nombre, categoria_id: this.formSubcat.categoria_id }
+          )
+        } else {
+          await axios.post('/productos/subcategorias',
+            { nombre: this.formSubcat.nombre, categoria_id: this.formSubcat.categoria_id }
+          )
+        }
+        this.modalSubcat = false
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al guardar')
+      } finally { this.guardandoSubcat = false }
+    },
+    async eliminarDepto(d) {
+      if (!confirm(`¿Eliminar el departamento "${d.nombre}"?`)) return
+      try {
+        await axios.delete(`/productos/departamentos/${d.id}`)
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al eliminar')
+      }
+    },
+    async eliminarCat(c) {
+      if (!confirm(`¿Eliminar la categoría "${c.nombre}"?`)) return
+      try {
+        await axios.delete(`/productos/categorias/${c.id}`)
+        if (this.catExpandida === c.id) this.catExpandida = null
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al eliminar')
+      }
+    },
+    async eliminarSubcat(s) {
+      if (!confirm(`¿Eliminar la subcategoría "${s.nombre}"?`)) return
+      try {
+        await axios.delete(`/productos/subcategorias/${s.id}`)
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al eliminar')
+      }
     },
     async guardarDepto() {
       this.guardandoDepto = true
@@ -323,10 +443,16 @@ export default {
 .depto-cats { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
 .cats-columnas { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .cats-col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 160px; }
-.cat-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--texto-principal); padding: 0.2rem 0; border-bottom: 1px solid #F0F0EC; }
+.cat-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--texto-principal); padding: 0.2rem 0; border-bottom: 1px solid #F0F0EC; cursor: pointer; }
 .cat-item:last-child { border-bottom: none; }
+.cat-item-activa { color: #996600; font-weight: 700; }
 .cat-bullet { color: #FFCC00; font-weight: 900; font-size: 1rem; line-height: 1; }
+.cat-sub-badge { font-size: 0.68rem; font-weight: 700; background: #F1F5F9; color: #475569; padding: 0.05rem 0.4rem; border-radius: 8px; }
 .cat-vacia { font-size: 0.78rem; color: var(--texto-muted); font-style: italic; }
+.subcats-panel { margin-top: 0.75rem; padding: 0.75rem 0.85rem; background: #FFFDF0; border: 1px dashed #FFCC00; border-radius: 8px; }
+.subcats-titulo { font-size: 0.78rem; font-weight: 700; color: #996600; margin-bottom: 0.5rem; }
+.subcats-lista { display: flex; flex-direction: column; gap: 0.15rem; }
+.subcat-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--texto-principal); padding: 0.15rem 0; }
 .mapa-resumen { display: flex; gap: 0.5rem; font-size: 0.78rem; color: var(--texto-muted); justify-content: center; }
 .mapa-cargando { text-align: center; padding: 3rem; color: var(--texto-muted); }
 .btn-nuevo-depto { background: #1A1A1A; color: #FFCC00; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 0.75rem; }

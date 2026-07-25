@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from database import get_db
-from models import Producto, TasaCambio, Departamento, Categoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor, Marca, ExistenciaSede
+from models import Producto, TasaCambio, Departamento, Categoria, Subcategoria, VarianteProducto, ComponenteProducto, Oferta, PlantillaGarantia, CatalogoProveedor, Proveedor, Marca, ExistenciaSede
 from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
@@ -32,6 +32,7 @@ class ProductoSchema(BaseModel):
     margen:      float          = 0.30
 
     categoria_id:            Optional[int]   = None
+    subcategoria_id:         Optional[int]   = None
     departamento_id:         Optional[int]   = None
     proveedor_id:            Optional[int]   = None
     es_producto_clave:       bool            = False
@@ -67,6 +68,14 @@ class CategoriaSchema(BaseModel):
     nombre:           str
     departamento_id:  int
     descuento_max_pct: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SubcategoriaSchema(BaseModel):
+    nombre:       str
+    categoria_id: int
 
     class Config:
         from_attributes = True
@@ -242,6 +251,36 @@ def generar_codigo(nombre: str, db: Session) -> str:
 # ============================================================================
 
 # ============================================================================
+# Helpers: conteo de productos asignados (directo + via jerarquia hija) para
+# bloquear eliminacion de Departamento/Categoria/Subcategoria.
+# ============================================================================
+
+def _contar_productos_departamento(db: Session, departamento_id: int) -> int:
+    categoria_ids = [c.id for c in db.query(Categoria.id).filter(Categoria.departamento_id == departamento_id).all()]
+    subcategoria_ids = []
+    if categoria_ids:
+        subcategoria_ids = [s.id for s in db.query(Subcategoria.id).filter(Subcategoria.categoria_id.in_(categoria_ids)).all()]
+    filtros = [Producto.departamento_id == departamento_id]
+    if categoria_ids:
+        filtros.append(Producto.categoria_id.in_(categoria_ids))
+    if subcategoria_ids:
+        filtros.append(Producto.subcategoria_id.in_(subcategoria_ids))
+    return db.query(Producto).filter(or_(*filtros)).count()
+
+
+def _contar_productos_categoria(db: Session, categoria_id: int) -> int:
+    subcategoria_ids = [s.id for s in db.query(Subcategoria.id).filter(Subcategoria.categoria_id == categoria_id).all()]
+    filtros = [Producto.categoria_id == categoria_id]
+    if subcategoria_ids:
+        filtros.append(Producto.subcategoria_id.in_(subcategoria_ids))
+    return db.query(Producto).filter(or_(*filtros)).count()
+
+
+def _contar_productos_subcategoria(db: Session, subcategoria_id: int) -> int:
+    return db.query(Producto).filter(Producto.subcategoria_id == subcategoria_id).count()
+
+
+# ============================================================================
 # Endpoints: Departamentos  (registrados antes que /{producto_id})
 # ============================================================================
 
@@ -256,10 +295,18 @@ def departamentos_con_categorias(db: Session = Depends(get_db)):
     result = []
     for d in deptos:
         cats = db.query(Categoria).filter(Categoria.departamento_id == d.id).order_by(Categoria.nombre).all()
+        cats_out = []
+        for c in cats:
+            subcats = db.query(Subcategoria).filter(Subcategoria.categoria_id == c.id).order_by(Subcategoria.nombre).all()
+            cats_out.append({
+                "id":            c.id,
+                "nombre":        c.nombre,
+                "subcategorias": [{"id": s.id, "nombre": s.nombre} for s in subcats],
+            })
         result.append({
             "id":         d.id,
             "nombre":     d.nombre,
-            "categorias": [{"id": c.id, "nombre": c.nombre} for c in cats],
+            "categorias": cats_out,
         })
     return result
 
@@ -303,13 +350,11 @@ def eliminar_departamento(
     dep = db.query(Departamento).filter(Departamento.id == departamento_id).first()
     if not dep:
         raise HTTPException(status_code=404, detail="Departamento no encontrado")
-    tiene_productos = db.query(Producto).filter(
-        Producto.departamento_id == departamento_id
-    ).first()
-    if tiene_productos:
+    n = _contar_productos_departamento(db, departamento_id)
+    if n > 0:
         raise HTTPException(
             status_code=400,
-            detail="No se puede eliminar: hay productos asignados a este departamento"
+            detail=f"No se puede eliminar: tiene {n} productos asignados, reasignalos primero."
         )
     db.delete(dep)
     db.commit()
@@ -378,17 +423,88 @@ def eliminar_categoria(
     cat = db.query(Categoria).filter(Categoria.id == categoria_id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    tiene_productos = db.query(Producto).filter(
-        Producto.categoria_id == categoria_id
-    ).first()
-    if tiene_productos:
+    n = _contar_productos_categoria(db, categoria_id)
+    if n > 0:
         raise HTTPException(
             status_code=400,
-            detail="No se puede eliminar: hay productos asignados a esta categoría"
+            detail=f"No se puede eliminar: tiene {n} productos asignados, reasignalos primero."
         )
     db.delete(cat)
     db.commit()
     return {"mensaje": "Categoría eliminada"}
+
+
+# ============================================================================
+# Endpoints: Subcategorías  (registrados antes que /{producto_id})
+# ============================================================================
+
+@router.get("/subcategorias")
+def listar_subcategorias(
+    categoria_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    q = db.query(Subcategoria)
+    if categoria_id:
+        q = q.filter(Subcategoria.categoria_id == categoria_id)
+    subs = q.order_by(Subcategoria.nombre).all()
+    return [
+        {
+            "id":           s.id,
+            "nombre":       s.nombre,
+            "categoria_id": s.categoria_id,
+        }
+        for s in subs
+    ]
+
+
+@router.post("/subcategorias")
+def crear_subcategoria(
+    datos: SubcategoriaSchema,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_o_gestionador),
+):
+    nueva = Subcategoria(**datos.dict())
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
+
+
+@router.put("/subcategorias/{subcategoria_id}")
+def actualizar_subcategoria(
+    subcategoria_id: int,
+    datos: SubcategoriaSchema,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_o_gestionador),
+):
+    sub = db.query(Subcategoria).filter(Subcategoria.id == subcategoria_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
+    for key, value in datos.dict(exclude_unset=True).items():
+        setattr(sub, key, value)
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+@router.delete("/subcategorias/{subcategoria_id}")
+def eliminar_subcategoria(
+    subcategoria_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    sub = db.query(Subcategoria).filter(Subcategoria.id == subcategoria_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
+    n = _contar_productos_subcategoria(db, subcategoria_id)
+    if n > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: tiene {n} productos asignados, reasignalos primero."
+        )
+    db.delete(sub)
+    db.commit()
+    return {"mensaje": "Subcategoría eliminada"}
 
 
 # ============================================================================
@@ -588,6 +704,7 @@ def listar_productos(
     busqueda: str = "",
     departamento_id: Optional[int] = None,
     categoria_id: Optional[int] = None,
+    subcategoria_id: Optional[int] = None,
     proveedor_id: Optional[int] = None,
     marca_id: Optional[int] = None,
     stock_cero: bool = False,
@@ -624,6 +741,8 @@ def listar_productos(
         q = q.filter(Producto.departamento_id == departamento_id)
     if categoria_id is not None:
         q = q.filter(Producto.categoria_id == categoria_id)
+    if subcategoria_id is not None:
+        q = q.filter(Producto.subcategoria_id == subcategoria_id)
     if proveedor_id is not None:
         q = q.filter(Producto.proveedor_id == proveedor_id)
     if marca_id is not None:

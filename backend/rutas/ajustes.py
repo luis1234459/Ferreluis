@@ -10,7 +10,7 @@ import io
 from database import get_db
 from models import (
     Producto, VarianteProducto, VendedorPerfil, Usuario, HistorialAjuste,
-    Departamento, Categoria, Proveedor, TasaCambio, Marca, ConteoPrioritario, Oferta,
+    Departamento, Categoria, Subcategoria, Proveedor, TasaCambio, Marca, ConteoPrioritario, Oferta,
 )
 from rutas.productos import _precios_computados
 from rutas.usuarios import require_admin, require_admin_o_gestionador
@@ -140,14 +140,17 @@ def _guardar_historial(db, usuario, tipo, descripcion, cambios):
 
 @router.get("/productos")
 def listar_productos_ajuste(
-    filtro_tipo:  str           = "todos",
-    filtro_id:    Optional[int] = None,
-    categoria_id: Optional[int] = None,
-    marca_id:     Optional[int] = None,
+    filtro_tipo:     str           = "todos",
+    filtro_id:       Optional[int] = None,
+    categoria_id:    Optional[int] = None,
+    subcategoria_id: Optional[int] = None,
+    marca_id:        Optional[int] = None,
     db: Session   = Depends(get_db),
     _: None       = Depends(require_admin_o_gestionador),
 ):
     productos     = _filtrar_productos(db, filtro_tipo, filtro_id, categoria_id)
+    if subcategoria_id and filtro_tipo != "marca":
+        productos = [p for p in productos if p.subcategoria_id == subcategoria_id]
     if marca_id and filtro_tipo != "marca":
         productos = [p for p in productos if p.marca_id == marca_id]
     bcv, binance  = _tasas(db)
@@ -374,6 +377,7 @@ class MoverProductosLote(BaseModel):
     producto_ids:    List[int]
     departamento_id: Optional[int] = None
     categoria_id:    Optional[int] = None
+    subcategoria_id: Optional[int] = None
     proveedor_id:    Optional[int] = None
     marca_id:        Optional[int] = None
 
@@ -389,6 +393,8 @@ def mover_departamento_lote(
     deptos_map = {d.id: d for d in db.query(Departamento).all()}
     if datos.departamento_id and datos.departamento_id not in deptos_map:
         raise HTTPException(404, "Departamento no encontrado")
+    if datos.subcategoria_id and not db.query(Subcategoria).filter(Subcategoria.id == datos.subcategoria_id).first():
+        raise HTTPException(404, "Subcategoría no encontrada")
 
     cambios = []
     for pid in datos.producto_ids:
@@ -399,6 +405,8 @@ def mover_departamento_lote(
         if datos.departamento_id is not None:
             p.departamento_id = datos.departamento_id
             p.categoria_id    = datos.categoria_id
+        if datos.subcategoria_id is not None:
+            p.subcategoria_id = datos.subcategoria_id
         if datos.proveedor_id is not None:
             p.proveedor_id = datos.proveedor_id
         if datos.marca_id is not None:

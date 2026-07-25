@@ -84,13 +84,17 @@
           <!-- Filtros -->
           <div class="filtros">
             <input v-model="busqueda" placeholder="Buscar producto..." class="buscador" />
-            <select v-model="filtroDepartamento" @change="filtroCategoria = ''">
+            <select v-model="filtroDepartamento" @change="filtroCategoria = ''; filtroSubcategoria = ''">
               <option value="">Todos los departamentos</option>
               <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
             </select>
-            <select v-model="filtroCategoria">
+            <select v-model="filtroCategoria" @change="filtroSubcategoria = ''">
               <option value="">Todas las categorías</option>
               <option v-for="c in categoriasFiltradas" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+            <select v-model="filtroSubcategoria">
+              <option value="">Todas las subcategorías</option>
+              <option v-for="s in subcategoriasFiltradas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
             </select>
             <select v-model="filtroMarca">
               <option value="">Todas las marcas</option>
@@ -145,6 +149,7 @@
                   <th>Bs</th>
                   <th>Depto.</th>
                   <th>Categoría</th>
+                  <th>Subcat.</th>
                   <th>Proveedor</th>
                   <th>Costo</th>
                   <th>Margen</th>
@@ -250,6 +255,11 @@
                     <template v-else>
                       <span class="txt-muted">{{ nombreCategoria(p.categoria_id) }}</span>
                     </template>
+                  </td>
+
+                  <!-- Subcategoría — solo vista, se asigna por lote desde Ajustes -->
+                  <td>
+                    <span class="txt-muted">{{ nombreSubcategoria(p.subcategoria_id) }}</span>
                   </td>
 
                   <!-- Proveedor -->
@@ -1327,6 +1337,7 @@ export default {
       busqueda:           '',
       filtroDepartamento: '',
       filtroCategoria:    '',
+      filtroSubcategoria: '',
       filtroMarca:        '',
       filtroTipo:         '',
 
@@ -1336,6 +1347,7 @@ export default {
 
       // Categorías
       categorias:       [],
+      subcategorias:    [],
       editandoCatId:    null,
       formCat:          { nombre: '', departamento_id: null },
       nuevaCatNombre:   '',
@@ -1480,6 +1492,10 @@ export default {
       if (!this.filtroDepartamento) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.filtroDepartamento)
     },
+    subcategoriasFiltradas() {
+      if (!this.filtroCategoria) return this.subcategorias
+      return this.subcategorias.filter(s => s.categoria_id === this.filtroCategoria)
+    },
     categoriasDelForm() {
       if (!this.form.departamento_id) return this.categorias
       return this.categorias.filter(c => c.departamento_id === this.form.departamento_id)
@@ -1539,6 +1555,7 @@ export default {
     },
     filtroDepartamento() { this.paginaActual = 1; this.cargarProductos() },
     filtroCategoria()    { this.paginaActual = 1; this.cargarProductos() },
+    filtroSubcategoria() { this.paginaActual = 1; this.cargarProductos() },
     filtroMarca()        { this.paginaActual = 1; this.cargarProductos() },
     filtroTipo()         { this.paginaActual = 1; this.cargarProductos() },
   },
@@ -1551,6 +1568,7 @@ export default {
       this.cargarProveedores(),
       this.cargarMarcas(),
       this.cargarCategorias(),
+      this.cargarSubcategorias(),
       this.cargarPlantillasGarantia(),
     ])
     if (this.esAdmin) this.activarModoEdicion()
@@ -1596,6 +1614,7 @@ export default {
       if (this.filtroMarca)        params.marca_id        = this.filtroMarca
       if (this.filtroDepartamento) params.departamento_id = this.filtroDepartamento
       if (this.filtroCategoria)    params.categoria_id    = this.filtroCategoria
+      if (this.filtroSubcategoria) params.subcategoria_id = this.filtroSubcategoria
       const res = await axios.get('/productos/', { params })
       // resetearBorrador (Fase 1K, cambio de sede) se aplica en el MISMO tick
       // que la reasignacion de productos, nunca antes del await — si se vacia
@@ -1618,6 +1637,12 @@ export default {
     async cargarCategorias() {
       const res = await axios.get('/productos/categorias')
       this.categorias = res.data
+    },
+    async cargarSubcategorias() {
+      try {
+        const res = await axios.get('/productos/subcategorias')
+        this.subcategorias = res.data
+      } catch { this.subcategorias = [] }
     },
     formatNombre(nombre) {
       if (!nombre) return ''
@@ -1655,6 +1680,11 @@ export default {
       if (!id) return '—'
       const c = this.categorias.find(x => x.id === id)
       return c ? c.nombre : '—'
+    },
+    nombreSubcategoria(id) {
+      if (!id) return '—'
+      const s = this.subcategorias.find(x => x.id === id)
+      return s ? s.nombre : '—'
     },
     actualizarMargen() {
       this.form.margen = Number(this.form.margen_pct || 0) / 100

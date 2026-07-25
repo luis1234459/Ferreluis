@@ -537,10 +537,17 @@
                 </option>
               </select>
               <select v-if="gestionCategoriasDestino.length > 0"
-                v-model="gestionCatDestino">
+                v-model="gestionCatDestino"
+                @change="cargarSubcategoriasDestino">
                 <option value="">— Categoría (opcional) —</option>
                 <option v-for="c in gestionCategoriasDestino"
                   :key="c.id" :value="c.id">{{ c.nombre }}</option>
+              </select>
+              <select v-if="gestionSubcategoriasDestino.length > 0"
+                v-model="gestionSubcatDestino">
+                <option value="">— Subcategoría (opcional) —</option>
+                <option v-for="s in gestionSubcategoriasDestino"
+                  :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
               <select v-model="marcaDestino">
                 <option value="">— Marca (sin cambio) —</option>
@@ -1191,6 +1198,8 @@ export default {
       gestionDeptDestino:       '',
       gestionCatDestino:        '',
       gestionCategoriasDestino: [],
+      gestionSubcatDestino:        '',
+      gestionSubcategoriasDestino: [],
       gestionMoviendo:          false,
       msgGestion:               '',
       marcaDestino:             '',
@@ -1879,6 +1888,8 @@ export default {
     },
 
     async cargarCategoriasDestino() {
+      this.gestionSubcategoriasDestino = []
+      this.gestionSubcatDestino = ''
       if (!this.gestionDeptDestino) {
         this.gestionCategoriasDestino = []
         this.gestionCatDestino = ''
@@ -1894,13 +1905,28 @@ export default {
       }
     },
 
+    async cargarSubcategoriasDestino() {
+      this.gestionSubcatDestino = ''
+      if (!this.gestionCatDestino) {
+        this.gestionSubcategoriasDestino = []
+        return
+      }
+      try {
+        const res = await axios.get('/productos/subcategorias',
+          { params: { categoria_id: this.gestionCatDestino } })
+        this.gestionSubcategoriasDestino = res.data
+      } catch {
+        this.gestionSubcategoriasDestino = []
+      }
+    },
+
     async moverDepartamento() {
       if (!this.gestionSeleccion.length) {
         this.msgGestion = 'Selecciona al menos un producto'
         return
       }
-      if (!this.gestionDeptDestino && !this.marcaDestino) {
-        this.msgGestion = 'Selecciona al menos un cambio (departamento o marca)'
+      if (!this.gestionDeptDestino && !this.marcaDestino && !this.gestionSubcatDestino) {
+        this.msgGestion = 'Selecciona al menos un cambio (departamento, marca o subcategoría)'
         return
       }
       this.gestionMoviendo = true
@@ -1910,6 +1936,7 @@ export default {
           producto_ids:    this.gestionSeleccion,
           departamento_id: this.gestionDeptDestino ? parseInt(this.gestionDeptDestino) : null,
           categoria_id:    this.gestionCatDestino ? parseInt(this.gestionCatDestino) : null,
+          subcategoria_id: this.gestionSubcatDestino ? parseInt(this.gestionSubcatDestino) : null,
           marca_id:        this.marcaDestino ? parseInt(this.marcaDestino) : null,
         }
         const res = await axios.post('/ajustes/productos/mover-departamento', payload,
@@ -1919,6 +1946,8 @@ export default {
         this.gestionSeleccion = []
         this.gestionDeptDestino = ''
         this.gestionCatDestino = ''
+        this.gestionSubcatDestino = ''
+        this.gestionSubcategoriasDestino = []
         this.marcaDestino = ''
         await this.cargarProductosGestion()
       } catch (e) {
