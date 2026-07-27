@@ -1054,6 +1054,21 @@
                 <label>Cantidad límite <small>(vacío = ilimitada)</small></label>
                 <input v-model="formOferta.cantidad_limite_str" type="number" min="1" step="1" placeholder="Ilimitada" />
               </div>
+              <div class="field field-wide">
+                <label>URL de imagen (foto) <small>(para cartelería digital)</small></label>
+                <input
+                  v-model="formOferta.foto_url"
+                  type="url"
+                  placeholder="https://ejemplo.com/imagen.jpg"
+                />
+                <img
+                  v-if="formOferta.foto_url"
+                  :src="formOferta.foto_url"
+                  style="max-height:80px; margin-top:0.5rem; border-radius:6px; border:1px solid var(--borde)"
+                  @error="formOferta.foto_url = ''"
+                />
+                <small style="color:var(--texto-muted)">Sin foto, esta oferta no aparece en las pantallas</small>
+              </div>
             </div>
 
             <label class="check-opt" style="margin: 0.5rem 0">
@@ -2300,7 +2315,7 @@ export default {
       this.formOferta = {
         producto_id: '', tipo_precio: 'porcentaje',
         valor: 0, fecha_inicio: hoy, fecha_fin: '',
-        cantidad_limite_str: '', activo: true,
+        cantidad_limite_str: '', activo: true, foto_url: '',
       }
       this.mostrarFormOferta = true
     },
@@ -2316,6 +2331,7 @@ export default {
         fecha_fin:           o.fecha_fin    || '',
         cantidad_limite_str: o.cantidad_limite != null ? String(o.cantidad_limite) : '',
         activo:              o.activo,
+        foto_url:            o.foto_url || '',
       }
       this.mostrarFormOferta = true
     },
@@ -2339,6 +2355,7 @@ export default {
                              ? Number(this.formOferta.cantidad_limite_str)
                              : null,
           activo: this.formOferta.activo,
+          foto_url: this.formOferta.foto_url || null,
         }
         if (this.editandoOfertaId) {
           await axios.put(`/productos/ofertas/${this.editandoOfertaId}`, payload)

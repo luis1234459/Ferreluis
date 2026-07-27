@@ -4,7 +4,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias, admin, notificaciones, export, reposicion, sedes, auth, transferencias
+from rutas import productos, ventas, usuarios, facturas, tasa, cierres, depositos, reportes, compras, bancos, clientes, vendedores, ajustes, dashboard, presupuestos, devoluciones, ubicaciones, claves, garantias, admin, notificaciones, export, reposicion, sedes, auth, transferencias, pantallas
 from database import engine, SessionLocal
 from database import Base
 from config import ENVIRONMENT
@@ -64,6 +64,7 @@ app.include_router(reposicion.router)
 app.include_router(sedes.router)
 app.include_router(auth.router)
 app.include_router(transferencias.router)
+app.include_router(pantallas.router)
 
 from rutas import marcas as _marcas_mod
 app.include_router(_marcas_mod.router, prefix="/marcas")
@@ -810,6 +811,83 @@ def inicializar_datos():
                 producto_id INTEGER NOT NULL REFERENCES productos(id),
                 cantidad INTEGER NOT NULL CHECK (cantidad > 0)
             )"""],
+        )
+
+        # ── ofertas: foto_url para cartelería digital ────────────────────────
+        migrar(
+            ["ALTER TABLE ofertas ADD COLUMN foto_url TEXT"],
+            ["ALTER TABLE ofertas ADD COLUMN IF NOT EXISTS foto_url TEXT"],
+        )
+
+        # ── Cartelería digital: pantallas, departamentos asignados y slides
+        # de marca. 3 pantallas se siembran de una vez (las TVs de Valera);
+        # crear más pantallas se hace luego desde /configuracion/cartelera.
+        migrar(
+            ["""CREATE TABLE IF NOT EXISTS pantallas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                activa BOOLEAN DEFAULT 1,
+                segundos_producto INTEGER DEFAULT 8,
+                segundos_oferta INTEGER DEFAULT 8,
+                segundos_marca INTEGER DEFAULT 6,
+                ratio_producto INTEGER DEFAULT 3,
+                ratio_oferta INTEGER DEFAULT 1,
+                ratio_marca INTEGER DEFAULT 1
+            )""",
+             """CREATE TABLE IF NOT EXISTS pantalla_departamentos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pantalla_id INTEGER NOT NULL REFERENCES pantallas(id) ON DELETE CASCADE,
+                departamento_id INTEGER NOT NULL REFERENCES departamentos(id) ON DELETE CASCADE
+            )""",
+             """CREATE TABLE IF NOT EXISTS slides_marca (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                foto_url TEXT NOT NULL,
+                titulo TEXT,
+                orden INTEGER DEFAULT 0,
+                activo BOOLEAN DEFAULT 1
+            )""",
+             """INSERT OR IGNORE INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (1, 'Valera - TV 1', 1, 8, 8, 6, 3, 1, 1)""",
+             """INSERT OR IGNORE INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (2, 'Valera - TV 2', 1, 8, 8, 6, 3, 1, 1)""",
+             """INSERT OR IGNORE INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (3, 'Valera - TV 3', 1, 8, 8, 6, 3, 1, 1)"""],
+            ["""CREATE TABLE IF NOT EXISTS pantallas (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                activa BOOLEAN DEFAULT TRUE,
+                segundos_producto INTEGER DEFAULT 8,
+                segundos_oferta INTEGER DEFAULT 8,
+                segundos_marca INTEGER DEFAULT 6,
+                ratio_producto INTEGER DEFAULT 3,
+                ratio_oferta INTEGER DEFAULT 1,
+                ratio_marca INTEGER DEFAULT 1
+            )""",
+             """CREATE TABLE IF NOT EXISTS pantalla_departamentos (
+                id SERIAL PRIMARY KEY,
+                pantalla_id INTEGER NOT NULL REFERENCES pantallas(id) ON DELETE CASCADE,
+                departamento_id INTEGER NOT NULL REFERENCES departamentos(id) ON DELETE CASCADE
+            )""",
+             """CREATE TABLE IF NOT EXISTS slides_marca (
+                id SERIAL PRIMARY KEY,
+                foto_url TEXT NOT NULL,
+                titulo TEXT,
+                orden INTEGER DEFAULT 0,
+                activo BOOLEAN DEFAULT TRUE
+            )""",
+             """INSERT INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (1, 'Valera - TV 1', TRUE, 8, 8, 6, 3, 1, 1) ON CONFLICT (id) DO NOTHING""",
+             """INSERT INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (2, 'Valera - TV 2', TRUE, 8, 8, 6, 3, 1, 1) ON CONFLICT (id) DO NOTHING""",
+             """INSERT INTO pantallas
+                (id, nombre, activa, segundos_producto, segundos_oferta, segundos_marca, ratio_producto, ratio_oferta, ratio_marca)
+                VALUES (3, 'Valera - TV 3', TRUE, 8, 8, 6, 3, 1, 1) ON CONFLICT (id) DO NOTHING""",
+             "SELECT setval(pg_get_serial_sequence('pantallas','id'), (SELECT MAX(id) FROM pantallas))"],
         )
 
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────

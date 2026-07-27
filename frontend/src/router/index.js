@@ -29,11 +29,16 @@ import Garantias          from '../views/Configuracion/Garantias.vue'
 import Mantenimiento      from '../views/Configuracion/Mantenimiento.vue'
 import Avisos       from '../views/Avisos.vue'
 import RadarDemanda from '../views/RadarDemanda.vue'
+import Cartelera    from '../views/Configuracion/Cartelera.vue'
+import PantallaReproductor from '../views/PantallaReproductor.vue'
 
 const routes = [
   { path: '/',          redirect: '/login' },
   { path: '/login',     name: 'Login',     component: Login },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard },
+
+  // Reproductor de cartelería digital (kiosco, sin login) — un TV por :id
+  { path: '/pantalla/:id', name: 'PantallaReproductor', component: PantallaReproductor, meta: { publica: true } },
 
   // Rutas con permiso de módulo (accesibles a no-admin según permisos)
   { path: '/ventas',    name: 'Ventas',    component: Ventas,    meta: { permiso: 'ventas' } },
@@ -82,6 +87,7 @@ const routes = [
   { path: '/configuracion/claves',     name: 'Claves',     component: Claves,     meta: { soloAdmin: true } },
   { path: '/configuracion/garantias',      name: 'Garantias',      component: Garantias,      meta: { soloAdmin: true } },
   { path: '/configuracion/mantenimiento', name: 'Mantenimiento', component: Mantenimiento, meta: { soloAdmin: true } },
+  { path: '/configuracion/cartelera',     name: 'Cartelera',     component: Cartelera,     meta: { soloAdmin: true } },
   { path: '/avisos',        name: 'Avisos',       component: Avisos,       meta: { requiresAuth: true } },
   { path: '/chuito',      name: 'Chuito',     component: () => import('../views/Chuito.vue'),     meta: { requiresAuth: true } },
   { path: '/mapa',        name: 'MapaDepartamentos', component: () => import('../views/MapaDepartamentos.vue'), meta: { requiresAuth: true } },
@@ -104,6 +110,8 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  if (to.meta.publica) return next()
+
   const raw = localStorage.getItem('usuario')
   if (to.path !== '/login' && !raw) return next('/login')
   if (!raw) return next()

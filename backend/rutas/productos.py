@@ -111,6 +111,7 @@ class OfertaSchema(BaseModel):
     fecha_fin:       Optional[date] = None
     cantidad_limite: Optional[int]  = None
     activo:          bool           = True
+    foto_url:        Optional[str]  = None
 
     class Config:
         from_attributes = True

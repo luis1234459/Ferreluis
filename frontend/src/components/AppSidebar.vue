@@ -299,6 +299,7 @@ const GRUPOS = [
       { ruta: '/configuracion/claves',          label: 'Claves Auth',    soloAdmin: true },
       { ruta: '/configuracion/garantias',       label: 'Garantías',      soloAdmin: true },
       { ruta: '/configuracion/mantenimiento',   label: 'Mantenimiento',  soloAdmin: true },
+      { ruta: '/configuracion/cartelera',       label: '📺 Cartelería',  soloAdmin: true },
     ],
   },
 ]

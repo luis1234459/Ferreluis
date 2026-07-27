@@ -158,6 +158,42 @@ class Oferta(Base):
     cantidad_limite  = Column(Integer, nullable=True)              # None = ilimitada por fechas
     cantidad_usada   = Column(Integer, default=0)
     activo           = Column(Boolean, default=True)
+    foto_url         = Column(String,  nullable=True)              # foto para cartelería digital
+
+
+class Pantalla(Base):
+    """Una TV de cartelería digital. Cada una tiene su propia URL /pantalla/{id}."""
+    __tablename__ = "pantallas"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    nombre            = Column(String, nullable=False)
+    activa            = Column(Boolean, default=True)
+    segundos_producto = Column(Integer, default=8)
+    segundos_oferta   = Column(Integer, default=8)
+    segundos_marca    = Column(Integer, default=6)
+    ratio_producto    = Column(Integer, default=3)   # peso relativo en la mezcla del loop
+    ratio_oferta      = Column(Integer, default=1)
+    ratio_marca       = Column(Integer, default=1)
+
+
+class PantallaDepartamento(Base):
+    """Departamentos asignados a una pantalla (una pantalla puede tener varios)."""
+    __tablename__ = "pantalla_departamentos"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    pantalla_id     = Column(Integer, ForeignKey("pantallas.id"), nullable=False)
+    departamento_id = Column(Integer, ForeignKey("departamentos.id"), nullable=False)
+
+
+class SlideMarca(Base):
+    """Slides de marca/institucionales, sin producto asociado."""
+    __tablename__ = "slides_marca"
+
+    id       = Column(Integer, primary_key=True, index=True)
+    foto_url = Column(String, nullable=False)
+    titulo   = Column(String, nullable=True)
+    orden    = Column(Integer, default=0)
+    activo   = Column(Boolean, default=True)
 
 
 class TasaCambio(Base):
