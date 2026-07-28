@@ -253,7 +253,7 @@
                     <div class="field-group" v-if="nuevoProdDepto">
                       <label class="field-label">Categoría</label>
                       <div v-if="!nuevoProdCrearCat" style="display:flex;gap:6px">
-                        <select v-model="nuevoProdCategoria" class="input-field" style="flex:1">
+                        <select v-model="nuevoProdCategoria" class="input-field" style="flex:1" @change="nuevoProdSubcategoria = null">
                           <option :value="null">— Sin categoría —</option>
                           <option v-for="c in nuevoProdCategorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
                         </select>
@@ -263,6 +263,22 @@
                         <input v-model="nuevoProdNuevaCat" class="input-field" style="flex:1" placeholder="Nombre de la categoría..." />
                         <button class="btn-confirmar" style="padding:0.4rem 0.8rem;font-size:0.85rem" @click="crearCatNuevoProd" :disabled="!nuevoProdNuevaCat.trim()">Crear</button>
                         <button class="btn-condicion" style="padding:0.4rem 0.6rem;font-size:0.85rem" @click="nuevoProdCrearCat = false; nuevoProdNuevaCat = ''">✕</button>
+                      </div>
+                    </div>
+                    <!-- Subcategoría (cascada de la categoría) -->
+                    <div class="field-group" v-if="nuevoProdCategoria">
+                      <label class="field-label">Subcategoría</label>
+                      <div v-if="!nuevoProdCrearSubcat" style="display:flex;gap:6px">
+                        <select v-model="nuevoProdSubcategoria" class="input-field" style="flex:1">
+                          <option :value="null">— Sin subcategoría —</option>
+                          <option v-for="s in nuevoProdSubcategorias" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                        </select>
+                        <button class="btn-match-nuevo" @click="nuevoProdCrearSubcat = true" title="Crear subcategoría" style="white-space:nowrap">+ Nuevo</button>
+                      </div>
+                      <div v-else style="display:flex;gap:6px">
+                        <input v-model="nuevoProdNuevaSubcat" class="input-field" style="flex:1" placeholder="Nombre de la subcategoría..." />
+                        <button class="btn-confirmar" style="padding:0.4rem 0.8rem;font-size:0.85rem" @click="crearSubcatNuevoProd" :disabled="!nuevoProdNuevaSubcat.trim()">Crear</button>
+                        <button class="btn-condicion" style="padding:0.4rem 0.6rem;font-size:0.85rem" @click="nuevoProdCrearSubcat = false; nuevoProdNuevaSubcat = ''">✕</button>
                       </div>
                     </div>
                     <small class="txt-muted">El código del proveedor quedará fijo automáticamente.</small>
@@ -457,8 +473,11 @@
                   <!-- Ubicación: departamento / categoría -->
                   <div class="lia-ubic" @click="abrirPanelDept(linea)">
                     <span v-if="linea.esNuevo && !linea.departamento_id" class="ubic-badge ubic-sin">Sin asignar</span>
+                    <span v-else-if="linea.departamento_id && !linea.subcategoria_id" class="ubic-badge ubic-warn" title="Sin subcategoría — clic para asignarla">
+                      {{ linea.departamento_nombre }}<small v-if="linea.categoria_nombre"> / {{ linea.categoria_nombre }}</small> · sin subcat. ✏️
+                    </span>
                     <span v-else-if="linea.departamento_id" class="ubic-badge ubic-ok">
-                      {{ linea.departamento_nombre }}<small v-if="linea.categoria_nombre"> / {{ linea.categoria_nombre }}</small> ✏️
+                      {{ linea.departamento_nombre }}<small v-if="linea.categoria_nombre"> / {{ linea.categoria_nombre }}</small><small v-if="linea.subcategoria_nombre"> / {{ linea.subcategoria_nombre }}</small> ✏️
                     </span>
                     <span v-else class="ubic-badge ubic-gris">Ver ✏️</span>
                   </div>
@@ -685,6 +704,9 @@
               <p v-if="lineasNuevasSinDept.length > 0" class="aviso-pendientes">
                 ⚠ {{ lineasNuevasSinDept.length }} producto(s) nuevo(s) sin departamento. Haz clic en cada fila para asignarlo.
               </p>
+              <p v-if="lineasSinSubcategoria.length > 0" class="aviso-pendientes" style="color:#92400E">
+                💡 {{ lineasSinSubcategoria.length }} producto(s) sin subcategoría (opcional). Haz clic en cada fila para completarla.
+              </p>
               <button
                 class="btn-confirmar"
                 :disabled="!puedeConfirmar || confirmando"
@@ -715,16 +737,23 @@
               </div>
               <div class="field-group" style="margin-top:1rem">
                 <label class="field-label" style="color:#aaa">Departamento</label>
-                <select class="input-field panel-select" v-model="panelDeptSeleccionado" @change="panelCatSeleccionada = null">
+                <select class="input-field panel-select" v-model="panelDeptSeleccionado" @change="panelCatSeleccionada = null; panelSubcatSeleccionada = null">
                   <option :value="null">— Seleccionar departamento —</option>
                   <option v-for="d in departamentos" :key="d.id" :value="d">{{ d.nombre }}</option>
                 </select>
               </div>
               <div class="field-group" style="margin-top:0.75rem" v-if="panelDeptSeleccionado && panelDeptSeleccionado.categorias?.length">
                 <label class="field-label" style="color:#aaa">Categoría</label>
-                <select class="input-field panel-select" v-model="panelCatSeleccionada">
+                <select class="input-field panel-select" v-model="panelCatSeleccionada" @change="panelSubcatSeleccionada = null">
                   <option :value="null">— Sin categoría específica —</option>
                   <option v-for="c in panelDeptSeleccionado.categorias" :key="c.id" :value="c">{{ c.nombre }}</option>
+                </select>
+              </div>
+              <div class="field-group" style="margin-top:0.75rem" v-if="panelCatSeleccionada && panelCatSeleccionada.subcategorias?.length">
+                <label class="field-label" style="color:#aaa">Subcategoría</label>
+                <select class="input-field panel-select" v-model="panelSubcatSeleccionada">
+                  <option :value="null">— Sin subcategoría específica —</option>
+                  <option v-for="s in panelCatSeleccionada.subcategorias" :key="s.id" :value="s">{{ s.nombre }}</option>
                 </select>
               </div>
             </div>
@@ -824,23 +853,27 @@ export default {
       // Selector OC existente
       ordenesDisponibles: [],
       ordenSeleccionada: null,
-      // Modal producto nuevo (expandido: Marca → Depto → Categoría)
+      // Modal producto nuevo (expandido: Marca → Depto → Categoría → Subcategoría)
       modalNuevoProd:  false,
       lineaPendiente:  null,
       nombreNuevoProd: '',
       nuevoProdMarca:     null,
       nuevoProdDepto:     null,
       nuevoProdCategoria: null,
+      nuevoProdSubcategoria: null,
       nuevoProdCrearDepto: false,
       nuevoProdNuevoDepto: '',
       nuevoProdCrearCat:   false,
       nuevoProdNuevaCat:   '',
-      // Panel departamento/categoría
+      nuevoProdCrearSubcat: false,
+      nuevoProdNuevaSubcat: '',
+      // Panel departamento/categoría/subcategoría
       panelDeptVisible:      false,
       panelDeptLinea:        null,
       departamentos:         [],
       panelDeptSeleccionado: null,
       panelCatSeleccionada:  null,
+      panelSubcatSeleccionada: null,
       // Picker inline con filtros (Problema 1)
       marcas:           [],
       pickerLinea:       null,
@@ -886,6 +919,14 @@ export default {
       if (!this.nuevoProdDepto) return []
       const d = this.departamentos.find(x => x.id === this.nuevoProdDepto)
       return d ? (d.categorias || []) : []
+    },
+    nuevoProdSubcategorias() {
+      if (!this.nuevoProdCategoria) return []
+      const c = this.nuevoProdCategorias.find(x => x.id === this.nuevoProdCategoria)
+      return c ? (c.subcategorias || []) : []
+    },
+    lineasSinSubcategoria() {
+      return this.lineas.filter(l => l.departamento_id && !l.subcategoria_id)
     },
     subtotalCalculado() {
       return this.lineas.reduce(
@@ -1016,6 +1057,8 @@ export default {
         departamento_nombre: '',
         categoria_id:        null,
         categoria_nombre:    '',
+        subcategoria_id:     null,
+        subcategoria_nombre: '',
         marca_id:            null,
         margen:              0.30,
         margen_display:      30,
@@ -1206,6 +1249,21 @@ export default {
       }
     },
 
+    // Copia depto/categoría/subcategoría del producto matcheado a la línea,
+    // para que el badge de ubicación refleje la clasificación real ya
+    // existente (y no siempre aparezca "sin asignar" para productos viejos).
+    _copiarClasificacionDeMatch(linea, prod) {
+      linea.departamento_id = prod.departamento_id || null
+      linea.categoria_id    = prod.categoria_id    || null
+      linea.subcategoria_id = prod.subcategoria_id || null
+      const d = linea.departamento_id ? this.departamentos.find(x => x.id === linea.departamento_id) : null
+      linea.departamento_nombre = d ? d.nombre : ''
+      const c = d && linea.categoria_id ? (d.categorias || []).find(x => x.id === linea.categoria_id) : null
+      linea.categoria_nombre = c ? c.nombre : ''
+      const s = c && linea.subcategoria_id ? (c.subcategorias || []).find(x => x.id === linea.subcategoria_id) : null
+      linea.subcategoria_nombre = s ? s.nombre : ''
+    },
+
     // ── Auto-match ────────────────────────────────────────────────────
     async autoMatchProducto(linea) {
       const codigo = (linea.codigo_proveedor || '').trim()
@@ -1226,6 +1284,7 @@ export default {
           linea.margen         = data[0].margen || 0.30
           linea.margen_display = Math.round(linea.margen * 100 * 10) / 10
           linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
+          this._copiarClasificacionDeMatch(linea, data[0])
         } else if (codigo && this.proveedorId && data.length === 0) {
           // Código de proveedor conocido pero no está en catálogo aún →
           // la norma exige producto nuevo exclusivo para este (código, RIF)
@@ -1300,6 +1359,7 @@ export default {
       linea.margen          = prod.margen || 0.30
       linea.margen_display  = Math.round(linea.margen * 100 * 10) / 10
       linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
+      this._copiarClasificacionDeMatch(linea, prod)
       this.cerrarPicker()
       // Preguntar si actualizar nombre si difiere
       const nombreIA = (linea.nombre_ia || '').trim()
@@ -1331,6 +1391,7 @@ export default {
       linea.margen          = prod.margen || 0.30
       linea.margen_display  = Math.round(linea.margen * 100 * 10) / 10
       linea.precio_venta_usd = Math.round(linea.precio_unitario * (1 + linea.margen) * 10000) / 10000
+      this._copiarClasificacionDeMatch(linea, prod)
 
       // Si el nombre de la IA es distinto al nombre en inventario,
       // preguntar si actualizar
@@ -1345,6 +1406,12 @@ export default {
       linea.match            = null
       linea._busqTexto       = ''
       linea.actualizar_costo = false
+      linea.departamento_id     = null
+      linea.departamento_nombre = ''
+      linea.categoria_id        = null
+      linea.categoria_nombre    = ''
+      linea.subcategoria_id     = null
+      linea.subcategoria_nombre = ''
     },
     recalcularPrecioVenta(linea) {
       if (!linea.precio_unitario) return
@@ -1368,10 +1435,13 @@ export default {
       this.nuevoProdMarca      = null
       this.nuevoProdDepto      = null
       this.nuevoProdCategoria  = null
+      this.nuevoProdSubcategoria = null
       this.nuevoProdCrearDepto = false
       this.nuevoProdNuevoDepto = ''
       this.nuevoProdCrearCat   = false
       this.nuevoProdNuevaCat   = ''
+      this.nuevoProdCrearSubcat = false
+      this.nuevoProdNuevaSubcat = ''
       this.modalNuevoProd      = true
     },
     confirmarNuevoProducto() {
@@ -1382,11 +1452,14 @@ export default {
       this.lineaPendiente.marca_id         = this.nuevoProdMarca
       this.lineaPendiente.departamento_id  = this.nuevoProdDepto
       this.lineaPendiente.categoria_id     = this.nuevoProdCategoria
+      this.lineaPendiente.subcategoria_id  = this.nuevoProdSubcategoria
       // Nombres para mostrar en badge de ubicación
       const dObj = this.departamentos.find(d => d.id === this.nuevoProdDepto)
       this.lineaPendiente.departamento_nombre = dObj ? dObj.nombre : ''
       const cObj = dObj ? (dObj.categorias || []).find(c => c.id === this.nuevoProdCategoria) : null
       this.lineaPendiente.categoria_nombre = cObj ? cObj.nombre : ''
+      const sObj = cObj ? (cObj.subcategorias || []).find(s => s.id === this.nuevoProdSubcategoria) : null
+      this.lineaPendiente.subcategoria_nombre = sObj ? sObj.nombre : ''
       this.lineaPendiente.margen        = 0.30
       this.lineaPendiente.margen_display = 30
       this.lineaPendiente.precio_venta_usd = Math.round(this.lineaPendiente.precio_unitario * 1.30 * 10000) / 10000
@@ -1419,10 +1492,28 @@ export default {
         const dObj = data.find(d => d.id === this.nuevoProdDepto)
         const nueva = dObj ? (dObj.categorias || []).find(c => c.nombre.toLowerCase() === nombre.toLowerCase()) : null
         if (nueva) this.nuevoProdCategoria = nueva.id
+        this.nuevoProdSubcategoria = null
         this.nuevoProdCrearCat = false
         this.nuevoProdNuevaCat = ''
       } catch (e) {
         alert('Error al crear categoría: ' + (e.response?.data?.detail || e.message))
+      }
+    },
+    async crearSubcatNuevoProd() {
+      const nombre = this.nuevoProdNuevaSubcat.trim()
+      if (!nombre || !this.nuevoProdCategoria) return
+      try {
+        await axios.post('/productos/subcategorias', { nombre, categoria_id: this.nuevoProdCategoria })
+        const { data } = await axios.get('/productos/departamentos-con-categorias')
+        this.departamentos = data
+        const dObj = data.find(d => d.id === this.nuevoProdDepto)
+        const cObj = dObj ? (dObj.categorias || []).find(c => c.id === this.nuevoProdCategoria) : null
+        const nueva = cObj ? (cObj.subcategorias || []).find(s => s.nombre.toLowerCase() === nombre.toLowerCase()) : null
+        if (nueva) this.nuevoProdSubcategoria = nueva.id
+        this.nuevoProdCrearSubcat = false
+        this.nuevoProdNuevaSubcat = ''
+      } catch (e) {
+        alert('Error al crear subcategoría: ' + (e.response?.data?.detail || e.message))
       }
     },
     async confirmarActualizarNombre(actualizar) {
@@ -1525,6 +1616,7 @@ export default {
           marca_id:            l.marca_id         || null,
           departamento_id:     l.departamento_id  || null,
           categoria_id:        l.categoria_id     || null,
+          subcategoria_id:     l.subcategoria_id  || null,
           margen:              l.margen ?? 0.30,
         })),
       }
@@ -1610,6 +1702,8 @@ export default {
         departamento_nombre: '',
         categoria_id:        null,
         categoria_nombre:    '',
+        subcategoria_id:     null,
+        subcategoria_nombre: '',
         marca_id:            null,
       }))
     },
@@ -1663,9 +1757,15 @@ export default {
         } else {
           this.panelCatSeleccionada = null
         }
+        if (linea.subcategoria_id && this.panelCatSeleccionada) {
+          this.panelSubcatSeleccionada = this.panelCatSeleccionada.subcategorias?.find(s => s.id === linea.subcategoria_id) || null
+        } else {
+          this.panelSubcatSeleccionada = null
+        }
       } else {
-        this.panelDeptSeleccionado = null
-        this.panelCatSeleccionada  = null
+        this.panelDeptSeleccionado   = null
+        this.panelCatSeleccionada    = null
+        this.panelSubcatSeleccionada = null
       }
       this.panelDeptVisible = true
     },
@@ -1675,6 +1775,8 @@ export default {
       this.panelDeptLinea.departamento_nombre = this.panelDeptSeleccionado.nombre
       this.panelDeptLinea.categoria_id        = this.panelCatSeleccionada?.id    || null
       this.panelDeptLinea.categoria_nombre    = this.panelCatSeleccionada?.nombre || ''
+      this.panelDeptLinea.subcategoria_id     = this.panelSubcatSeleccionada?.id    || null
+      this.panelDeptLinea.subcategoria_nombre = this.panelSubcatSeleccionada?.nombre || ''
       this.panelDeptVisible = false
     },
 
@@ -1846,6 +1948,7 @@ select.input-field { cursor: pointer; }
 .ubic-sin { background: #FEE2E2; color: #DC2626; }
 .ubic-ok  { background: #DCFCE7; color: #15803D; }
 .ubic-gris{ background: #F1F5F9; color: #6B7280; }
+.ubic-warn{ background: #FEF3C7; color: #92400E; }
 .lia-campos {
   display: flex; align-items: center; gap: 0; flex-shrink: 0;
 }

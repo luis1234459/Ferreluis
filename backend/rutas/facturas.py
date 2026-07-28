@@ -437,6 +437,9 @@ def buscar_producto(
             "match_exacto": match_exacto,
             "margen": margen,
             "precio_referencial_usd": round(costo * (1 + margen), 2),
+            "departamento_id": p.departamento_id,
+            "categoria_id":    p.categoria_id,
+            "subcategoria_id": p.subcategoria_id,
         }
 
     def _res_producto(p, codigo_prov="", match_exacto=False):
@@ -458,6 +461,9 @@ def buscar_producto(
             "match_exacto": match_exacto,
             "margen": margen,
             "precio_referencial_usd": round(costo * (1 + margen), 2),
+            "departamento_id": p.departamento_id,
+            "categoria_id":    p.categoria_id,
+            "subcategoria_id": p.subcategoria_id,
         }
 
     def _expandir(p, codigo_prov="", match_exacto=False):
@@ -736,8 +742,9 @@ def confirmar_compra(
         margen_nuevo = p.get("margen")   # None si no viene en el payload
         costo_ant   = None
 
-        dept_id = p.get("departamento_id") or None
-        cat_id  = p.get("categoria_id")  or None
+        dept_id    = p.get("departamento_id") or None
+        cat_id     = p.get("categoria_id")  or None
+        subcat_id  = p.get("subcategoria_id") or None
 
         # Si es producto nuevo, crearlo en inventario
         if es_nuevo and not prod_id:
@@ -750,6 +757,7 @@ def confirmar_compra(
                 proveedor_id       = proveedor_id,
                 departamento_id    = dept_id,
                 categoria_id       = cat_id,
+                subcategoria_id    = subcat_id,
                 activo             = True,
                 auditado           = True,
                 fecha_auditoria    = datetime.utcnow(),
@@ -762,11 +770,13 @@ def confirmar_compra(
         if prod_id:
             prod = db.query(Producto).filter(Producto.id == prod_id).first()
             if prod:
-                # Actualizar departamento/categoría si vienen y difieren del actual
+                # Actualizar departamento/categoría/subcategoría si vienen y difieren del actual
                 if dept_id and prod.departamento_id != dept_id:
                     prod.departamento_id = dept_id
                 if cat_id and prod.categoria_id != cat_id:
                     prod.categoria_id = cat_id
+                if subcat_id and prod.subcategoria_id != subcat_id:
+                    prod.subcategoria_id = subcat_id
                 if variante_id:
                     variante = db.query(VarianteProducto).filter(VarianteProducto.id == variante_id).first()
                     if variante:
