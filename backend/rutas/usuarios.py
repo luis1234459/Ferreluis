@@ -70,6 +70,19 @@ def require_admin_o_gestionador(
     return user
 
 
+def require_editor_foto(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    x_usuario_rol: Optional[str] = Header(None),
+    x_usuario_id:  Optional[str] = Header(None),
+) -> dict:
+    """Roles habilitados para actualizar solo la foto_url de un producto
+    (sin acceso a nombre, precio, costo o stock)."""
+    user = get_current_user(credentials, x_usuario_rol, x_usuario_id)
+    if user.get("rol") not in ("admin", "gestionador", "vendedor"):
+        raise HTTPException(status_code=403, detail="Acceso denegado.")
+    return user
+
+
 # ── Password helpers ──────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:

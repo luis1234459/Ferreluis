@@ -7,7 +7,7 @@ from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
-from rutas.usuarios import require_admin, require_admin_o_gestionador
+from rutas.usuarios import require_admin, require_admin_o_gestionador, require_editor_foto
 from rutas.auth import resolver_sede_activa_opcional, resolver_sede_activa, ajustar_existencia_sede
 import io
 import re
@@ -98,6 +98,13 @@ class VarianteSchema(BaseModel):
 class ComponenteSchema(BaseModel):
     producto_componente_id: int
     cantidad:               float
+
+    class Config:
+        from_attributes = True
+
+
+class FotoSchema(BaseModel):
+    foto_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1236,6 +1243,27 @@ def cambiar_estado_producto(
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     p.activo = bool(datos.get("activo", True))
+    db.commit()
+    db.refresh(p)
+    bcv, binance = _tasas_actuales(db)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
+
+
+@router.patch("/{producto_id}/foto")
+def actualizar_foto_producto(
+    producto_id: int,
+    datos: FotoSchema,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_editor_foto),
+):
+    """Actualiza únicamente foto_url. Habilitado para admin, gestionador y
+    vendedor, sin darles acceso al resto de campos del producto (precio,
+    costo, stock, etc.) que solo se editan vía PUT /{producto_id} (admin)."""
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    p.foto_url = datos.foto_url or None
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)

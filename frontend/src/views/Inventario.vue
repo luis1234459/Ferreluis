@@ -311,7 +311,7 @@
                   <!-- Acciones -->
                   <td>
                     <div class="acciones">
-                      <button v-if="!esGestionador" class="btn-editar"    @click="editar(p)">Editar</button>
+                      <button class="btn-editar"    @click="editar(p)">Editar</button>
                       <button class="btn-variantes" @click="abrirVariantes(p)">Variantes</button>
                       <button v-if="p.es_producto_compuesto" class="btn-comp" @click="abrirComponentes(p)">Componentes</button>
                       <button v-if="esAdmin && p.activo"  class="btn-desactivar" @click="cambiarEstado(p, false)">Desactivar</button>
@@ -422,69 +422,69 @@
               <button class="btn-cerrar-modal" @click="cancelar">✕</button>
             </div>
 
-            <!-- Aviso modo vendedor -->
-            <div v-if="esVendedor" class="aviso-solo-foto">
+            <!-- Aviso modo solo-foto (vendedor / gestionador) -->
+            <div v-if="puedeEditarSoloFoto" class="aviso-solo-foto">
               Solo puedes editar la URL de imagen del producto.
             </div>
 
             <!-- Pestañas: solo tiene sentido "Reposición" con el producto ya creado -->
-            <div class="tabs-ficha" v-if="editando && !esVendedor">
+            <div class="tabs-ficha" v-if="editando && !puedeEditarSoloFoto">
               <button type="button" :class="['tab-ficha-btn', tabProducto === 'general' ? 'activo' : '']"
                 @click="tabProducto = 'general'">Datos generales</button>
               <button type="button" :class="['tab-ficha-btn', tabProducto === 'reposicion' ? 'activo' : '']"
                 @click="abrirTabReposicion">📦 Reposición</button>
             </div>
 
-            <template v-if="tabProducto === 'general' || !editando || esVendedor">
+            <template v-if="tabProducto === 'general' || !editando || puedeEditarSoloFoto">
             <div class="grid-form">
               <div class="field field-wide">
                 <label>Nombre *</label>
-                <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" :disabled="esVendedor" />
+                <input v-model="form.nombre" placeholder="Ej: Martillo 16oz" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Código</label>
-                <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" :disabled="esVendedor" />
+                <input v-model="form.codigo" placeholder="Ej: HRR-001 (opcional)" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field" v-else>
                 <label>Prefijo generador <small class="txt-muted">(base para códigos de variantes)</small></label>
-                <input v-model="form.codigo" placeholder="Ej: CABLE-12 (sugerencia para variantes)" class="input-prefijo" :disabled="esVendedor" />
+                <input v-model="form.codigo" placeholder="Ej: CABLE-12 (sugerencia para variantes)" class="input-prefijo" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field">
                 <label>Departamento</label>
-                <select v-model="form.departamento_id" @change="form.categoria_id = null" :disabled="esVendedor">
+                <select v-model="form.departamento_id" @change="form.categoria_id = null" :disabled="puedeEditarSoloFoto">
                   <option :value="null">— Sin departamento —</option>
                   <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Categoría</label>
-                <select v-model="form.categoria_id" :disabled="esVendedor">
+                <select v-model="form.categoria_id" :disabled="puedeEditarSoloFoto">
                   <option :value="null">— Sin categoría —</option>
                   <option v-for="c in categoriasDelForm" :key="c.id" :value="c.id">{{ c.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Proveedor principal</label>
-                <select v-model="form.proveedor_id" :disabled="esVendedor">
+                <select v-model="form.proveedor_id" :disabled="puedeEditarSoloFoto">
                   <option :value="null">— Sin proveedor —</option>
                   <option v-for="p in proveedores" :key="p.id" :value="p.id">{{ p.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Marca</label>
-                <select v-model="form.marca_id" :disabled="esVendedor">
+                <select v-model="form.marca_id" :disabled="puedeEditarSoloFoto">
                   <option :value="null">— Sin marca —</option>
                   <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                 </select>
               </div>
               <div class="field">
                 <label>Costo USD</label>
-                <input v-model.number="form.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" :disabled="esVendedor" />
+                <input v-model.number="form.costo_usd" type="number" min="0" step="0.01" placeholder="0.00" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field">
                 <label>Margen (%)</label>
                 <input v-model.number="form.margen_pct" type="number" min="0" max="999" step="1"
-                  placeholder="Ej: 30" @input="actualizarMargen" :disabled="esVendedor" />
+                  placeholder="Ej: 30" @input="actualizarMargen" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field">
                 <label>Descuento máximo en ventas %
@@ -496,12 +496,12 @@
                     type="number" min="0" max="100" step="0.5"
                     placeholder="Sin límite"
                     style="max-width:100px"
-                    :disabled="esVendedor"
+                    :disabled="puedeEditarSoloFoto"
                   />
                   <span>%</span>
                 </div>
               </div>
-              <div class="field" v-if="!esVendedor">
+              <div class="field" v-if="!puedeEditarSoloFoto">
                 <label>
                   🔥 Comisión empuje (USD fijo)
                   <span class="label-hint">(vacío = sin empuje, ej: 5 = $5 fijos por venta)</span>
@@ -515,7 +515,7 @@
               </div>
               <div class="field" v-if="!form.tiene_variantes">
                 <label>Stock</label>
-                <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="esVendedor || editando" />
+                <input v-model.number="form.stock" type="number" min="0" placeholder="0" :disabled="puedeEditarSoloFoto || editando" />
                 <span v-if="editando" class="label-hint">Los cambios de stock se hacen desde Ajustes → Stock</span>
               </div>
               <div class="field" v-else>
@@ -524,7 +524,7 @@
               </div>
               <div class="field">
                 <label>Descripción</label>
-                <input v-model="form.descripcion" placeholder="Descripción opcional" :disabled="esVendedor" />
+                <input v-model="form.descripcion" placeholder="Descripción opcional" :disabled="puedeEditarSoloFoto" />
               </div>
               <div class="field field-wide">
                 <label>URL de imagen (foto)</label>
@@ -544,7 +544,7 @@
             </div>
 
             <!-- Opciones especiales -->
-            <div class="opciones-especiales" v-if="!esVendedor">
+            <div class="opciones-especiales" v-if="!puedeEditarSoloFoto">
               <label class="check-opt">
                 <input type="checkbox" v-model="form.es_producto_clave" />
                 <span class="check-label">
@@ -567,7 +567,7 @@
             </div>
 
             <!-- Garantía -->
-            <div class="opciones-especiales" v-if="!esVendedor" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+            <div class="opciones-especiales" v-if="!puedeEditarSoloFoto" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
               <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Garantía</p>
               <label class="check-opt">
                 <input type="checkbox" v-model="form.requiere_serial" />
@@ -588,7 +588,7 @@
             </div>
 
             <!-- Unidad de medida y paquete -->
-            <div class="opciones-especiales" v-if="!esVendedor" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
+            <div class="opciones-especiales" v-if="!puedeEditarSoloFoto" style="margin-top:0.75rem; border-top: 1px solid #E5E5E0; padding-top: 0.75rem;">
               <p style="font-size:0.8rem;font-weight:700;color:#555;margin:0 0 0.6rem;">Unidad de medida</p>
               <div class="campo-fila">
                 <div class="field" style="flex:1">
@@ -626,7 +626,7 @@
             </div>
 
             <!-- Preview precios -->
-            <div class="preview-precios" v-if="!esVendedor && form.costo_usd > 0 && form.margen > 0">
+            <div class="preview-precios" v-if="!puedeEditarSoloFoto && form.costo_usd > 0 && form.margen > 0">
               <p class="preview-titulo">Vista previa de precios</p>
               <div class="preview-row">
                 <span>Precio base (USD):</span>
@@ -644,7 +644,7 @@
             </template>
 
             <!-- ═══════════ Pestaña: Reposición ═══════════ -->
-            <template v-if="editando && !esVendedor && tabProducto === 'reposicion'">
+            <template v-if="editando && !puedeEditarSoloFoto && tabProducto === 'reposicion'">
               <div v-if="cargandoReposicion" class="msg-info">Cargando ficha de reposición...</div>
 
               <!-- Ficha no cargada todavía -->
@@ -788,7 +788,7 @@
 
             <div class="form-botones">
               <button class="btn-cancelar" @click="cancelar">Cancelar</button>
-              <button v-if="tabProducto === 'general' || !editando || esVendedor"
+              <button v-if="tabProducto === 'general' || !editando || puedeEditarSoloFoto"
                 class="btn-guardar" @click="guardar" :disabled="guardando">
                 {{ guardando ? 'Guardando...' : 'Guardar' }}
               </button>
@@ -1478,6 +1478,7 @@ export default {
     esAdmin()       { return this.usuario.rol === 'admin' },
     esVendedor()    { return this.usuario.rol === 'vendedor' },
     esGestionador() { return this.usuario.rol === 'gestionador' },
+    puedeEditarSoloFoto() { return this.esVendedor || this.esGestionador },
 
     todosStock0Seleccionados() {
       return this.productosFiltrados.length > 0 &&
@@ -1758,10 +1759,10 @@ export default {
       this.mostrarForm = true
     },
     async guardar() {
-      if (this.esVendedor) {
+      if (this.puedeEditarSoloFoto) {
         this.guardando = true; this.error = ''
         try {
-          await axios.put(`/productos/${this.form.id}`, { foto_url: this.form.foto_url || '' })
+          await axios.patch(`/productos/${this.form.id}/foto`, { foto_url: this.form.foto_url || '' })
           await this.cargarProductos()
           this.cancelar()
         } catch (e) {
