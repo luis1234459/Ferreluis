@@ -86,6 +86,7 @@ class Producto(Base):
     es_producto_clave       = Column(Boolean, default=False)   # producto Pareto
     es_delicado             = Column(Boolean, default=False)   # producto delicado — prioridad alta en auditorías
     es_producto_compuesto   = Column(Boolean, default=False)
+    es_portada_departamento = Column(Boolean, default=False)   # 1 por depto — foto destacada en el catálogo público
     descuento_compuesto_pct = Column(Float,   default=0)       # % dto solo admin
     comision_pct            = Column(Float,   default=0.0)     # % comisión al vendedor por este producto
     comision_push           = Column(Float,   nullable=True)   # USD fijo comisión empuje (NULL = no aplica)

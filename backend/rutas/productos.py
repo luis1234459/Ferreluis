@@ -319,6 +319,48 @@ def departamentos_con_categorias(db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/portadas")
+def listar_portadas_departamento(db: Session = Depends(get_db)):
+    """1 producto portada por departamento, para el mosaico del catálogo
+    público. Si el depto no tiene portada marcada (o quedó inactiva/sin
+    foto), cae al primer producto activo con foto — misma heurística de
+    "primer producto con foto" que usaba el frontend público, resuelta acá
+    para no repetir el escaneo en cada carga del sitio."""
+    deptos = db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
+    resultado = []
+    for d in deptos:
+        con_foto = [
+            Producto.departamento_id == d.id,
+            Producto.activo == True,
+            Producto.foto_url.isnot(None),
+            Producto.foto_url != "",
+        ]
+        producto = (
+            db.query(Producto)
+            .filter(*con_foto, Producto.es_portada_departamento == True)
+            .first()
+        )
+        es_fallback = producto is None
+        if es_fallback:
+            producto = (
+                db.query(Producto)
+                .filter(*con_foto)
+                .order_by(func.length(Producto.nombre), Producto.nombre)
+                .first()
+            )
+        if not producto:
+            continue
+        resultado.append({
+            "departamento_id":    d.id,
+            "departamento_nombre": d.nombre,
+            "producto_id":        producto.id,
+            "nombre":             producto.nombre,
+            "foto_url":           producto.foto_url,
+            "es_fallback":        es_fallback,
+        })
+    return resultado
+
+
 @router.post("/departamentos")
 def crear_departamento(
     datos: DepartamentoSchema,
@@ -1243,6 +1285,34 @@ def cambiar_estado_producto(
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     p.activo = bool(datos.get("activo", True))
+    db.commit()
+    db.refresh(p)
+    bcv, binance = _tasas_actuales(db)
+    policy, ajuste_tipo, ajuste_divisa_pct = _resolver_policy(p, db)
+    return _enriquecer(p, bcv, binance, plantilla=_plantilla_de(p, db), policy=policy, ajuste_tipo=ajuste_tipo, ajuste_divisa_pct=ajuste_divisa_pct, db=db)
+
+
+@router.patch("/{producto_id}/portada")
+def cambiar_portada_departamento(
+    producto_id: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin_o_gestionador),
+):
+    """Marca/desmarca un producto como portada de su departamento. Exclusivo:
+    al marcar uno, se desmarca cualquier otro portada existente del mismo
+    departamento (1 producto portada por depto)."""
+    p = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    es_portada = bool(datos.get("es_portada", True))
+    if es_portada:
+        db.query(Producto).filter(
+            Producto.departamento_id == p.departamento_id,
+            Producto.id != p.id,
+            Producto.es_portada_departamento == True,
+        ).update({"es_portada_departamento": False})
+    p.es_portada_departamento = es_portada
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)
