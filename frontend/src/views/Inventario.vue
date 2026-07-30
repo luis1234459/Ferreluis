@@ -194,8 +194,9 @@
                     </template>
                     <template v-else>
                       <span class="prod-nombre" style="min-width:120px; display:inline-block">{{ formatNombre(p.nombre) }}</span>
-                      <span v-if="p.es_producto_clave"     class="badge-clave">CLAVE</span>
-                      <span v-if="p.es_producto_compuesto" class="badge-comp">COMPUESTO</span>
+                      <span v-if="p.es_producto_clave"          class="badge-clave">CLAVE</span>
+                      <span v-if="p.es_portada_departamento"     class="badge-portada">PORTADA</span>
+                      <span v-if="p.es_producto_compuesto"       class="badge-comp">COMPUESTO</span>
                       <span v-if="!p.activo"               class="badge-inactivo">INACTIVO</span>
                     </template>
                   </td>
@@ -550,6 +551,13 @@
                 <span class="check-label">
                   <strong>Producto clave (Pareto)</strong>
                   <small>Prioridad alta en reportes y reposición</small>
+                </span>
+              </label>
+              <label class="check-opt" v-if="editando && form.departamento_id">
+                <input type="checkbox" :checked="form.es_portada_departamento" @change="togglePortada($event.target.checked)" />
+                <span class="check-label">
+                  <strong>Portada de departamento</strong>
+                  <small>Foto destacada de "{{ nombreDepartamento(form.departamento_id) }}" en el catálogo público — reemplaza la portada actual del depto</small>
                 </span>
               </label>
               <label class="check-opt">
@@ -1385,7 +1393,7 @@ export default {
         departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
-        es_producto_clave: false, es_producto_compuesto: false,
+        es_producto_clave: false, es_portada_departamento: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
       },
 
@@ -1725,7 +1733,7 @@ export default {
         departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
         stock: 0, descripcion: '', foto_url: '',
-        es_producto_clave: false, es_producto_compuesto: false,
+        es_producto_clave: false, es_portada_departamento: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
         unidad_medida: 'unidad', unidades_por_paquete: 1, nombre_paquete: '',
@@ -1743,6 +1751,7 @@ export default {
         proveedor_id:            p.proveedor_id            ?? null,
         marca_id:                p.marca_id                ?? null,
         es_producto_clave:       p.es_producto_clave       ?? false,
+        es_portada_departamento: p.es_portada_departamento ?? false,
         es_producto_compuesto:   p.es_producto_compuesto   ?? false,
         descuento_compuesto_pct: p.descuento_compuesto_pct ?? 0,
         requiere_serial:         p.requiere_serial         ?? false,
@@ -2147,6 +2156,19 @@ export default {
         await this.cargarProductos()
       } catch (e) {
         alert(e?.response?.data?.detail || 'Error al cambiar estado')
+      }
+    },
+    async togglePortada(marcar) {
+      const depto = this.nombreDepartamento(this.form.departamento_id)
+      if (marcar && !confirm(`Esto reemplaza la portada actual de "${depto}" por "${this.form.nombre}". ¿Continuar?`)) {
+        return
+      }
+      try {
+        const res = await axios.patch(`/productos/${this.form.id}/portada`, { es_portada: marcar })
+        this.form.es_portada_departamento = res.data.es_portada_departamento
+        await this.cargarProductos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al cambiar portada')
       }
     },
 
@@ -2670,6 +2692,7 @@ export default {
 .prod-nombre { font-weight: 600; margin-right: 0.35rem; }
 .badge-clave { background: #FFCC0033; color: #996600; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; margin-right: 0.25rem; text-transform: uppercase; }
 .badge-comp  { background: #8888881A; color: #555555; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; text-transform: uppercase; }
+.badge-portada { background: #16A34A1A; color: #16A34A; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; margin-right: 0.25rem; text-transform: uppercase; }
 .txt-muted   { color: var(--texto-muted); }
 .txt-usd     { color: #16A34A; font-weight: 600; }
 .txt-rojo    { color: var(--danger); font-weight: 600; }
