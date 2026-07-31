@@ -28,6 +28,7 @@ class ProductoSchema(BaseModel):
     categoria:   Optional[str]  = None
     stock:       int            = 0
     foto_url:    Optional[str]  = None
+    imagen_publicitaria_url: Optional[str] = None
     costo_usd:   float          = 0.0
     margen:      float          = 0.30
 
@@ -105,6 +106,7 @@ class ComponenteSchema(BaseModel):
 
 class FotoSchema(BaseModel):
     foto_url: Optional[str] = None
+    imagen_publicitaria_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -355,7 +357,7 @@ def listar_portadas_departamento(db: Session = Depends(get_db)):
             "departamento_nombre": d.nombre,
             "producto_id":        producto.id,
             "nombre":             producto.nombre,
-            "foto_url":           producto.foto_url,
+            "foto_url":           producto.imagen_publicitaria_url or producto.foto_url,
             "es_fallback":        es_fallback,
         })
     return resultado
@@ -1327,13 +1329,15 @@ def actualizar_foto_producto(
     db: Session = Depends(get_db),
     _: None = Depends(require_editor_foto),
 ):
-    """Actualiza únicamente foto_url. Habilitado para admin, gestionador y
-    vendedor, sin darles acceso al resto de campos del producto (precio,
-    costo, stock, etc.) que solo se editan vía PUT /{producto_id} (admin)."""
+    """Actualiza únicamente foto_url / imagen_publicitaria_url. Habilitado para
+    admin, gestionador y vendedor, sin darles acceso al resto de campos del
+    producto (precio, costo, stock, etc.) que solo se editan vía PUT
+    /{producto_id} (admin)."""
     p = db.query(Producto).filter(Producto.id == producto_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     p.foto_url = datos.foto_url or None
+    p.imagen_publicitaria_url = datos.imagen_publicitaria_url or None
     db.commit()
     db.refresh(p)
     bcv, binance = _tasas_actuales(db)

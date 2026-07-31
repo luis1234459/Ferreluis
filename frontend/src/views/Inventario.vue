@@ -542,6 +542,21 @@
                 />
                 <small style="color:var(--texto-muted)">Pega la URL de la imagen del producto</small>
               </div>
+              <div class="field field-wide">
+                <label>Imagen publicitaria (pieza diseñada) <small>(opcional — cartelería digital)</small></label>
+                <input
+                  v-model="form.imagen_publicitaria_url"
+                  type="url"
+                  placeholder="https://ejemplo.com/pieza-1920x1080.jpg"
+                />
+                <img
+                  v-if="form.imagen_publicitaria_url"
+                  :src="form.imagen_publicitaria_url"
+                  style="max-height:80px; margin-top:0.5rem; border-radius:6px; border:1px solid var(--borde)"
+                  @error="form.imagen_publicitaria_url = ''"
+                />
+                <small style="color:var(--texto-muted)">Pieza diseñada en Canva (1920x1080). Si tiene URL, la pantalla de TV la muestra a pantalla completa en vez del slide automático</small>
+              </div>
             </div>
 
             <!-- Opciones especiales -->
@@ -1392,7 +1407,7 @@ export default {
         id: null, nombre: '', categoria: '', categoria_id: null,
         departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
-        stock: 0, descripcion: '', foto_url: '',
+        stock: 0, descripcion: '', foto_url: '', imagen_publicitaria_url: '',
         es_producto_clave: false, es_portada_departamento: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
       },
@@ -1732,7 +1747,7 @@ export default {
         id: null, nombre: '', categoria: '', categoria_id: null, codigo: '',
         departamento_id: null, proveedor_id: null, marca_id: null,
         costo_usd: 0, margen: 0.30, margen_pct: 30,
-        stock: 0, descripcion: '', foto_url: '',
+        stock: 0, descripcion: '', foto_url: '', imagen_publicitaria_url: '',
         es_producto_clave: false, es_portada_departamento: false, es_producto_compuesto: false,
         descuento_compuesto_pct: 0,
         requiere_serial: false, plantilla_garantia_id: null,
@@ -1771,7 +1786,10 @@ export default {
       if (this.puedeEditarSoloFoto) {
         this.guardando = true; this.error = ''
         try {
-          await axios.patch(`/productos/${this.form.id}/foto`, { foto_url: this.form.foto_url || '' })
+          await axios.patch(`/productos/${this.form.id}/foto`, {
+            foto_url: this.form.foto_url || '',
+            imagen_publicitaria_url: this.form.imagen_publicitaria_url || '',
+          })
           await this.cargarProductos()
           this.cancelar()
         } catch (e) {
@@ -1787,6 +1805,7 @@ export default {
           categoria_id:            this.form.categoria_id   || null,
           descripcion:             this.form.descripcion    || null,
           foto_url:                this.form.foto_url       || '',
+          imagen_publicitaria_url: this.form.imagen_publicitaria_url || null,
           costo_usd:               Number(this.form.costo_usd),
           margen:                  Number(this.form.margen),
           stock:                   Number(this.form.stock),

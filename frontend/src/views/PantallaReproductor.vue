@@ -5,8 +5,13 @@
     </div>
 
     <template v-else>
-      <!-- Slide producto -->
-      <div v-if="slideActual.tipo === 'producto'" class="pant-slide pant-producto">
+      <!-- Slide producto: pieza publicitaria diseñada (prioridad sobre la plantilla) -->
+      <div v-if="slideActual.tipo === 'producto' && slideActual.imagen_publicitaria_url" class="pant-slide pant-pieza">
+        <img :src="slideActual.imagen_publicitaria_url" class="pant-pieza-foto" />
+      </div>
+
+      <!-- Slide producto: plantilla automática (fondo amarillo) -->
+      <div v-else-if="slideActual.tipo === 'producto'" class="pant-slide pant-producto">
         <div v-if="slideActual.codigo" class="prod-sku">{{ slideActual.codigo }}</div>
         <div class="prod-logo">
           <div class="prod-logo-badge">FERRE·ÚTIL</div>
@@ -285,6 +290,15 @@ export default {
   border-radius: 50px;
   box-shadow: 0 8px 30px rgba(220,38,38,0.5);
   letter-spacing: 0.05em;
+}
+
+.pant-pieza { padding: 0; }
+.pant-pieza-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
 }
 
 .pant-marca { padding: 0; }

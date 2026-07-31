@@ -78,6 +78,12 @@ class Producto(Base):
     costo_usd   = Column(Float,   default=0)    # precio de compra en USD
     margen      = Column(Float,   default=0.30) # ej: 0.30 = 30%
 
+    # Pieza publicitaria diseñada (Canva, 1920x1080) para ~200 productos clave.
+    # Independiente de foto_url (que sigue siendo la foto de catálogo/inventario).
+    # Si está seteada, la cola de cartelería la muestra a pantalla completa sin
+    # aplicar la plantilla automática (fondo amarillo + logo + precio).
+    imagen_publicitaria_url = Column(String, nullable=True)
+
     # ── Nuevos campos ────────────────────────────────────────────────────────
     departamento_id         = Column(Integer, nullable=True)   # FK → Departamento
     categoria_id            = Column(Integer, nullable=True)   # FK → Categoria

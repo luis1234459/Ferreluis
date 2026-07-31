@@ -243,6 +243,7 @@ def obtener_cola(pantalla_id: int, db: Session = Depends(get_db)):
                 "nombre":     p.nombre,
                 "codigo":     p.codigo,
                 "foto_url":   p.foto_url,
+                "imagen_publicitaria_url": p.imagen_publicitaria_url,
                 "precio_usd": round(precios["precio_base_usd"], 2),
             })
 
