@@ -7,11 +7,19 @@
     <template v-else>
       <!-- Slide producto -->
       <div v-if="slideActual.tipo === 'producto'" class="pant-slide pant-producto">
-        <img :src="slideActual.foto_url" class="pant-foto" />
-        <div class="pant-info">
-          <h1 class="pant-nombre">{{ slideActual.nombre }}</h1>
-          <div class="pant-precio">${{ Number(slideActual.precio_usd).toFixed(2) }}</div>
-          <div v-if="slideActual.codigo" class="pant-codigo">{{ slideActual.codigo }}</div>
+        <div v-if="slideActual.codigo" class="prod-sku">{{ slideActual.codigo }}</div>
+        <div class="prod-logo">
+          <div class="prod-logo-badge">FERRE·ÚTIL</div>
+          <div class="prod-logo-sub">INGENIERÍA FERRETERA</div>
+        </div>
+        <div class="prod-foto-card">
+          <img :src="slideActual.foto_url" class="prod-foto" />
+        </div>
+        <div class="prod-info">
+          <h1 class="prod-nombre">{{ slideActual.nombre }}</h1>
+          <div class="prod-precio-tag">
+            <span class="prod-precio">${{ Number(slideActual.precio_usd).toFixed(2) }}</span>
+          </div>
         </div>
       </div>
 
@@ -154,6 +162,116 @@ export default {
   color: #ccc;
   font-family: monospace;
   letter-spacing: 0.05em;
+}
+
+/* ── Slide producto (fondo amarillo) ───────────────────────────────── */
+/* Grid de 3 filas fijas: la fila del medio SIEMPRE mide 65% del alto total
+   del cuadro, y logo/precio quedan confinados a sus propias filas de 17.5%
+   arriba y abajo — así nunca pueden montarse sobre la foto. */
+.pant-producto {
+  display: grid;
+  grid-template-rows: 17.5% 65% 17.5%;
+  justify-items: center;
+  background: #F5C518;
+  box-sizing: border-box;
+  padding: 0.8rem 1.5rem;
+}
+
+.prod-sku {
+  position: absolute;
+  top: 1.5rem;
+  right: 2.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3a3000;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.prod-logo {
+  grid-row: 1;
+  align-self: center;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.prod-logo-badge {
+  background: #0E2A47;
+  color: #fff;
+  font-size: clamp(1.3rem, 3.2vw, 2.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 0.4rem 1.3rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.prod-logo-sub {
+  margin-top: 0.4rem;
+  font-size: clamp(0.6rem, 1.1vw, 0.85rem);
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #FF0000;
+}
+
+.prod-foto-card {
+  grid-row: 2;
+  width: calc(100% + 3rem);
+  margin: 0 -1.5rem;
+  height: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prod-foto {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.prod-info {
+  grid-row: 3;
+  align-self: center;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 90%;
+}
+.prod-nombre {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #000;
+  margin: 0;
+  text-align: center;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.prod-precio-tag {
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.4rem 1.4rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+.prod-precio {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #8A5A00;
 }
 
 .pant-badge-oferta {
