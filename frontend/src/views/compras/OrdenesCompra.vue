@@ -152,9 +152,24 @@
                 <div class="oc-cat-header">
                   <i class="ti ti-building-store" style="color:#FFCC00;font-size:18px" aria-hidden="true"></i>
                   <span>Catálogo de productos</span>
-                  <span class="oc-cat-count">{{ opcionesFiltradas.length }} opciones</span>
+                  <span v-if="tabCatalogoOC === 'buscar'" class="oc-cat-count">{{ opcionesFiltradas.length }} opciones</span>
                 </div>
 
+                <!-- Tabs: Buscar productos / Lista de reposición (solo referencia) -->
+                <div class="oc-tabs">
+                  <button
+                    class="oc-tab-btn"
+                    :class="{ active: tabCatalogoOC === 'buscar' }"
+                    @click="tabCatalogoOC = 'buscar'"
+                  >Buscar productos</button>
+                  <button
+                    class="oc-tab-btn"
+                    :class="{ active: tabCatalogoOC === 'reposicion' }"
+                    @click="tabCatalogoOC = 'reposicion'; cargarListaReposicionOC()"
+                  >🛒 Lista de reposición<span v-if="listaReposicionOC.length"> ({{ listaReposicionOC.length }})</span></button>
+                </div>
+
+                <template v-if="tabCatalogoOC === 'buscar'">
                 <!-- Buscador (método principal) + toggle de filtros -->
                 <div class="oc-buscador-wrap">
                   <div class="oc-busqueda">
@@ -231,6 +246,28 @@
                   <!-- Crear producto nuevo -->
                   <div class="oc-crear-nuevo" @click="agregarLinea">
                     <i class="ti ti-plus" style="font-size:14px" aria-hidden="true"></i> Crear producto nuevo
+                  </div>
+                </div>
+                </template>
+
+                <!-- Lista de reposición (solo referencia visual, no agrega al carrito) -->
+                <div v-else class="oc-repos-list">
+                  <p class="oc-repos-hint">
+                    Solo de referencia — armada desde Reportes → Ventas diarias. Agrega los productos al carrito manualmente con el buscador.
+                  </p>
+                  <div v-if="listaReposicionOC.length === 0" class="oc-prod-vacio">
+                    No hay productos en la lista de reposición
+                  </div>
+                  <div v-for="p in listaReposicionOC" :key="p.producto_id" class="oc-repos-item">
+                    <span :class="'oc-punto-' + p.semaforo">●</span>
+                    <div class="oc-repos-info">
+                      <span class="oc-repos-nombre">{{ p.nombre }}</span>
+                      <span class="oc-repos-meta">
+                        Stock: {{ p.stock }} ·
+                        {{ p.dias >= 999 ? 'Sin movimiento' : p.dias + 'd cobertura' }}
+                        <template v-if="p.cantidad_pedir"> · Pedir: {{ p.cantidad_pedir }}</template>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -327,6 +364,8 @@ export default {
       categoriasOC:       [],
       subcategoriasOC:    [],
       filtrosAbiertosOC:  false,
+      tabCatalogoOC:      'buscar',
+      listaReposicionOC:  [],
       ordenDetalle:       null,
       mostrarForm:        false,
       editandoId:         null,
@@ -516,6 +555,12 @@ export default {
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroCategoriaOC = ''
       this.filtroSubcategoriaOC = ''; this.categoriasOC = []; this.subcategoriasOC = []
     },
+    cargarListaReposicionOC() {
+      try {
+        const raw = localStorage.getItem('ferreutil_lista_reposicion')
+        this.listaReposicionOC = raw ? JSON.parse(raw) : []
+      } catch { this.listaReposicionOC = [] }
+    },
     _lineaVacia() {
       return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false, marca_id: null, departamento_id: null, categoria_id: null }
     },
@@ -525,6 +570,8 @@ export default {
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.filtroSubcategoriaOC = ''; this.subcategoriasOC = []; this.filtrosAbiertosOC = false
+      this.tabCatalogoOC = 'buscar'
+      this.cargarListaReposicionOC()
       this.mostrarForm = true
     },
     editarOrden(o) {
@@ -532,6 +579,8 @@ export default {
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
       this.filtroSubcategoriaOC = ''; this.subcategoriasOC = []; this.filtrosAbiertosOC = false
+      this.tabCatalogoOC = 'buscar'
+      this.cargarListaReposicionOC()
       this.form = {
         proveedor_id: o.proveedor_id,
         observacion:  o.observacion || '',
@@ -831,6 +880,19 @@ export default {
 .oc-catalogo { min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--borde); }
 .oc-cat-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.9rem; font-weight: 500; }
 .oc-cat-count { margin-left: auto; font-size: 0.75rem; color: var(--texto-sec); font-weight: 400; }
+.oc-tabs { display: flex; gap: 4px; padding: 0 14px 8px; border-bottom: 1px solid var(--borde); }
+.oc-tab-btn { background: transparent; border: none; padding: 6px 4px; margin-bottom: -1px; color: var(--texto-sec); font-size: 0.82rem; cursor: pointer; border-bottom: 2px solid transparent; }
+.oc-tab-btn:hover { color: var(--texto-principal); }
+.oc-tab-btn.active { color: #1A1A1A; font-weight: 600; border-bottom-color: #FFCC00; }
+.oc-repos-list { flex: 1; overflow-y: auto; padding: 8px 14px; }
+.oc-repos-hint { font-size: 0.75rem; color: var(--texto-sec); font-style: italic; margin: 0 0 8px; }
+.oc-repos-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--borde); }
+.oc-repos-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.oc-repos-nombre { font-size: 0.82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-repos-meta { font-size: 0.72rem; color: var(--texto-sec); }
+.oc-punto-rojo     { color: #DC2626; font-size: 0.9rem; flex-shrink: 0; }
+.oc-punto-amarillo { color: #D97706; font-size: 0.9rem; flex-shrink: 0; }
+.oc-punto-verde    { color: #16A34A; font-size: 0.9rem; flex-shrink: 0; }
 .oc-buscador-wrap { display: flex; gap: 6px; align-items: center; padding: 0 14px 6px; }
 .oc-btn-filtros-toggle { padding: 0 10px; height: 30px; background: var(--fondo); border: 0.5px solid var(--borde); color: var(--texto-sec); border-radius: 6px; cursor: pointer; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
 .oc-btn-filtros-toggle:hover, .oc-btn-filtros-toggle.active { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
