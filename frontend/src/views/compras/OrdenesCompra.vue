@@ -155,32 +155,50 @@
                   <span class="oc-cat-count">{{ opcionesFiltradas.length }} opciones</span>
                 </div>
 
-                <!-- Filtros -->
-                <div class="oc-filtros">
+                <!-- Buscador (método principal) + toggle de filtros -->
+                <div class="oc-buscador-wrap">
+                  <div class="oc-busqueda">
+                    <i class="ti ti-search" style="color:#A0A0A0;font-size:15px" aria-hidden="true"></i>
+                    <input v-model="filtroBusquedaOC" placeholder="Buscar producto o código..." autocomplete="off" />
+                  </div>
+                  <button
+                    class="oc-btn-filtros-toggle"
+                    :class="{ active: filtrosAbiertosOC }"
+                    @click="filtrosAbiertosOC = !filtrosAbiertosOC"
+                    title="Filtros"
+                  >⚙ Filtros</button>
+                </div>
+
+                <!-- Filtros secundarios (colapsables) -->
+                <div v-if="filtrosAbiertosOC" class="oc-filtros-panel">
+                  <select v-model="filtroDeptoOC" class="oc-filtro-sel" @change="alCambiarDeptoOC">
+                    <option value="">Departamento</option>
+                    <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
+                  </select>
+                  <select v-model="filtroCategoriaOC" class="oc-filtro-sel" :disabled="!filtroDeptoOC" @change="alCambiarCategoriaOC">
+                    <option value="">Categoría</option>
+                    <option v-for="c in categoriasOC" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                  </select>
+                  <select v-model="filtroSubcategoriaOC" class="oc-filtro-sel" :disabled="!filtroCategoriaOC">
+                    <option value="">Subcategoría</option>
+                    <option v-for="s in subcategoriasOC" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                  </select>
                   <select v-model="filtroMarcaOC" class="oc-filtro-sel">
                     <option value="">Marca</option>
                     <option v-for="m in marcas" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                   </select>
-                  <select v-model="filtroDeptoOC" class="oc-filtro-sel" @change="cargarCategoriasOC">
-                    <option value="">Departamento</option>
-                    <option v-for="d in departamentos" :key="d.id" :value="d.id">{{ d.nombre }}</option>
-                  </select>
-                  <select v-model="filtroCategoriaOC" class="oc-filtro-sel" :disabled="!filtroDeptoOC">
-                    <option value="">Categoría</option>
-                    <option v-for="c in categoriasOC" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                  </select>
-                </div>
-                <div class="oc-filtros">
-                  <div class="oc-busqueda">
-                    <i class="ti ti-search" style="color:#A0A0A0;font-size:15px" aria-hidden="true"></i>
-                    <input v-model="filtroBusquedaOC" placeholder="Buscar producto o código..." />
-                  </div>
+                  <button
+                    v-if="filtroMarcaOC || filtroDeptoOC || filtroCategoriaOC || filtroSubcategoriaOC"
+                    class="oc-btn-limpiar-filtros"
+                    @click="limpiarFiltrosOC"
+                  >✕ Limpiar</button>
                 </div>
 
                 <!-- Lista de productos -->
                 <div class="oc-prod-list">
                   <div v-for="op in opcionesFiltradas" :key="op.key" class="oc-prod-item"
-                    :class="{ 'oc-prod-en-orden': productoEnOrden(op.key) }">
+                    :class="{ 'oc-prod-en-orden': productoEnOrden(op.key) }"
+                    @click="agregarDesdeCatalogo(op)">
                     <div class="oc-prod-info">
                       <div class="oc-prod-nombre-row">
                         <span class="oc-prod-nombre">{{ op.label }}</span>
@@ -197,14 +215,17 @@
                         Sin compras previas | Stock: <span :class="{ 'oc-stock-bajo': op.stock < 5 }">{{ op.stock }}</span>
                       </div>
                     </div>
-                    <button v-if="!productoEnOrden(op.key)" class="oc-btn-add" @click="agregarDesdeCatalogo(op)">+</button>
+                    <span v-if="!productoEnOrden(op.key)" class="oc-btn-add">+</span>
                     <span v-else class="oc-ya-agregado">
                       <i class="ti ti-check" aria-hidden="true"></i>
                     </span>
                   </div>
 
-                  <div v-if="opcionesFiltradas.length === 0" class="oc-prod-vacio">
-                    Usa los filtros para encontrar productos
+                  <div v-if="mostrarVacioInicialOC" class="oc-prod-vacio">
+                    Escribe 2+ caracteres o usa los filtros para buscar productos
+                  </div>
+                  <div v-else-if="opcionesFiltradas.length === 0" class="oc-prod-vacio">
+                    Sin resultados
                   </div>
 
                   <!-- Crear producto nuevo -->
@@ -302,7 +323,10 @@ export default {
       filtroProveedorOC:  '',
       filtroBusquedaOC:   '',
       filtroCategoriaOC:  '',
+      filtroSubcategoriaOC: '',
       categoriasOC:       [],
+      subcategoriasOC:    [],
+      filtrosAbiertosOC:  false,
       ordenDetalle:       null,
       mostrarForm:        false,
       editandoId:         null,
@@ -358,10 +382,11 @@ export default {
               variante_id:    v.id,
               departamento_id:p.departamento_id || null,
               categoria_id:   p.categoria_id    || null,
+              subcategoria_id:p.subcategoria_id || null,
               proveedor_id:   p.proveedor_id    || null,
               marca_id:       p.marca_id        || null,
               label,
-              labelBusq:      label.toLowerCase(),
+              labelBusq:      `${p.codigo || ''} ${label}`.toLowerCase(),
               costo,
               stock:          v.stock || 0,
               stock_label:    v.stock < 5 ? ` · ⚠ stock:${v.stock}` : ` · stock:${v.stock}`,
@@ -375,10 +400,11 @@ export default {
             variante_id:    null,
             departamento_id:p.departamento_id || null,
             categoria_id:   p.categoria_id    || null,
+            subcategoria_id:p.subcategoria_id || null,
             proveedor_id:   p.proveedor_id    || null,
             marca_id:       p.marca_id        || null,
             label:          p.nombre,
-            labelBusq:      p.nombre.toLowerCase(),
+            labelBusq:      `${p.codigo || ''} ${p.nombre}`.toLowerCase(),
             costo:          p.costo_usd || 0,
             stock:          p.stock || 0,
             stock_label:    (p.stock || 0) < 5 ? ` · ⚠ stock:${p.stock}` : ` · stock:${p.stock}`,
@@ -388,7 +414,13 @@ export default {
       }
       return lista.sort((a, b) => a.label.localeCompare(b.label))
     },
+    mostrarVacioInicialOC() {
+      const q = this.filtroBusquedaOC.trim()
+      const tieneFiltro = this.filtroMarcaOC || this.filtroDeptoOC || this.filtroCategoriaOC || this.filtroSubcategoriaOC || this.filtroProveedorOC
+      return q.length < 2 && !tieneFiltro
+    },
     opcionesFiltradas() {
+      if (this.mostrarVacioInicialOC) return []
       let lista = this.opcionesProductos
       if (this.filtroMarcaOC) {
         const id = parseInt(this.filtroMarcaOC)
@@ -401,6 +433,10 @@ export default {
       if (this.filtroCategoriaOC) {
         const id = parseInt(this.filtroCategoriaOC)
         lista = lista.filter(o => o.categoria_id === id)
+      }
+      if (this.filtroSubcategoriaOC) {
+        const id = parseInt(this.filtroSubcategoriaOC)
+        lista = lista.filter(o => o.subcategoria_id === id)
       }
       if (this.filtroProveedorOC) {
         const id = parseInt(this.filtroProveedorOC)
@@ -456,6 +492,30 @@ export default {
         this.filtroCategoriaOC = ''
       } catch { this.categoriasOC = [] }
     },
+    async cargarSubcategoriasOC() {
+      if (!this.filtroCategoriaOC) {
+        this.subcategoriasOC = []
+        this.filtroSubcategoriaOC = ''
+        return
+      }
+      try {
+        const res = await axios.get('/productos/subcategorias', { params: { categoria_id: this.filtroCategoriaOC } })
+        this.subcategoriasOC = res.data
+        this.filtroSubcategoriaOC = ''
+      } catch { this.subcategoriasOC = [] }
+    },
+    alCambiarDeptoOC() {
+      this.subcategoriasOC = []
+      this.filtroSubcategoriaOC = ''
+      this.cargarCategoriasOC()
+    },
+    alCambiarCategoriaOC() {
+      this.cargarSubcategoriasOC()
+    },
+    limpiarFiltrosOC() {
+      this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroCategoriaOC = ''
+      this.filtroSubcategoriaOC = ''; this.categoriasOC = []; this.subcategoriasOC = []
+    },
     _lineaVacia() {
       return { _key: '', producto_id: null, variante_id: null, nombre_producto: '', cantidad_pedida: 1, precio_unitario_usd: 0, es_producto_nuevo: false, marca_id: null, departamento_id: null, categoria_id: null }
     },
@@ -464,12 +524,14 @@ export default {
       this.form = { proveedor_id: '', observacion: '', detalles: [] }
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
+      this.filtroSubcategoriaOC = ''; this.subcategoriasOC = []; this.filtrosAbiertosOC = false
       this.mostrarForm = true
     },
     editarOrden(o) {
       this.editandoId = o.id
       this.filtroMarcaOC = ''; this.filtroDeptoOC = ''; this.filtroProveedorOC = ''; this.filtroBusquedaOC = ''
       this.filtroCategoriaOC = ''; this.categoriasOC = []
+      this.filtroSubcategoriaOC = ''; this.subcategoriasOC = []; this.filtrosAbiertosOC = false
       this.form = {
         proveedor_id: o.proveedor_id,
         observacion:  o.observacion || '',
@@ -765,18 +827,23 @@ export default {
 .oc-prov-bar { padding: 0 1.25rem 0.5rem; display: flex; align-items: center; gap: 8px; }
 .oc-prov-bar label { font-size: 0.82rem; color: var(--texto-sec); white-space: nowrap; }
 .oc-prov-bar select { flex: 1; }
-.oc-panels { display: flex; flex: 1; min-height: 380px; border-top: 1px solid var(--borde); overflow: hidden; }
-.oc-catalogo { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--borde); }
+.oc-panels { display: grid; grid-template-columns: 70fr 30fr; flex: 1; min-height: 380px; border-top: 1px solid var(--borde); overflow: hidden; }
+.oc-catalogo { min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--borde); }
 .oc-cat-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.9rem; font-weight: 500; }
 .oc-cat-count { margin-left: auto; font-size: 0.75rem; color: var(--texto-sec); font-weight: 400; }
-.oc-filtros { display: flex; gap: 5px; padding: 0 14px 6px; }
-.oc-filtro-sel { flex: 1; min-width: 0; font-size: 0.78rem; height: 30px; }
+.oc-buscador-wrap { display: flex; gap: 6px; align-items: center; padding: 0 14px 6px; }
+.oc-btn-filtros-toggle { padding: 0 10px; height: 30px; background: var(--fondo); border: 0.5px solid var(--borde); color: var(--texto-sec); border-radius: 6px; cursor: pointer; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+.oc-btn-filtros-toggle:hover, .oc-btn-filtros-toggle.active { background: #1A1A1A; color: #FFCC00; border-color: #1A1A1A; }
+.oc-filtros-panel { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; padding: 0 14px 6px; }
+.oc-filtro-sel { flex: 1; min-width: 110px; font-size: 0.78rem; height: 30px; }
+.oc-btn-limpiar-filtros { padding: 0 10px; height: 30px; background: transparent; border: 1px solid #DC2626; color: #DC2626; border-radius: 6px; cursor: pointer; font-size: 0.75rem; white-space: nowrap; flex-shrink: 0; }
+.oc-btn-limpiar-filtros:hover { background: #DC26261A; }
 .oc-busqueda { display: flex; align-items: center; gap: 6px; flex: 1; background: var(--fondo); border: 0.5px solid var(--borde); border-radius: 6px; height: 30px; padding: 0 8px; }
 .oc-busqueda input { background: transparent; border: none; color: var(--texto-principal); font-size: 0.8rem; flex: 1; outline: none; }
 .oc-prod-list { flex: 1; overflow-y: auto; padding: 0 14px 8px; }
-.oc-prod-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--borde); cursor: default; }
+.oc-prod-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--borde); cursor: pointer; }
 .oc-prod-item:hover { background: var(--fondo-hover, rgba(255,204,0,0.03)); }
-.oc-prod-en-orden { opacity: 0.5; }
+.oc-prod-en-orden { opacity: 0.5; cursor: default; }
 .oc-prod-info { flex: 1; min-width: 0; }
 .oc-prod-nombre-row { display: flex; align-items: baseline; gap: 8px; }
 .oc-prod-nombre { min-width: 0; flex: 1; font-size: 0.82rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -791,7 +858,7 @@ export default {
 .oc-crear-nuevo { padding: 10px 0; text-align: center; color: #FFCC00; font-size: 0.8rem; cursor: pointer; border-top: 1px dashed var(--borde); margin-top: 4px; }
 .oc-crear-nuevo:hover { text-decoration: underline; }
 /* Panel derecho: orden */
-.oc-orden { width: 400px; display: flex; flex-direction: column; background: var(--fondo); flex-shrink: 0; }
+.oc-orden { min-width: 0; display: flex; flex-direction: column; background: var(--fondo); }
 .oc-orden-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.88rem; font-weight: 500; border-bottom: 0.5px solid var(--borde); }
 .oc-orden-items { flex: 1; overflow-y: auto; padding: 4px 12px; }
 .oc-orden-item { padding: 8px 0; border-bottom: 0.5px solid var(--borde); }

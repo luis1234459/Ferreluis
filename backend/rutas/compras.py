@@ -996,7 +996,7 @@ def variaciones_precio(db: Session = Depends(get_db), _: None = Depends(require_
 @router.get("/catalogo-costos")
 def catalogo_costos(db: Session = Depends(get_db), _: None = Depends(require_admin)):
     resultado = _listar_productos_completo(
-        incluir_inactivos=False, skip=0, limit=1_000_000, db=db
+        incluir_inactivos=False, skip=0, limit=1_000_000, db=db, sede_activa=None
     )
     productos = resultado["productos"]
 
