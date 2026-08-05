@@ -38,7 +38,7 @@
                     title="Editar">✏️</button>
                   <button class="btn-edit-depto"
                     @click.stop="eliminarDepto(d)"
-                    title="Eliminar">🗑️</button>
+                    title="Eliminar"><svg class="icono-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
                 </div>
               </div>
 
@@ -59,7 +59,7 @@
                         title="Editar">✏️</button>
                       <button v-if="esAdmin" class="btn-edit-cat"
                         @click.stop="eliminarCat(c)"
-                        title="Eliminar">🗑️</button>
+                        title="Eliminar"><svg class="icono-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
                     </div>
                   </div>
                 </div>
@@ -85,7 +85,7 @@
                         title="Editar">✏️</button>
                       <button v-if="esAdmin" class="btn-edit-cat"
                         @click="eliminarSubcat(s)"
-                        title="Eliminar">🗑️</button>
+                        title="Eliminar"><svg class="icono-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
                     </div>
                   </div>
                   <button v-if="esAdmin" class="btn-nueva-cat"
@@ -466,6 +466,7 @@ export default {
 .cat-item:hover .btn-edit-cat,
 .subcat-item:hover .btn-edit-cat { opacity: 0.6; }
 .btn-edit-cat:hover { opacity: 1 !important; }
+.icono-trash { width: 1em; height: 1em; vertical-align: -0.15em; color: #DC2626; }
 .mapa-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; }
 .mapa-modal { background: #FFFFFF; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 1rem; }
 .mapa-modal h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--texto-principal); }
