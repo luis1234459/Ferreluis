@@ -489,7 +489,7 @@
           <!-- Filtros para cargar productos -->
           <div class="filtros-bar">
             <select v-model="gestionFiltroTipo"
-              @change="gestionFiltroId = ''; gestionFiltroCategoria = ''; gestionCategoriasOpc = []; gestionProductos = []">
+              @change="gestionFiltroId = ''; gestionFiltroCategoria = ''; gestionCategoriasOpc = []; gestionFiltroSubcategoria = ''; gestionSubcategoriasOpc = []; gestionProductos = []">
               <option value="todos">Todos los productos</option>
               <option value="departamento">Por departamento</option>
               <option value="proveedor">Por proveedor</option>
@@ -506,9 +506,15 @@
                 :key="op.id" :value="op.id">{{ op.nombre }}</option>
             </select>
             <select v-if="gestionFiltroTipo === 'departamento' && gestionCategoriasOpc.length > 0"
-              v-model="gestionFiltroCategoria">
+              v-model="gestionFiltroCategoria"
+              @change="cargarSubcategoriasGestion">
               <option value="">— Todas las categorías —</option>
               <option v-for="c in gestionCategoriasOpc" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+            <select v-if="gestionFiltroTipo === 'departamento' && gestionSubcategoriasOpc.length > 0"
+              v-model="gestionFiltroSubcategoria">
+              <option value="">— Todas las subcategorías —</option>
+              <option v-for="s in gestionSubcategoriasOpc" :key="s.id" :value="s.id">{{ s.nombre }}</option>
             </select>
             <button class="btn-cargar" @click="cargarProductosGestion"
               :disabled="gestionCargando">
@@ -1179,6 +1185,8 @@ export default {
       gestionFiltroId:          '',
       gestionFiltroCategoria:   '',
       gestionCategoriasOpc:     [],
+      gestionFiltroSubcategoria:   '',
+      gestionSubcategoriasOpc:     [],
       gestionProductos:         [],
       gestionCargando:          false,
       gestionSeleccion:         [],
@@ -1843,6 +1851,7 @@ export default {
         const params = { filtro_tipo: this.gestionFiltroTipo }
         if (this.gestionFiltroId) params.filtro_id = this.gestionFiltroId
         if (this.gestionFiltroCategoria) params.categoria_id = this.gestionFiltroCategoria
+        if (this.gestionFiltroSubcategoria) params.subcategoria_id = this.gestionFiltroSubcategoria
         const res = await axios.get('/ajustes/productos',
           { params, headers: this._headers() })
         this.gestionProductos = res.data
@@ -1853,11 +1862,25 @@ export default {
     async cargarCategoriasGestion() {
       this.gestionFiltroCategoria = ''
       this.gestionCategoriasOpc = []
+      this.gestionFiltroSubcategoria = ''
+      this.gestionSubcategoriasOpc = []
       if (this.gestionFiltroTipo !== 'departamento' || !this.gestionFiltroId) return
       try {
         const res = await axios.get('/productos/categorias', { params: { departamento_id: this.gestionFiltroId } })
         this.gestionCategoriasOpc = res.data
       } catch { this.gestionCategoriasOpc = [] }
+    },
+    async cargarSubcategoriasGestion() {
+      this.gestionFiltroSubcategoria = ''
+      if (!this.gestionFiltroCategoria) {
+        this.gestionSubcategoriasOpc = []
+        return
+      }
+      try {
+        const res = await axios.get('/productos/subcategorias',
+          { params: { categoria_id: this.gestionFiltroCategoria } })
+        this.gestionSubcategoriasOpc = res.data
+      } catch { this.gestionSubcategoriasOpc = [] }
     },
 
     toggleGestionSeleccion(id) {

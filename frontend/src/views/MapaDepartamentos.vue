@@ -463,7 +463,8 @@ export default {
 .btn-nueva-cat { background: #F1F5F9; border: 1px dashed #CBD5E1; border-radius: 6px; padding: 0.3rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #475569; margin-top: 0.25rem; width: 100%; }
 .btn-nueva-cat:hover { background: #E2E8F0; border-color: #94A3B8; }
 .btn-edit-cat { background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0; opacity: 0; margin-left: auto; }
-.cat-item:hover .btn-edit-cat { opacity: 0.6; }
+.cat-item:hover .btn-edit-cat,
+.subcat-item:hover .btn-edit-cat { opacity: 0.6; }
 .btn-edit-cat:hover { opacity: 1 !important; }
 .mapa-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; }
 .mapa-modal { background: #FFFFFF; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 1rem; }
