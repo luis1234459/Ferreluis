@@ -38,7 +38,7 @@
                     title="Editar">✏️</button>
                   <button class="btn-edit-depto"
                     @click.stop="eliminarDepto(d)"
-                    title="Eliminar">🗑</button>
+                    title="Eliminar">🗑️</button>
                 </div>
               </div>
 
@@ -59,7 +59,7 @@
                         title="Editar">✏️</button>
                       <button v-if="esAdmin" class="btn-edit-cat"
                         @click.stop="eliminarCat(c)"
-                        title="Eliminar">🗑</button>
+                        title="Eliminar">🗑️</button>
                     </div>
                   </div>
                 </div>
@@ -85,7 +85,7 @@
                         title="Editar">✏️</button>
                       <button v-if="esAdmin" class="btn-edit-cat"
                         @click="eliminarSubcat(s)"
-                        title="Eliminar">🗑</button>
+                        title="Eliminar">🗑️</button>
                     </div>
                   </div>
                   <button v-if="esAdmin" class="btn-nueva-cat"
