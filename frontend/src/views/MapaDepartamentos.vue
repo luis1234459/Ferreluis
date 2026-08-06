@@ -22,12 +22,13 @@
           <div v-else class="mapa-grid">
             <div v-for="d in departamentosFiltrados" :key="d.id"
               class="depto-card"
-              :class="{ 'depto-expandido': expandido === d.id }">
+              :class="{ 'depto-expandido': expandido === d.id, 'depto-card-inactiva': !d.activo }">
 
               <div class="depto-header"
                 @click="expandido = expandido === d.id ? null : d.id">
                 <span class="depto-icono">📦</span>
                 <span class="depto-nombre">{{ d.nombre }}</span>
+                <span v-if="!d.activo" class="depto-badge depto-badge-inactivo">Inactivo</span>
                 <span class="depto-badge">
                   {{ d.categorias.length }} {{ d.categorias.length === 1 ? 'categoría' : 'categorías' }}
                 </span>
@@ -131,6 +132,13 @@
           placeholder="Nombre del departamento"
           class="mapa-input" ref="inputDepto"
         />
+        <label class="mapa-check-opt">
+          <input type="checkbox" v-model="formDepto.activo" />
+          <span>
+            <strong>Activo</strong>
+            <small>Si se desactiva, sus productos se ocultan de Ventas, Inventario y Reportes — el departamento se sigue pudiendo editar desde acá.</small>
+          </span>
+        </label>
         <div class="mapa-modal-botones">
           <button class="btn-cancelar"
             @click="modalDepto = false">Cancelar</button>
@@ -223,7 +231,7 @@ export default {
       busqueda:       '',
       usuario:        JSON.parse(localStorage.getItem('usuario') || '{}'),
       modalDepto:     false,
-      formDepto:      { id: null, nombre: '' },
+      formDepto:      { id: null, nombre: '', activo: true },
       modalCat:       false,
       formCat:        { id: null, nombre: '', departamento_id: null },
       guardandoDepto: false,
@@ -263,8 +271,8 @@ export default {
     },
     abrirModalDepto(d) {
       this.formDepto = d
-        ? { id: d.id, nombre: d.nombre }
-        : { id: null, nombre: '' }
+        ? { id: d.id, nombre: d.nombre, activo: d.activo }
+        : { id: null, nombre: '', activo: true }
       this.modalDepto = true
       this.$nextTick(() => this.$refs.inputDepto?.focus())
     },
@@ -339,11 +347,11 @@ export default {
         if (this.formDepto.id) {
           await axios.put(
             `/productos/departamentos/${this.formDepto.id}`,
-            { nombre: this.formDepto.nombre }
+            { nombre: this.formDepto.nombre, activo: this.formDepto.activo }
           )
         } else {
           await axios.post('/productos/departamentos',
-            { nombre: this.formDepto.nombre }
+            { nombre: this.formDepto.nombre, activo: this.formDepto.activo }
           )
         }
         this.modalDepto = false
@@ -374,7 +382,9 @@ export default {
       } finally { this.guardandoCat = false }
     },
     async cargarDepartamentos() {
-      const res = await axios.get('/productos/departamentos-con-categorias')
+      const res = await axios.get('/productos/departamentos-con-categorias', {
+        params: { incluir_inactivos: true },
+      })
       this.departamentos = res.data
     },
     async cargarMarcas() {
@@ -438,6 +448,10 @@ export default {
 .depto-expandido .depto-nombre { color: #FFCC00; }
 .depto-badge { font-size: 0.72rem; font-weight: 700; background: #F1F5F9; color: #475569; padding: 0.15rem 0.5rem; border-radius: 10px; white-space: nowrap; }
 .depto-expandido .depto-badge { background: rgba(255,204,0,0.2); color: #FFCC00; }
+.depto-badge-inactivo { background: #FEE2E2; color: #B91C1C; }
+.depto-expandido .depto-badge-inactivo { background: #B91C1C; color: #FFFFFF; }
+.depto-card-inactiva { opacity: 0.6; }
+.depto-card-inactiva:hover { opacity: 0.85; }
 .depto-toggle { font-size: 0.72rem; color: var(--texto-muted); flex-shrink: 0; }
 .depto-expandido .depto-toggle { color: #FFCC00; }
 .depto-cats { padding: 0.75rem 1rem; border-top: 1px solid var(--borde); background: #FFFFFF; }
@@ -472,6 +486,11 @@ export default {
 .mapa-modal h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--texto-principal); }
 .mapa-input { border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.9rem; width: 100%; box-sizing: border-box; }
 .mapa-input:focus { outline: none; border-color: #FFCC00; }
+.mapa-check-opt { display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; }
+.mapa-check-opt input[type="checkbox"] { margin-top: 0.2rem; width: 1rem; height: 1rem; flex-shrink: 0; cursor: pointer; }
+.mapa-check-opt span { display: flex; flex-direction: column; gap: 0.15rem; }
+.mapa-check-opt strong { font-size: 0.88rem; color: var(--texto-principal); }
+.mapa-check-opt small { font-size: 0.76rem; color: var(--texto-muted); line-height: 1.35; }
 .mapa-modal-botones { display: flex; gap: 0.5rem; justify-content: flex-end; }
 .btn-cancelar { background: #F1F5F9; border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; color: #475569; }
 .btn-cancelar:hover { background: #E2E8F0; }

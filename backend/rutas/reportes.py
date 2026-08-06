@@ -71,6 +71,16 @@ def _calcular_dias_periodo(desde, hasta) -> int:
         return 30
 
 
+def _sin_deptos_inactivos(db: Session, productos: list) -> list:
+    """Filtra productos cuyo departamento está inactivo (ej. consignación
+    fuera de revisión) — para que los reportes de inventario no los listen
+    ni los sumen mientras el departamento permanezca oculto."""
+    inactivos = {row[0] for row in db.query(Departamento.id).filter(Departamento.activo == False).all()}
+    if not inactivos:
+        return productos
+    return [p for p in productos if p.departamento_id not in inactivos]
+
+
 # ---------------------------------------------------------------------------
 # VENTAS — endpoints existentes
 # ---------------------------------------------------------------------------
@@ -697,6 +707,7 @@ def reporte_inventario(
     _: None = Depends(require_admin),
 ):
     productos  = db.query(Producto).order_by(Producto.nombre).all()
+    productos  = _sin_deptos_inactivos(db, productos)
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
         variantes_map.setdefault(v.producto_id, []).append(v)
@@ -748,6 +759,7 @@ def inventario_por_departamento(
     _: None = Depends(require_admin),
 ):
     productos     = db.query(Producto).order_by(Producto.nombre).all()
+    productos     = _sin_deptos_inactivos(db, productos)
     departamentos = {d.id: d for d in db.query(Departamento).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -798,6 +810,7 @@ def inventario_por_proveedor(
     _: None = Depends(require_admin),
 ):
     productos   = db.query(Producto).order_by(Producto.nombre).all()
+    productos   = _sin_deptos_inactivos(db, productos)
     proveedores = {p.id: p for p in db.query(Proveedor).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -845,6 +858,7 @@ def inventario_pareto(
     _: None = Depends(require_admin),
 ):
     productos_clave = db.query(Producto).filter(Producto.es_producto_clave == True).order_by(Producto.nombre).all()
+    productos_clave = _sin_deptos_inactivos(db, productos_clave)
     mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     detalles = _detalles_en_periodo(db, desde, hasta)
@@ -880,6 +894,7 @@ def inventario_rotacion(
 ):
     dias_periodo  = _calcular_dias_periodo(desde, hasta)
     productos     = db.query(Producto).order_by(Producto.nombre).all()
+    productos     = _sin_deptos_inactivos(db, productos)
     departamentos = {d.id: d for d in db.query(Departamento).all()}
     variantes_map: dict = {}
     for v in db.query(VarianteProducto).all():
@@ -951,6 +966,7 @@ def valorizacion_inventario(
             Producto.activo == True,
             Producto.stock > 0,
         ).order_by(Producto.nombre).all()
+    productos = _sin_deptos_inactivos(db, productos)
     mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     deptos = {d.id: d.nombre for d in db.query(Departamento).all()}
@@ -1042,6 +1058,7 @@ def pdf_no_auditados(
         q = q.filter(Producto.departamento_id == departamento_id)
 
     productos = q.order_by(Producto.nombre).all()
+    productos = _sin_deptos_inactivos(db, productos)
     mapa_ex = mapa_existencia_por_sede(db) if sede_id else {}
 
     if desde_nombre:

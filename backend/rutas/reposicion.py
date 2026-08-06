@@ -150,6 +150,10 @@ def tabla_reposicion(
     del agregado global — igual que el resto de reportes de inventario desde
     la Fase 1J. Sin sede_id, comportamiento agregado de siempre, sin cambios.
     """
+    depto = db.query(Departamento).filter(Departamento.id == departamento_id).first()
+    if depto is None or not depto.activo:
+        return {"productos": []}
+
     q = db.query(Producto.id).filter(Producto.activo == True, Producto.departamento_id == departamento_id)
     if categoria_id is not None:
         q = q.filter(Producto.categoria_id == categoria_id)

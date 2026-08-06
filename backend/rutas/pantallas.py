@@ -204,6 +204,15 @@ def obtener_cola(pantalla_id: int, db: Session = Depends(get_db)):
         pd.departamento_id for pd in
         db.query(PantallaDepartamento).filter(PantallaDepartamento.pantalla_id == pantalla_id).all()
     ]
+    # Departamento inactivo (ej. consignación fuera de revisión) no debe
+    # colarse en cartelería aunque la pantalla lo tenga asignado y algún
+    # producto tenga foto puesta a mano.
+    if dep_ids:
+        dep_ids = [
+            row[0] for row in db.query(Departamento.id).filter(
+                Departamento.id.in_(dep_ids), Departamento.activo == True,
+            ).all()
+        ]
 
     bcv, binance = _tasas_actuales(db)
     hoy = date.today()

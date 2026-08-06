@@ -300,8 +300,11 @@ def listar_departamentos(db: Session = Depends(get_db)):
 
 
 @router.get("/departamentos-con-categorias")
-def departamentos_con_categorias(db: Session = Depends(get_db)):
-    deptos = db.query(Departamento).filter(Departamento.activo == True).order_by(Departamento.nombre).all()
+def departamentos_con_categorias(incluir_inactivos: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Departamento)
+    if not incluir_inactivos:
+        q = q.filter(Departamento.activo == True)
+    deptos = q.order_by(Departamento.nombre).all()
     result = []
     for d in deptos:
         cats = db.query(Categoria).filter(Categoria.departamento_id == d.id).order_by(Categoria.nombre).all()
@@ -316,6 +319,7 @@ def departamentos_con_categorias(db: Session = Depends(get_db)):
         result.append({
             "id":         d.id,
             "nombre":     d.nombre,
+            "activo":     d.activo,
             "categorias": cats_out,
         })
     return result
@@ -767,8 +771,16 @@ def listar_productos(
     q = db.query(Producto)
     if not incluir_inactivos:
         q = q.filter(Producto.activo == True)
+    # Departamento inactivo (ej. consignación fuera de revisión) oculta sus
+    # productos de toda búsqueda/listado, sin afectar productos sin depto.
+    deptos_inactivos_ids = [r[0] for r in db.query(Departamento.id).filter(Departamento.activo == False).all()]
+    if deptos_inactivos_ids:
+        q = q.filter(or_(
+            Producto.departamento_id.is_(None),
+            ~Producto.departamento_id.in_(deptos_inactivos_ids),
+        ))
     if busqueda:
-        from sqlalchemy import or_, and_
+        from sqlalchemy import and_
         variante_ids = db.query(VarianteProducto.producto_id).filter(
             VarianteProducto.codigo.ilike(f"%{busqueda}%")
         ).subquery()
@@ -806,7 +818,7 @@ def listar_productos(
         # activa resuelta, mira existencia_sede de esa sede (o stock de
         # variante activa, que no vive en existencia_sede); sin sede activa
         # (vista agregada), cae al stock global de siempre.
-        from sqlalchemy import exists, and_, or_
+        from sqlalchemy import exists, and_
         if sede_activa is not None:
             q = q.filter(or_(
                 exists().where(and_(
