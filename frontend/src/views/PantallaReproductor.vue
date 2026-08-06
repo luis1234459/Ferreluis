@@ -31,7 +31,9 @@
       <!-- Slide oferta -->
       <div v-else-if="slideActual.tipo === 'oferta'" class="pant-slide pant-oferta">
         <span class="pant-badge-oferta">OFERTA</span>
-        <img :src="slideActual.foto_url" class="pant-foto" />
+        <div class="pant-foto-card">
+          <img :src="slideActual.foto_url" class="pant-foto" />
+        </div>
         <div class="pant-info">
           <h1 class="pant-nombre">{{ slideActual.nombre }}</h1>
           <div class="pant-precios">
@@ -44,7 +46,9 @@
 
       <!-- Slide marca -->
       <div v-else class="pant-slide pant-marca">
-        <img :src="slideActual.foto_url" class="pant-foto-marca" />
+        <div class="pant-foto-marca-card">
+          <img :src="slideActual.foto_url" class="pant-foto-marca" />
+        </div>
         <h1 v-if="slideActual.titulo" class="pant-titulo-marca">{{ slideActual.titulo }}</h1>
       </div>
     </template>
@@ -130,12 +134,24 @@ export default {
   position: relative;
 }
 
-.pant-foto {
-  max-width: 90vw;
-  max-height: 62vh;
-  object-fit: contain;
+/* Caja/marco blanco: la foto siempre se contiene completa adentro, nunca se
+   recorta ni se deforma, sin importar el tamaño/proporción de origen. */
+.pant-foto-card {
+  width: 90vw;
+  height: 62vh;
+  box-sizing: border-box;
+  background: #fff;
   border-radius: 16px;
   box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pant-foto {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .pant-info { text-align: center; margin-top: 2.5rem; }
@@ -301,22 +317,36 @@ export default {
   inset: 0;
 }
 
-.pant-marca { padding: 0; }
-.pant-foto-marca {
+.pant-marca {
+  padding: 3rem;
+  box-sizing: border-box;
+  gap: 2rem;
+}
+/* Misma idea que .pant-foto-card: caja blanca que contiene la imagen completa,
+   sin recortarla ni deformarla, sin importar su tamaño/proporción de origen. */
+.pant-foto-marca-card {
+  flex: 1;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: absolute;
-  inset: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pant-foto-marca {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 .pant-titulo-marca {
-  position: relative;
-  z-index: 1;
+  flex-shrink: 0;
   font-size: 3rem;
   font-weight: 800;
-  background: rgba(0,0,0,0.55);
-  padding: 1rem 2.5rem;
-  border-radius: 16px;
   text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 </style>

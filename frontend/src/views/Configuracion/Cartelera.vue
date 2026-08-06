@@ -373,7 +373,7 @@ export default {
 .cart-deptos { font-size: 0.85rem; color: var(--texto-principal); margin: 0 0 0.35rem; }
 .cart-timing { font-size: 0.78rem; color: var(--texto-sec); margin: 0; }
 
-.cart-thumb { max-height: 44px; max-width: 70px; border-radius: 4px; object-fit: cover; }
+.cart-thumb { max-height: 44px; max-width: 70px; border-radius: 4px; object-fit: contain; background: #fff; }
 
 .cart-deptos-check {
   display: grid;
