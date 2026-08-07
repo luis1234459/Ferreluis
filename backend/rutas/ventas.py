@@ -31,7 +31,7 @@ from models import (
     Producto, VarianteProducto, Venta, PagoVenta, DetalleVenta,
     TasaCambio, Configuracion, ExcepcionVenta, ClaveAutorizacion, AbonoCredito,
     VentaCliente, Cliente, VendedorPerfil, ComisionVenta,
-    GarantiaVenta, PlantillaGarantia, Proveedor,
+    GarantiaVenta, PlantillaGarantia, Proveedor, ExistenciaSede,
     METODOS_USD, METODOS_BS, METODOS_VALIDOS,
     TOLERANCIA, DECIMALES_USD, DECIMALES_BS,
 )
@@ -390,8 +390,17 @@ def registrar_venta(
         if precio_unitario_usd < 0:
             raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
 
-        # Sin stock — verificar contra variante o producto
-        stock_disponible = float(variante.stock or 0) if variante else float(producto.stock or 0)
+        # Sin stock — variante: sigue frozen, lee variante.stock global.
+        # Sin variante: lee existencia_sede de la sede activa, no el agregado
+        # global (un vendedor solo puede vender lo que hay físicamente en su sede).
+        if variante:
+            stock_disponible = float(variante.stock or 0)
+        else:
+            existencia_activa = db.query(ExistenciaSede).filter(
+                ExistenciaSede.producto_id == producto_id,
+                ExistenciaSede.sede_id == sede_activa,
+            ).first()
+            stock_disponible = float(existencia_activa.existencia) if existencia_activa else 0.0
         if cantidad > stock_disponible:
             label = f"{producto.nombre}" + (f" ({variante.clase} {variante.color or ''})".rstrip() if variante else "")
             motivos_autorizacion.append(f"Venta sin stock: {label}")

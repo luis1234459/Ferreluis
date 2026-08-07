@@ -1,0 +1,199 @@
+departamento,categoria,prefijo,ganador_o_perdedor_en_colision,letra_alternativa_usada
+Accesorios p/Pintor,Brochas,AIBR,perdedor_depto,I
+Accesorios p/Pintor,cinta tirro,AICI,perdedor_depto,I
+Accesorios p/Pintor,fundas o camisas,AIFU,perdedor_depto,I
+Accesorios p/Pintor,kit bandeja,AIKI,perdedor_depto,I
+Accesorios p/Pintor,lijas,AILI,perdedor_depto,I
+Accesorios p/Pintor,pistolas,AIPI,perdedor_depto,I
+Accesorios p/Pintor,rodillos,AIRO,perdedor_depto,I
+Accesorios p/Constructor,botas todas,APBO,ganador_depto,
+Accesorios p/Constructor,carretilas,APCA,ganador_depto+ganador_categoria,
+Accesorios p/Constructor,cauchos todos / tripas todas,APCC,ganador_depto+perdedor_categoria,C
+Accesorios p/Constructor,cepillos todos,APCE,ganador_depto,
+Accesorios p/Constructor,cucharas,APCU,ganador_depto,
+Accesorios p/Constructor,espatulas,APES,ganador_depto,
+Accesorios p/Constructor,guantes,APGU,ganador_depto,
+Accesorios p/Constructor,limpotex,APLI,ganador_depto,
+Accesorios p/Constructor,Palin / cabos todos,APPA,ganador_depto+ganador_categoria,
+Accesorios p/Constructor,Palas/picos,APPL,ganador_depto+perdedor_categoria,L
+Accesorios p/Constructor,palustras,APPU,ganador_depto+perdedor_categoria,U
+Accesorios p/Constructor,rastrillos,APRA,ganador_depto,
+Bombas de motor Electrico,Autocebantes,BMAU,ganador_depto,
+Bombas de motor Electrico,bombas centrifugas,BMBA,ganador_depto+perdedor_categoria,A
+Bombas de motor Electrico,bombas de pesquera,BMBB,ganador_depto+perdedor_categoria,B
+Bombas de motor Electrico,bombas perifericas,BMBM,ganador_depto+perdedor_categoria,M
+Bombas de motor Electrico,bombas de caudal,BMBO,ganador_depto+ganador_categoria,
+Bombas de motor Electrico,bombas verticales,BMBS,ganador_depto+perdedor_categoria,S
+Bombas de motor Electrico,Bombas sumergibles,BMBU,ganador_depto+perdedor_categoria,U
+Bombas de motor Electrico,Flotadores/boyas,BMFL,ganador_depto,
+Conexiones Plasticas Roscadas,niples plasticos,CPNI,ganador_depto,
+Conexiones para ROSCA Galvaniz,conectores variantes,CRCN,perdedor_categoria,N
+Conexiones para ROSCA Galvaniz,conectores básicos,CRCO,ganador_categoria,
+Conexiones para ROSCA Galvaniz,niples galvanizados,CRNI,,
+Conexiones y Tuberia COBRE,Conexiones,CTCO,,
+Conexiones y Tuberia COBRE,tuberia,CTTU,,
+Conexiones P.V.C.,coneptores basicos P.V.C,CVCO,perdedor_depto,V
+Ferretería General,abrazadera,FGAB,,
+Ferretería General,balanzas todas,FGBA,,
+Ferretería General,CAVAS/FILTROS/TERMOS,FGCA,,
+Ferretería General,cortineros y tubos,FGCO,,
+Ferretería General,escaleras,FGES,,
+Ferretería General,gatos automotriz,FGGA,,
+Ferretería General,Generalidades,FGGE,,
+Ferretería General,manguera roja y multiuso,FGMA,ganador_categoria,
+Ferretería General,mecates,FGMC,perdedor_categoria,C
+Ferretería General,mecate/nylon/mecatillos,FGME,ganador_categoria,
+Ferretería General,manguera trasparente,FGMN,perdedor_categoria,N
+Ferretería General,pegamentos/ silicones,FGPE,,
+Ferretería General,regulador/cocinas/rep cocina,FGRE,,
+Ferretería General,ruedas todas,FGRU,,
+Ferretería General,señales,FGSE,,
+Herramientas Electricas,desmalezadoras electricas,HEDE,,
+Herramientas Electricas,Esmeriles,HEES,,
+Herramientas Electricas,minicompresores portatiles,HEMI,,
+Herramientas Electricas,Taladros,HETA,,
+Herramientas Electricas,Trozadoras,HETR,,
+Hidros y filtros en General,cartuchos de filtros/ cargas para desbarradores,HFCA,,
+Hidros y filtros en General,filtros domesticos en general,HFFI,ganador_categoria,
+Hidros y filtros en General,Filtros desbarradores aqqua1,HFFL,perdedor_categoria,L
+Hidros y filtros en General,HIDROTANQUE,HFHD,perdedor_categoria,D
+Hidros y filtros en General,Hidroneumaticos/hidrofiltros,HFHI,ganador_categoria,
+Hidros y filtros en General,Press control/accesrios para hidros/filtros,HFPR,,
+Hidros y filtros en General,tanques hidri / hidrofiltro,HFTA,ganador_categoria,
+Hidros y filtros en General,tanques filtros / filtros compactos,HFTN,perdedor_categoria,N
+Hidros y filtros en General,Tanques Precargados/kit hidrocompacto,HFTQ,perdedor_categoria,Q
+HIERRO Y HERRERIA,"cabillas, malla cercha  y perfiles",HHCA,,
+HIERRO Y HERRERIA,Ciclon/tubos/partes,HHCI,,
+HIERRO Y HERRERIA,ELECTRODOS,HHEL,,
+HIERRO Y HERRERIA,laminas techo y hierro negro,HHLA,,
+HIERRO Y HERRERIA,PUERTAS,HHPU,,
+HIERRO Y HERRERIA,Tuberias/angulos/pletinas,HHTU,,
+Herramientas Manuales,alicates,HMAL,,
+Herramientas Manuales,arco seguetas,HMAR,,
+Herramientas Manuales,dados todos,HMDA,,
+Herramientas Manuales,destornilladores y juegos destonillador,HMDE,,
+Herramientas Manuales,escuadras,HMES,,
+Herramientas Manuales,exactos,HMEX,,
+Herramientas Manuales,grapadoras todas,HMGR,,
+Herramientas Manuales,llaves combinadas,HMLA,perdedor_categoria,A
+Herramientas Manuales,llaves ajustables,HMLL,ganador_categoria,
+Herramientas Manuales,niveles,HMNI,,
+Herramientas Manuales,tenazas,HMTE,,
+Impermeabilizacion,Asfalticos,IMAS,,
+Impermeabilizacion,Imper/color,IMIM,,
+Impermeabilizacion,Mantos/Laminas,IMMA,,
+linea agricola,asperosores p/riego,LAAS,,
+linea agricola,bidones p/ equipos 2 tiempos,LABI,,
+linea agricola,fumigadoras,LAFU,,
+linea agricola,machetes,LAMA,,
+Linea Bricolaje,arandelas,LBAR,,
+Linea Bricolaje,barras roscadas,LBBA,,
+Linea Bricolaje,Bisagras,LBBI,,
+Linea Bricolaje,Mechas p/hierro,LBME,,
+Linea Bricolaje,perro p/guayas,LBPE,,
+Linea Bricolaje,pie de amigo,LBPI,,
+Linea Bricolaje,Ramplug todos  /cancamos,LBRA,,
+Linea Bricolaje,remaches,LBRE,,
+Linea Bricolaje,TORNILLO,LBTO,,
+Linea Construccion,bateas de granito,LCBA,ganador_depto,
+Linea Construccion,canales accesorios,LCCA,ganador_depto+ganador_categoria,
+Linea Construccion,cadenas,LCCD,ganador_depto+perdedor_categoria,D
+Linea Construccion,Clavos/alambre,LCCL,ganador_depto,
+Linea Construccion,Drywall general,LCDR,ganador_depto,
+Linea Construccion,lamina general,LCLA,ganador_depto,
+Linea Construccion,Mallas agricolas,LCMA,ganador_depto+ganador_categoria,
+Linea Construccion,mallas construccion,LCML,ganador_depto+perdedor_categoria,L
+Linea Construccion,pegos etc prodcits mixer,LCPE,ganador_depto,
+Linea Electricidad,apagadores,LEAP,,
+Linea Electricidad,baterias,LEBA,,
+Linea Electricidad,bombiIlos,LEBO,,
+Linea Electricidad,Breaker genericos todos,LEBR,,
+Linea Electricidad,Cables tw,LECA,ganador_categoria,
+Linea Electricidad,cuchillas / ticinos,LECC,perdedor_categoria,C
+Linea Electricidad,cajetin y tapas,LECJ,perdedor_categoria,J
+Linea Electricidad,canaletas,LECN,perdedor_categoria,N
+Linea Electricidad,Curvas/ EMT todas,LECU,ganador_categoria,
+Linea Electricidad,enchufes,LEEN,,
+Linea Electricidad,extensiones electricas,LEEX,,
+Linea Electricidad,fotoceldas y bases,LEFO,,
+Linea Electricidad,paneles led,LEPA,,
+Linea Electricidad,Protectores neveras y accesorios,LEPR,,
+Linea Electricidad,reflectores,LERE,,
+Linea Electricidad,tableros electricos,LETA,,
+Linea Herreria,Discos Corte y Desbaste,LHDI,,
+Linea Herreria,electrodos,LHEL,,
+Linea Herreria,Soldadoras,LHSO,,
+Linea Pinturas,aditivos varios,LIAD,perdedor_depto,I
+Linea Pinturas,BARNIZ / TRAFICO /CANCHA,LIBA,perdedor_depto,I
+Linea Pinturas,esmaltes/fondos etc,LIES,perdedor_depto,I
+Linea Pinturas,Pasta profesional,LIPA,perdedor_depto,I
+Linea Pinturas,pinturas caucho TIIPO C,LIPI,perdedor_depto+ganador_categoria,I
+Linea Pinturas,pinturas caucho TIIPO B,LIPN,perdedor_depto+perdedor_categoria,N
+Linea Pinturas,pinturas caucho TIIPO A,LIPT,perdedor_depto+perdedor_categoria,T
+Linea Pinturas,spray varios,LISP,perdedor_depto,I
+Linea Plomeria,accesorios p/poceta,LPAC,ganador_depto,
+Linea Plomeria,adaptadores de tanque,LPAD,ganador_depto,
+Linea Plomeria,cheques de bronce,LPCE,ganador_depto+perdedor_categoria,E
+Linea Plomeria,checkes plasticos,LPCH,ganador_depto+ganador_categoria,
+Linea Plomeria,coneptores manguera jardin,LPCO,ganador_depto,
+Linea Plomeria,cheques tipo maraca,LPCQ,ganador_depto+perdedor_categoria,Q
+Linea Plomeria,cheques veleta,LPCU,ganador_depto+perdedor_categoria,U
+Linea Plomeria,duchas telefonicas,LPDC,ganador_depto+perdedor_categoria,C
+Linea Plomeria,desague de lavaplatos/batea,LPDE,ganador_depto,
+Linea Plomeria,duchas regaderas,LPDU,ganador_depto+ganador_categoria,
+Linea Plomeria,filtro p/cheques,LPFI,ganador_depto,
+Linea Plomeria,Flotadores/boyas,LPFL,ganador_depto,
+Linea Plomeria,Griferias p/lavaplato dobles,LPGI,ganador_depto+perdedor_categoria,I
+Linea Plomeria,gomas,LPGO,ganador_depto,
+Linea Plomeria,griferias p/lavamano,LPGR,ganador_depto+ganador_categoria,
+Linea Plomeria,herrajes,LPHE,ganador_depto,
+Linea Plomeria,inodoros y rejillas,LPIN,ganador_depto,
+Linea Plomeria,Llave arresto,LPLL,ganador_depto,
+Linea Plomeria,manguera p/ lavaplatos,LPMA,ganador_depto+ganador_categoria,
+Linea Plomeria,manguera p/ lavamanos,LPMG,ganador_depto+perdedor_categoria,G
+Linea Plomeria,manguera jardin y kits,LPMN,ganador_depto+perdedor_categoria,N
+Linea Plomeria,niples plasticos,LPNI,ganador_depto,
+Linea Plomeria,sifones todos,LPSI,ganador_depto,
+Linea Plomeria,Valvulas de paso plasticas roscadas,LPVA,ganador_depto+ganador_categoria,
+Linea Plomeria,Valvulas de paso plasticas pegables,LPVL,ganador_depto+perdedor_categoria,L
+Linea Plomeria,vastagos todos,LPVS,ganador_depto+perdedor_categoria,S
+Linea Plomeria,Valvulas de chorro todas,LPVU,ganador_depto+perdedor_categoria,U
+Linea Plomeria,Valvulas de paso bronce todas,LPVV,ganador_depto+perdedor_categoria,V
+Linea Plomeria,wc/lavamaos y pedestales,LPWC,ganador_depto,
+Linea Cerrajeria,candados anticizallas,LRCA,perdedor_depto+ganador_categoria,R
+Linea Cerrajeria,cerradura pomo,LRCD,perdedor_depto+perdedor_categoria,D
+Linea Cerrajeria,cerradura cerrojo,LRCE,perdedor_depto+ganador_categoria,R
+Linea Cerrajeria,cilindros,LRCI,perdedor_depto,R
+Linea Cerrajeria,candados basicos,LRCN,perdedor_depto+perdedor_categoria,N
+Linea Cerrajeria,cerraduras p/Embutir,LRCR,perdedor_depto+perdedor_categoria,R
+MANGUERA Y Conexiones RIEGO,conectores básicos,MCCN,perdedor_categoria,N
+MANGUERA Y Conexiones RIEGO,CONEXIONES RIEGO,MCCO,ganador_categoria,
+MANGUERA Y Conexiones RIEGO,MANGUERAS,MCMA,,
+Maquinaria Industrial y Agricola,compresores,MICM,perdedor_categoria,M
+Maquinaria Industrial y Agricola,compactadoras/alisador/vibradores,MICO,ganador_categoria,
+Maquinaria Industrial y Agricola,Generadores,MIGE,,
+Maquinaria Industrial y Agricola,Hidroyet y accesorios,MIHI,,
+Maquinaria Industrial y Agricola,Maquinaria agricola,MIMA,,
+Maquinaria Industrial y Agricola,Motosierras/accesorios,MIMO,ganador_categoria,
+Maquinaria Industrial y Agricola,Motores,MIMT,perdedor_categoria,T
+Repuestos en General,Repuestos bombas de agua,RGRE,ganador_categoria,
+Repuestos en General,Rpe dezmalezadoras,RGRP,,
+Repuestos en General,repuestos de trompos,RGRU,perdedor_categoria,U
+Tubos alta/azul/PVC/Emt,Para Electricidad plastico,TAPA,ganador_categoria,
+Tubos alta/azul/PVC/Emt,Pegar agua fria,TAPE,ganador_categoria,
+Tubos alta/azul/PVC/Emt,Pegar agua caliente,TAPG,perdedor_categoria,G
+Tubos alta/azul/PVC/Emt,Para Electricidad EMT,TAPL,perdedor_categoria,L
+Tubos alta/azul/PVC/Emt,Para Agua negras,TAPR,perdedor_categoria,R
+Tubos alta/azul/PVC/Emt,Roscados azules,TARO,,
+Tubrica conexiones Agua F/A.C /Electri,coneptores basicos A.C,TCCN,perdedor_categoria,N
+Tubrica conexiones Agua F/A.C /Electri,coneptores basicos A.F,TCCO,ganador_categoria,
+Tanques plasticos,Australianos,TPAU,,
+Tanques plasticos,Bateas,TPBA,,
+Tanques plasticos,bebederos,TPBE,,
+Tanques plasticos,Cilindricos,TPCI,ganador_categoria,
+Tanques plasticos,Conicos,TPCO,,
+Tanques plasticos,Cisternas,TPCS,perdedor_categoria,S
+Tanques plasticos,Jumbos Industriales,TPJM,perdedor_categoria,M
+Tanques plasticos,Jumbos,TPJU,ganador_categoria,
+Bombas motor Gasolina o Gasoi,(sin categoria),BOXX,perdedor_depto,O
+Sin departamento,(sin categoria),SDXX,,

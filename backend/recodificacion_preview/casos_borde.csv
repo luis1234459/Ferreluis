@@ -1,0 +1,478 @@
+producto_id,nombre,caso,comportamiento_propuesto
+3,Destornillador plano,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-001; migrar a depto real despues
+10,ACCESORIOS PARA BAÑOS (VALENTINO B),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-001
+21,ALCAYATA METAL (PAR),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-002
+24,AMOLADORA RECTA 1- 1/2 DW887,con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-001
+88,ASPIRADO D/AUTO AV1500LA DW,con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-002
+111,BATIDOR DE MEZCLA 3/8 550M AMARILLO,con_depto_sin_categoria (Accesorios p/Pintor),placeholder XX -> AIXX-001
+183,BRIDA MOVIL C/CUELLO P/TUBO 3Y 4 FAMA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-003
+185,BUJE MOTOR LAVADO 12mm,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-001
+186,BUJE MOTOR SECADO 10mm,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-002
+187,BUJE VENT KOOL S/C,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-003
+188,BUJE VENT PATÓN BISELADO,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-004
+203,CALENTADOR ELÉCTRICO 35L 110V,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-004
+235,CARETA P/ESMERILAR,con_depto_sin_categoria (HIERRO Y HERRERIA),placeholder XX -> HHXX-001
+236,CARETA P/SOLDAR AUTOMÁTICA NEGRA (EXXEL),con_depto_sin_categoria (Linea Herreria),placeholder XX -> LHXX-001
+239,CARGADOR AIRE INDUSTRIAL AZUL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-005
+267,Cavadora de Madera Exxel Uso Agricola,con_depto_sin_categoria (linea agricola),placeholder XX -> LAXX-001
+315,CARTUCHO ELEMENTO FILTRO CARB AQP-21758,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-006
+357,CESTA ESCURRIDERO ACERO INOXIDABLE,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-007
+360,CESTA REDONDA C/TAPA 30.5LTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-008
+395,CINTA ALUMINIO BUTILO 5M*10CM COVO,con_depto_sin_categoria (Impermeabilizacion),placeholder XX -> IMXX-001
+397,CINTA ALUMINIO BUTÍLO 3M x 10CM (COVO),con_depto_sin_categoria (Impermeabilizacion),placeholder XX -> IMXX-002
+398,CINTA ANTIRRESBALANTE PRECAUCION AMAR,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-009
+406,CINTA IMPERM BUTILO EXXEL,con_depto_sin_categoria (Impermeabilizacion),placeholder XX -> IMXX-003
+407,CINTA IMPERMEABLE TAPA HUECOS AQQUAPLUS,con_depto_sin_categoria (Impermeabilizacion),placeholder XX -> IMXX-004
+424,"Cinta Adh. Tiro Verde 1""x45m EXXEL",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-010
+447,CLIP PARA MALLA POLISOMBRA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-011
+453,COMBO LAVAMANOS CRIOLLA N 5,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-001
+454,COMBO LAVAPLATO N 2,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-002
+470,CONO DE SEGURIDAD PVC 18,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-012
+472,CONTRATUERCA GRVEN LAVAPLATO,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-003
+476,CORTA CERAMICA T/LAPIZ RUBI,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-013
+477,CORTA TUBO BEKER,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-014
+478,CORTA TUBO PEQUEÑO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-015
+480,CORTADORA DE LOZA BD TC1200,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-016
+482,CRAYONES PARA MARCAR 6PZAS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-017
+483,CREOLINA 500ML,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-018
+489,CUERDA ELASTICA 60CM (UYUSTOOLS),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-019
+490,CUERDA ELASTICA 8MM VERDE 1.2MTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-020
+491,CUERDA SUJETA CARGA 1TON 1.5MTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-021
+495,DADOS PARA BUJIAS 1/2*13/16 o 21mm,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-022
+496,DADOS PARA BUJIAS 1/2*5/8 o 16mm,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-023
+554,DESMALEAZDORA HOMELITE 26CC,con_depto_sin_categoria (Maquinaria Industrial y Agricola),placeholder XX -> MIXX-001
+564,DESTAPADOR DE CAÑERÍAS (ACTIVO),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-024
+615,DISPENSADOR DE JABÓN LÍQUIDO 130ML,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-025
+616,DISPENSADOR JABON LAVAPLATOS,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-004
+617,DRILL SET 65PZA COOFIX 135W 8000-3300RPM,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-026
+678,DUCTO DE ESCAPE 4*5 FLEXIB,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-027
+696,ENGRASADORA INGCO 400CC,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-028
+697,ENVASE ATOMIZADOR EXXEL 500ML,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-029
+698,EQUIPO OXICORTE MASTERMING,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-030
+704,ESCARDILLA AGRICOLA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-031
+730,ESTAÑO X MTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-032
+733,EXTENSION 1 1/2 PLASTICA,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-005
+736,EXTENSION 1.1/4 PLASTICO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-033
+744,"EXTRACTOR 10"" GENÉRICO (DAÑADO)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-034
+745,"EXTRACTOR 12"" GENÉRICO (DAÑADO)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-035
+754,FILTRO D AIRE TRAMPA D/AGUA 10CC (WADFOW,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-006
+808,FORMULA MECANICA FEDERAL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-036
+909,GANCHO DE METAL PARA LAMINAS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-037
+910,GANCHO PARA COLGAR DOBLE BRONCE,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-038
+911,GARRUCHA 4RB,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-039
+912,GARRUCHAS 2RB,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-040
+922,GRAPAS CORONA COVO 1/2,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-041
+923,"GRAPAS DE 1/2"" (TOTAL)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-042
+924,GRASA AZÚL AUTOMOTRÍZ 400gr,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-043
+925,GRASA GRAFITADA 1KG,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-044
+980,GUIA 40MM 1/2 GRANDE,con_depto_sin_categoria (HIERRO Y HERRERIA),placeholder XX -> HHXX-002
+985,HACHA 3.5 C/CABO EXXEL,con_depto_sin_categoria (linea agricola),placeholder XX -> LAXX-002
+986,HACHUELA CABO MADERA,con_depto_sin_categoria (linea agricola),placeholder XX -> LAXX-003
+987,HARAGAN PLASTICO PRQUEÑO S/CABO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-045
+988,HARAGAN PLASTICOGRANDE S/CABO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-046
+1083,HOJA SEGUETA 24,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-001
+1119,IN- CAUTÍN 60W C/DIFUSOR MEGAPRO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-001
+1122,IN- CAUTÍN ELÉCTRICO 60W (VITRON),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-002
+1124,IN- CEPILLO ALAMBRE 3 HILERAS COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-047
+1125,IN- CEPILLO ALAMBRE CURVO (MEGAPRO),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-048
+1126,"IN- CEPILLO COPA ALAMBRE 4"" x5/8 (COVO)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-049
+1127,"IN- CEPILLO COPA ALAMBRE TREN 5"" (ROJO)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-050
+1128,"IN- CEPILLO COPA TRENZADO 5"" (UYUSTOOLS)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-051
+1129,IN- CEPILLO DE ALAMBRE (WOLGANF),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-052
+1130,IN- CEPILLO DE ALAMBRE 6 HILERA AMARILLO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-053
+1131,IN- CLAVADORA NEUMÁTICA 1030mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-003
+1132,IN- CLAVADORA NEUMÁTICA D/HORMIGÓN(INGCO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-004
+1153,IN- DETECTOR DE VOLTAJE (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-005
+1162,"IN- ESTOPA P/PULIR 7"" PULIDORA IN(INGCO)",con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-006
+1166,"IN- EXTENSIÓN P/RACHE 1/2"" x 10"" (EXXEL)",con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-007
+1168,IN- GANCHOS P/COLGAR NEGRO (EXXEL),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-008
+1175,IN- GRAPAS INDUSTRIAL 10MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-009
+1176,IN- GRAPAS INDUSTRIAL 12MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-010
+1177,IN- GRAPAS INDUSTRIAL 8MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-011
+1178,IN- GRAPAS P/ CLAVADORA 8mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-012
+1179,IN- GRAPAS P/CLAVADORA 10mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-013
+1180,IN- GRAPAS P/CLAVADORA 12mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-014
+1181,IN- GRAPAS P/CLAVADORA 35mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-015
+1185,IN- JUEGO D LLAVES ALLEN 10 PIEZAS(EXXEL,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-016
+1186,IN- JUEGO D LLAVES ALLEN 8 PZA PULG EXXE,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-017
+1187,IN- JUEGO D RATCHE Y DADO 40PZA (EXXEL),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-018
+1188,IN- JUEGO D/BOQUILL GIRATORIA 5PZ 1/2,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-019
+1189,IN- JUEGO DE CIERRA CIRCULAR 7PZAS,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-020
+1191,IN- JUEGO DE PUNTA ESTRELLA 5PZA EXXEL,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-021
+1196,IN- JUEGO LLAVES TORX BOLSILLT9-T40 (ING,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-022
+1227,IN- PROBADOR MEDIDOR DIGITAL UYUSTOOL,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-023
+1229,IN- PROBADOR VOLTAJE 600V DIGITAL TROEN,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-024
+1244,"IN-VERNIER PLASTICO 6""",con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-025
+1255,JUEGO ACOPLE BRONCE P/COMPRESOR,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-026
+1256,"JUEGO AROS GOMA 2"" INODORO",con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-027
+1257,JUEGO CONECTORES P/TELEF 6PZA ROCWER,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-028
+1258,JUEGO HERRAMIENTAS 39 PZA BOSS MAN,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-029
+1259,JUEGO MECJHAS 8PZA METAL TOTAL,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-030
+1260,JUEGO PEINES P/SALPICADORA S/BASE,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-031
+1261,JUEGO/DUCHA 1.5M MANGUERA GRIVEN,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-007
+1262,Junta Dresser 4 Pulgadas - Hierro fundid,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-054
+1265,KIT CARGA PEQUEÑA SACO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-055
+1267,KIT D/TUBOS TERMOCONTRAIBLES (TROEN),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-056
+1273,LANZA DE FUMIGADORAS,con_depto_sin_categoria (linea agricola),placeholder XX -> LAXX-004
+1299,LEO - CAJA ARRANCADORA B/SUMG 0.5HP,con_depto_sin_categoria (Bombas de motor Electrico),placeholder XX -> BMXX-001
+1341,LEO- SISTEMA PRESION CONSTANTE 350W 220V,con_depto_sin_categoria (Bombas de motor Electrico),placeholder XX -> BMXX-002
+1342,LEO- SISTEMA PRESION CONSTANTE 450W 220,con_depto_sin_categoria (Bombas de motor Electrico),placeholder XX -> BMXX-003
+1390,LIJADORA BD SS1000-B3,con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-003
+1391,LIJADORA DW D28111SK,con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-004
+1392,LIMPIADOR DE CARBURADOR 450ML COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-057
+1394,LIMPIADOR DE MOTOR,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-058
+1395,LIMPIADOR MULTIPROPÓSITO 40Z GRIVEN,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-059
+1396,"LIMPOTEX 1,43 LTS",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-002
+1434,LLAVE P/MANDRIL WOLFGGANG,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-060
+1439,LLAVERO DESTORCEDOR UYUSTOOL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-061
+1440,LLAVES MECANICAS X 6PZAS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-062
+1446,"LOB-PRENSA MINI BASE GIRATORIA 3""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-063
+1447,LOB-PRENSA MINI BASE GIRATORIA 4,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-064
+1452,LUBRICANTE AFLOJATODO 210ML COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-065
+1521,MANILLAS REPUESTO BLUE,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-066
+1533,MAQUINA SELLADORA 20CM*2MM 110 300W,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-067
+1541,MASCARILLA DE GASES ACIDOS 2 CARTUCHOS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-068
+1542,MATADOR VERDE 200G,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-069
+1543,MAZO DE GOMA 450G 160Z TOTAL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-070
+1571,MECHA SET ESCALONADAS 32MM COOFIX,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-071
+1572,MEDIDOR DE PRESION DE AIRE 0-100 PSI,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-072
+1576,MOLINO DE GRANOS CENTURY,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-073
+1578,MOTOBOMBA KOSHIN - HONDA 3*3,con_depto_sin_categoria (Bombas motor Gasolina o Gasoi),placeholder XX -> BOXX-001
+1581,MOTORES AGROS 14HP GASOLINA,con_depto_sin_categoria (Bombas motor Gasolina o Gasoi),placeholder XX -> BOXX-002
+1582,MOTORES ELECTRICOS,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-001
+1584,"NAVAJA PICO LORO 8"" EXXEL",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-074
+1748,"PARRILLERA 13.5""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-075
+1749,"PARRILLERA 2""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-076
+1750,"PARRILLERA 20""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-077
+1751,"PASADOR 2 1/2"" DORADO",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-078
+1754,"PASADOR CULATA 3"" DIESEL TOOL",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-079
+1758,"PASADOR PORTA CANDADO D/ZINCADO 4""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-080
+1759,PAÑO DE MICROFIBRA PAQ 5 (LF),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-081
+1788,PEINE DE SALPICADORA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-082
+1802,PICO/ GRIFO PARA TERMO GRANDE (DECORAR),con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-008
+1815,PIEDRA DE AMOLAR,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-083
+1816,PIEDRA PARA FILTRO D CERAMICA GRIMAX C/C,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-084
+1833,PISTOLA DE CALOR INGCO 1600W,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-085
+1834,PISTOLA DE ESTAÑO WADFOW 60W,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-086
+1836,PISTOLA DE SILICON ROJA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-087
+1851,PISTOLA SILICON EXXEL DELGAD 15W,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-088
+1852,PISTOLA SILICON PROFESIONAL D/*CDARTUCHO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-089
+1854,PISTOLA. DE ENGRASAR COMET,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-090
+1857,PLASTICO TRANSPARENTE 3*1 P/MTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-091
+1861,PONCHERA 50LTS C/ASA ASA MARRON,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-092
+1863,PONCHERA PLAST C/ASAS VERDE 25LTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-093
+1864,PORTA CHAMPU ESQUINERO BLANCO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-094
+1865,PORTA DE CILINDRO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-095
+1870,PORTA ROLLO JOMAI PARA PAPEL S,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-096
+1872,"PRENSA DE BANCO 4""1300KG TOTAL",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-097
+1890,PUERTA BLANCA SD00R003 IZQUIERDA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-098
+1896,PULIDORA ELECTRICA 180MM COOFIX 110,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-099
+2009,RAMPLUN 3/8 NARAN PAQ,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-100
+2120,RC-TAPA TOPE D/COCINA CON PLANCHA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-005
+2125,RCG-BOBINA D/CORTAGRAMA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-006
+2126,RCG-CUCHILLA 22 P/CORTAGRAMA UNIVERSAL,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-007
+2127,RCG-FILTRO D/CORTAGRAMA GRANDE,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-008
+2128,RCG-KIT CUCHILLA D/CORTAGRAMA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-009
+2129,RCG-PISTON P/CORTAGRAMA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-010
+2130,RCP-BIELA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-011
+2131,RCP-RODAMIENTO 6203,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-012
+2137,RD-ARRANCADOR P/DESMALEZADORA UNIVER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-013
+2143,RD-BUJIAS DESMALEZADORA COVO,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-014
+2168,RD-FILTRO D/AIRE P/DESMALEZADORA C/TAPA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-015
+2175,RD-MAGNETO DESMALEZADORA 52/43CC,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-016
+2186,RD-RESORTE P/DESMALEZADORA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-017
+2191,RD-TAPA.TRASERA DEL MOTOR DESMALEZADORA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-018
+2207,"REGATONES 1"" PLASTICO",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-101
+2208,REGULADOR AIRE LINCE PRO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-102
+2214,REGULADOR DE FILTRO DE AIRE 14 15CC WODF,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-103
+2305,RESISTENCIA P/ COCINA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-104
+2308,RESPUESTO PARA EXACTO 19X60MM 10PZA,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-002
+2309,RIDGID-MAQUINA LIMPIEZA DRENAJE K-45,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-105
+2310,RIDGID-MAQUINA LIMPIEZA DRENAJE K-50,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-106
+2347,RLI ASPA METAL MOTOR OSTER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-019
+2348,RLI CARBON C/ALAMBRE PAR OSTER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-020
+2349,RLI- CUCHILLA GENERICA 4 ALETAS OSTER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-021
+2350,RLI- CUCHILLA GENERICA 6 ALETAS OSTER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-022
+2351,RLI-ACOPLE GRANDE,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-023
+2352,RLI-ACOPLE PEQUEÑO,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-024
+2353,RLI-BASE LICUADORA C/CUCHILLA ROJA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-025
+2354,RLI-BASE P/LICUADORA BLANCA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-026
+2355,RLI-BASE P/LICUADORA NEGRA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-027
+2356,RLI-CUADRANTE DE LICUADORA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-028
+2358,RLI-CUCHILLA D/LICUADORA OSTER ORIGINAL,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-029
+2360,RLI-KIT ACOPLE OSTER,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-030
+2361,RLI-TAPA ANTIDERRAME LICUAD NEGRA GRANDE,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-031
+2362,RLI-TAPA ANTIDERRAME LICUAD NEGRA PEQUEÑ,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-032
+2363,RLI-TAPA ANTIDERRAME LICUADORA BLANCA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-033
+2366,RLI-TAPA MOTOR DE LICUADORA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-034
+2368,RLI-VASO LICUADORA OSTER ECONOMICA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-035
+2382,RMZ-BOBINA MOTOSIERRA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-036
+2383,RMZ-CADENA DE MOTOSIERRA GALGA,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-037
+2385,RMZ-ESPADA DE MOTOSIERRA 52CC,con_depto_sin_categoria (Repuestos en General),placeholder XX -> RGXX-038
+2387,ROCIADOR 1000ML .,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-107
+2388,RODAPIE TEXTURIZADO 2MT*8CM VERT,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-108
+2389,RODEL FINO P/CORTADORA CERAMICA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-109
+2390,"ROLDANA FIJA 1"" HASTA 60KG",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-110
+2391,ROLDANA MOVIL 1.1/2 HASTA 67KG,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-111
+2393,ROMANILLA P/VENTANA,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-003
+2394,ROMPEDOR CADENA D/BANCO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-112
+2458,RYOVI-TROMPO ENRUTADOR 8.5AMP,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-113
+2462,"SAPITO FLAPPER GRIVEN 2""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-114
+2463,SAPITO FLAPPER WC MODELO VIEJO,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-009
+2467,SELLADOR P PARABRISA POLIURET NEGRO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-115
+2480,SEPARADORES DE CERAMICA 5MM 100PZA COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-116
+2484,SET DE HERRAMIENTAS P JARDIN 4 PIEZ,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-117
+2496,SEÑORITA CADENA 2T TUCSON TOOLS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-118
+2497,SEÑORITA CADENA 3T TUCSON TOOLS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-119
+2504,SIERRA CILINDRICA DIAMANTADA 32MM COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-120
+2505,SIERRA CILINDRICA DIAMANTADA 44MM COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-121
+2506,SIERRA CILINDRICA DIAMANTADA 54MM COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-122
+2522,SILLA PLASTICA BLANCA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-123
+2532,SOPORTE DE PUNTA INGCO C/LIMITE 238A HEX,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-124
+2533,"SOPORTE PARA TV 26""A 65 TROEN",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-125
+2549,"STA - TIJERA D JARDINERIA 8"" (STANLEY)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-126
+2555,STA-AYUDANTE DE PLOMERO 87448,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-127
+2556,"STA-CAJA DE HERRAMIENTAS 16""",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-128
+2561,STA-CIZALLA 30,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-032
+2563,STA-DESTORNI COPA 3/16,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-129
+2564,STA-DESTORNI PALETA CORTO FINO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-130
+2568,STA-DESTORNI PALETA LARGO GRUESO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-131
+2571,STA-JGO DESTOR PRO 6PZ PTA MAGNET 69170,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-132
+2572,STA-JGO LLAVES COMBINADAS PULG 86970,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-133
+2583,STA-PATA DE CABRA 55526,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-134
+2585,STA-RASP MINI CUCHILLA 28100,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-135
+2591,"STA-TIJERA 30MM 12"" 14558",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-136
+2592,STA-TIJERAS P/PODAR,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-137
+2593,SULFATO DE ALUMINIO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-138
+2678,"TAK-INGLETEADORA 10"" 255 MM 1600 WATTS",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-139
+2700,"TAPA HUECO P/LAV 1-1/2"" (GRIVEN)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-140
+2703,"TAPA.. REGISTRO 2"" C/CUELLO",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-141
+2704,TAPA.. REGISTRO 3 BRONCE,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-010
+2705,TAPON AUDITIVO NARANJA,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-142
+2731,"TE - CONECTOR PLÁSTICO 1""",con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-001
+2761,TEIPE AUTOSOLDABLE 23 19MM,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-143
+2765,TERMOSTATO K50-P1133,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-144
+2766,TIJERA P/PODAR BELLOTA.,con_depto_sin_categoria (linea agricola),placeholder XX -> LAXX-005
+2767,TIJERA PARA CORTAR TUBO PVC PESADA,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-011
+2768,TIJERA PARA JARDINERIA GARDEN,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-145
+2769,TIMER LAVADORA 2TINA 6 CABL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-146
+2770,TIRRA BLANCO 3.5*370M,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-147
+2771,TIRRA BLANCO 3.6X250MM 100PC,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-148
+2772,TIRRA BLANCO 3.6X300MM 100PC,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-149
+2773,TIRRA BLANCO 3.6X450MM 100PC,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-150
+2776,TIRRA NEGRO Y BLANCO 8*200*,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-151
+2777,TIRRAJE ACERO INOXIDABLE 4.6x350mm (COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-152
+2778,"TIRRAJE NYLON BLANCO 12"" 4.8x300MM",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-153
+2779,"TIRRAJE NYLON BLANCO 14"" 4.8x350MM",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-154
+2780,"TIRRAJE NYLON BLANCO 8"" 2 .5x200",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-155
+2781,TIRRAJE NYLON NEGRO 4.8 - 500MM (EXXEL),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-156
+2782,TIRRAJE NYLON NEGRO 4.8 -250MM COVO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-157
+2783,TIZA P/HERRERO,con_depto_sin_categoria (Linea Herreria),placeholder XX -> LHXX-002
+2784,TOBO C/TAPA 150LTS,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-158
+2787,TOMA SENCILLO 110V ECONOMICO,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-159
+2902,TQ-TANQUE HIDROCOMP 12L KIT GRIVEN,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-012
+2911,TRAMPA DE RATON,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-160
+2912,"TRAMPA PARA RATAS 7"" (EXXEL)",con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-013
+2915,TRIPA 26 SOLDIER,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-161
+2916,TRIPA P/RUEDA 10,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-162
+2917,"TRIPA PARA RUEDA DE CARRUCHA 10"" (EXXEL)",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-163
+2919,"TRONZAD 14"" D28710-B3 DEWALT",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-164
+2920,"TRONZAD 14"" RUN",con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-005
+2921,"TRONZAD 14"" TAKIMA",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-165
+2937,U- ANILLO 1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-001
+2938,U- ANILLO 3/4 PLAST AZUL,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-002
+2941,"U- ANILLO. 2"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-003
+2942,U- BOTELLA 1 * 1/2 PASTICO (NEGRO),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-004
+2943,U- BOTELLA 1 * 3/4 PASTICO (NEGRO),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-005
+2944,U- BOTELLA 3/4*1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-006
+2945,"U- BUSHING 1 1/2"" x 1 1/4""",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-007
+2946,U- BUSHING 3/4*1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-008
+2947,U- BUSHING. 1 * 3/4 PLAST,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-009
+2948,U- BUSHING. 1 1/2 * 3/4 PLAST (NEGRO),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-010
+2949,U- BUSHING. 1*1/2 PLAST,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-011
+2951,U- BUSHING. 2 * 1 1/2 PLAST (NEGRO),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-012
+2953,U- CODO 1/2*90 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-013
+2955,"CODO SCH80 TUBOMAX 90° 3/4"" ROSCA A/FRIA PVC UNITECA",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-014
+2957,"U- CODO. 1""*90 PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-015
+2958,U- CODO. 1.1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-016
+2960,"U- CODO. 2"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-017
+2961,"JUNTA DRESSER 1/2"" A/FRIA PLAST. FEMOI",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-018
+2962,"JUNTA DRESSER 3/4"" A/FRIA PLAST. FEMOI",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-019
+2963,"U- JUNTA DRESS. 1 1/2""PLAST",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-020
+2964,"U- JUNTA DRESS. 1""PLAST",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-021
+2966,U- TAPA 3/4 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-022
+2967,"U- TAPA. 1"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-023
+2968,"U- TAPA. 1.1/2"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-024
+2969,"U- TAPA. 2"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-025
+2970,U- TAPON 1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-026
+2971,U- TAPON 3/4 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-027
+2972,"U- TAPON. 1"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-028
+2974,"U- TAPON. 2"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-029
+2975,U- TEE 1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-030
+2976,U- TEE 3/4 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-031
+2977,"U- TEE. 1"" PLAST (AZUL)",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-032
+2978,U- TEE. 1.1/2 PLAST (AZUL),con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-033
+2991,U- UNION PATENT 1/2 PLAST,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-034
+2993,"U- UNION PATENT. 1"" PLAST",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-035
+2996,"U- UNION PATENT. 2"" PLAST",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-036
+2999,UNIÓN COMPRENSIÓN 3/8,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-166
+3001,UÑAS DE LAVAMANOS PQÑA PAR,con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-014
+3017,VALVULA MAXI-FLUX BOTÓN (BELT-G),con_depto_sin_categoria (Linea Plomeria),placeholder XX -> LPXX-015
+3047,VARILLA BRONCE REVESTIDA,con_depto_sin_categoria (Linea Herreria),placeholder XX -> LHXX-003
+3057,VENTANA PVC 1.20 X 1M DT15-YZJ10121,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-167
+3058,VENTANA PVC 1X1M DT15-YZJ10111,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-168
+3059,"VENTILADOR 18"" BUJE C/COBRE",con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-169
+3061,VERNIER DIGITAL PLAST 150mm (EXXEL),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-170
+3115,VIDRIO P/CARETA TRANSPARENTE,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-171
+3154,YEE P/LAVADORA METAL (LF),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-172
+3155,YEE P/LAVADORA PCP,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-173
+3158,ZOCALO PARA BICHOS NEGRO GOMA EXXEL,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-174
+3191,BARRA ATERRAMIENTO 1.5mts 5/8 CUPERMAN,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-004
+3198,BASE P/ FOTOCELDA CON SOPORTE METALICO,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-002
+3199,BATERIA RECARGABLE LAMPARA EMERGENCIA 6V,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-003
+3200,BOLSITA GRAVA COLORES,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-005
+3330,CAL SECA KL,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-006
+3334,CEMENTO BLANCO POR KILO,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-007
+3336,CINTA PASACABLE 5MM*20MTS,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-004
+3337,CINTA PASACABLE 5MM*30MTS,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-005
+3338,"CLAVO P/MADERA S/CABEZA 1""",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-008
+3339,CLAVO P/MADERA S/CABEZA 1.1/2,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-009
+3340,CLAVO P/MADERA S/CABEZA 1.1/4,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-010
+3341,CLAVO P/MADERA S/CABEZA 2 1/2,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-011
+3342,"CLAVO P/MADERA S/CABEZA 2""",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-012
+3343,CLAVO P/MADERA S/CABEZA 3/4,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-013
+3344,CLAVO PARA ZINC DE 2 1/2*20MM,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-014
+3345,"CLAVO PUNTA PARIS 1-1/2"" x KILO (EXXE",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-015
+3346,"CLAVO PUNTA PARIS 2"" X12 KILO (EXXE",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-016
+3348,"CLAVO PUNTA PARIS 3""X9 KILO (EXXE",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-017
+3351,CLAVO/ACERO 2 1/2 UND,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-018
+3354,CLAVO/ACERO LISO 1 BOLSITA,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-019
+3355,CLAVO/ACERO LISO 3/4 BOLSITA,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-020
+3356,"CLAVO/MADERA 2 1/2""",con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-021
+3362,CONECTOR CABLE COAXIAL RG6,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-006
+3363,CONECTOR P/BARRA ATERRAMIENTO,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-022
+3365,CONECTOR ROJO P/CABLE RG6 PONCHAR,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-007
+3423,"EXTRACTOR DE AIRE 10"" 110V WEQUP",con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-008
+3425,"EXTRACTOR DE AIRE 8"" 110V WEQUP",con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-009
+3427,FLEXICON PLASTICO NEGRO 1/2,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-010
+3428,FLEXICON PLASTICO NEGRO 3/4,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-011
+3429,FOTOCELDA CON BASE EXCELINE TEMPORI,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-012
+3430,FOTOCELDA DE 15AMP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-013
+3431,FOTOCELDA SIN BASE VITRON,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-014
+3442,FUSIBLE MOCROONDAS 10AMP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-015
+3443,GRAPA P/ ALMBRE PUA 1X9 EXXEL,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-023
+3445,GRAPAS P/ CABLE 14,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-016
+3446,GRAPAS P/CABLE,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-024
+3447,GRAVA MEDIA,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-025
+3448,GUAYA ACERO GALV 1/8 MTS,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-026
+3449,GUIA PASACABLE PVC40 10M EXXEL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-017
+3450,GUIA PASACABLE PVC40 25M EXXEL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-018
+3514,IMPRIMANTE GALON,con_depto_sin_categoria (Impermeabilizacion),placeholder XX -> IMXX-005
+3515,IN- CLAVO P/HORMIGÓN 38mm1000PZAS (INGCO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-033
+3516,IN- GRAPAS T/CLAVOS 10MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-034
+3517,IN- GRAPAS TIPO CLAVOS 30MM DETALLADAS,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-035
+3518,IN- GRAPAS TIPO CLAVOS 35MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-036
+3519,IN- GRAPAS TIPO CLAVOS 50MM (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-037
+3520,IN- GRAPAS TIPO/CLAVOS 10mm (INGCO),con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-038
+3522,IN- PONCHADORA CABLE RED,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-039
+3523,JUEGO DE CABLE DE VOLTIMETRO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-040
+3533,LAMPARA DE 32 COMPLETA,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-019
+3534,LAMPARA DE 32 SOLA,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-020
+3535,LAMPARA PLAFON VIDRIO REDONDO ECON,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-021
+3580,OCCIFRISO OCCIDENTE 20KG,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-027
+3581,OJO DE BUEY Base,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-022
+3616,P. SPRAY BLANCO BRILLANTE 130GR PEQÑ,con_depto_sin_categoria (Linea Pinturas),placeholder XX -> LIXX-001
+3621,P. SPRAY FONDO NEGRO ANTICORRO,con_depto_sin_categoria (Linea Pinturas),placeholder XX -> LIXX-002
+3626,P. SPRAY NEGRO BRILLANTE 130GR PQÑ,con_depto_sin_categoria (Linea Pinturas),placeholder XX -> LIXX-003
+3631,P. SPRAY ORO (MEGAPRO),con_depto_sin_categoria (Linea Pinturas),placeholder XX -> LIXX-004
+3762,PULSADOR TIMBRE VARIOS,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-023
+3768,RD-TORNILLO P/DEZMAL,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-028
+3769,Regleta Elec Blanca 6 Tomas 2000W VITR,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-024
+3771,REGLETA 8 TOMAS (VITRON),con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-025
+3772,RELAY DE ARRANQUE 1/3HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-026
+3773,RELAY DE ARRANQUE 1/4HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-027
+3774,RELAY DE ARRANQUE 1/6HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-028
+3794,SACO ARENA P/FILTRO,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-029
+3795,SACO GRAVA FINA PARA GRAFIAR,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-030
+3798,SACOS BLANCO 50KG,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-031
+3805,SENSOR P/FOTOCELDA MINI 6AM (VERT),con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-029
+3823,SPLINTER 2 VIAS P/ CABLE COAXIAL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-030
+3824,SPLINTER 3 VIAS P/ CABLE COAXIAL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-031
+3825,STA-JGO DESTOR PRO 6PZAS P/TUERCAS,con_depto_sin_categoria (Linea Construccion),placeholder XX -> LCXX-032
+3828,STARTE FS-4 LULI,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-032
+3844,TAPA P/ INTERRUPTOR SENCILLO,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-033
+3848,TERMICO PROTECTOR 1/3HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-034
+3849,TERMICO PROTECTOR 1/4HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-035
+3850,TERMICO PROTECTOR 1/6HP,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-036
+3851,TERMINAL HEMBRA FORRADO,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-037
+3854,TICINO 601 32AMP LUMI,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-038
+3857,TIMBRE C/PLACA ROCKWELL ELECT,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-039
+3858,TIMBRE DIN DON LUMI,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-040
+3859,TIMBRE INALAMBRICO DOORBELL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-041
+3860,TIMBRE MELODIA SUPERFICIAL 110-130V,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-042
+3861,TIMBRE PULSADOR SIEMENS,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-043
+3918,UNION P/CABLE COAXIAL,con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-044
+3921,VERT -BOMBILLO LED DICROICO 5 W (EXXEL),con_depto_sin_categoria (Linea Electricidad),placeholder XX -> LEXX-045
+4077,"ESCUADRA MAGNETICA 4"" MULTIUSO COVO",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-002; migrar a depto real despues
+4078,"ESCUADRA MAGNETICA 3"" MULTIUSO COVO",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-003; migrar a depto real despues
+4083,LANA DE ACERO #3 400G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-004; migrar a depto real despues
+4084,LANA DE ACERO #5 100G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-005; migrar a depto real despues
+4085,LANA DE ACERO #3 100G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-006; migrar a depto real despues
+4086,"LLAVE PARA DUCHA 1/2"" GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-007; migrar a depto real despues
+4088,"VALVULA 3/4"" DE PVC SIN ROSCA GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-008; migrar a depto real despues
+4093,"DESTORNILLADOR DE ESTRIA CONFORT GRIP 6"" X PH2 COVO",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-009; migrar a depto real despues
+4094,MEDIDOR DE DISTANCIA LASER 50M COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-010; migrar a depto real despues
+4095,JUEGO DE DESTORNILLADORES 26 PZAS COVO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-041
+4096,SEPARADORES DE CERAMICAS 3MM 150 PZAS COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-011; migrar a depto real despues
+4097,SEPARADORES DE CERAMICAS 5MM 100 PZAS COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-012; migrar a depto real despues
+4098,SEPARADORES DE CERAMICAS 2MM 200 PZAS COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-013; migrar a depto real despues
+4099,SUELDA TODO EPOXI 25G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-014; migrar a depto real despues
+4101,BATERIA DE ION LITIO 20V 2AH COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-015; migrar a depto real despues
+4103,CARGADOR DE BATERIA ION LITIO COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-016; migrar a depto real despues
+4105,"ASPERSOR AUTOMATICO 3/4"" GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-017; migrar a depto real despues
+4108,JUEGO DE LLAVES ALLEN PUNTA ESFERICA 7PZAS COVO,con_depto_sin_categoria (Herramientas Manuales),placeholder XX -> HMXX-042
+4111,DESAGUE PUSH PARA LAVAMANOS SIN REBOSADERO GRIVEN BASIC,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-018; migrar a depto real despues
+4117,"VALVULA 1/2"" DE BRONCE LIVIANA GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-019; migrar a depto real despues
+4123,"LLAVE PARA DUCHA 1/2"" INDIVIDUAL GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-020; migrar a depto real despues
+4126,SOLDADURA PVC CONDICIONES HUMEDAS 4ONZ GRIVEN,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-021; migrar a depto real despues
+4127,SELLADOR DE SILICONA TRANSPARENTE 85G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-022; migrar a depto real despues
+4128,FREGADERO INDIVIDUAL 64 X 56 CM ACERO INOXIDABLE GRIVEN (1PZAS),sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-023; migrar a depto real despues
+4129,"DESAGUE PARA LAVAMANOS 1 1/4"" X 21CM PUSH GRANDE GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-024; migrar a depto real despues
+4130,SET DE DESTORNILLADORES 2 PIEZAS PALETA Y ESTRIA COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-025; migrar a depto real despues
+4133,"[8150] LLAVE PARA DUCHA 1/2"" INDIVIDUAL GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-026; migrar a depto real despues
+4136,[8291] SOLDADURA PVC CONDICIONES HUMEDAS 4ONZ GRIVEN,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-027; migrar a depto real despues
+4137,[8340] SELLADOR DE SILICONA TRANSPARENTE 85G COVO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-028; migrar a depto real despues
+4138,[8559] FREGADERO INDIVIDUAL 64 X 56 CM ACERO INOXIDABLE GRIVEN (1PZAS),sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-029; migrar a depto real despues
+4139,"[8649] DESAGUE PARA LAVAMANOS 1 1/4"" X 21CM PUSH GRANDE GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-030; migrar a depto real despues
+4142,"FLOTADOR 3/4"" PARA TANQUES GRIVEN",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-031; migrar a depto real despues
+4160,CONEXION PLASTICA 3/8 x ESPIGA P/FILTROS,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-032; migrar a depto real despues
+4161,FREGADERO MULTIFUNCIONAL DOBLE TINA SOBRE TOPE 82x45 BRIDGE EXTENSIBLE BLACK,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-033; migrar a depto real despues
+4169,"FT-PIEDRA D/CERAMICA P/FIL C/CARBON ACT 11"" GRIMAX",sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-034; migrar a depto real despues
+4170,WC-TANQUE BAJO BOTON PUSH SUPERIOR GREENPRO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-035; migrar a depto real despues
+4175,LAVAPLATO INTELIGENTE NEGRO CON PORTA CELULAR GREENPRO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-036; migrar a depto real despues
+4176,LAVAPLATO INTELIGENTE GRIS CON PORTA CELULAR GREENPRO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-037; migrar a depto real despues
+4177,LAVAPLATO INTELIGENTE PLATEADO CON PORTA CELULAR GREENPRO,sin_departamento_real (prefijo SD transitorio),prefijo virtual SDXX -> SDXX-038; migrar a depto real despues
+4286,DSA-MOTOBOMBA GAS. 3X3 7.0HP DOMO,con_depto_sin_categoria (Bombas motor Gasolina o Gasoi),placeholder XX -> BOXX-003
+4304,Pistola Silicona Tubular 9 Pgd Exxel,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-175
+4309,U-  UNION PATENT 3/4,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-037
+4332,U- UNION PATENT 1/2 PLAST  PCP 3002,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-038
+4333,U- UNION PATENT 3/4 PLAST  PCP 3002,con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-039
+4351,KIT DE EMPALME MM 11 (3X14 AWG - 3X6 AWG) P/CABLE SUMERGIBLE,con_depto_sin_categoria (Bombas de motor Electrico),placeholder XX -> BMXX-004
+4356,Soldadura para PVC condiciones humedas 1/32 galo TU32201,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-001
+4357,Soldadura para PVC sistemas CPVC 1/64 galón Tubr TU20706,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-002
+4358,Soldadura para PVC multipropósito 1/32 galón Tub TU30401,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-003
+4359,Soldadura para PVC sistemas CPVC 1/32galón Tubri TU20701,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-004
+4360,Soldadura para PVC multipropósito 1/64 galón Tub TU30406,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-005
+4364,Soldadura para PVC condiciones humedas 1/64 galo TU32206,con_depto_sin_categoria (Tubrica conexiones Agua F/A.C /Electri),placeholder XX -> TCXX-006
+4365,"U-Anillo PVC agua fria para roscar 1"" Gdeseo CPP-A803",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-040
+4366,RECUPERACIÓN GASTOS FLETE (E),con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-176
+4368,"MOTOBOMBA AGRICOLA AUTOCEBANTE 2x2"" GASOLINA 7HP",con_depto_sin_categoria (Bombas motor Gasolina o Gasoi),placeholder XX -> BOXX-004
+4387,"U- TEE SCH80 TUBOMAX 1/2"" ROSCA A/FRIA PVC UNITECA",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-041
+4388,"U- TAPA SCH80 TUBOMAX 1/2"" ROSCA HEMBRA A/FRIA PVC UNITECA",con_depto_sin_categoria (Conexiones Plasticas Roscadas),placeholder XX -> CPXX-042
+4390,TANQUE ROTONAC 2100LTS,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-003
+4399,CILINDRICOS Tangue Facil 440,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-004
+4400,CILINDRICOS Tangue Facil 460,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-005
+4401,CILINDRICOS Tangue Facil 250,con_depto_sin_categoria (Tanques plasticos),placeholder XX -> TPXX-006
+4443,Cuerda Elastica c/Gancho 8mmx90cm EXXE,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-177
+4450,TALADRO INALAMBRICO COOFIX,con_depto_sin_categoria (Herramientas Electricas),placeholder XX -> HEXX-006
+4462,CORDEL 4X3 NATURAL LOS ELEFANTES,con_depto_sin_categoria (Ferretería General),placeholder XX -> FGXX-178

@@ -1,0 +1,20 @@
+producto_id,nombre,departamento,categoria,codigo_viejo,codigo_nuevo
+4046,NOVACAPA_MINERAL 350,Impermeabilizacion,Mantos/Laminas,NOV-002,IMMA-006
+4168,DECO - CONICO 1000 LTS,Tanques plasticos,Conicos,,TPCO-011
+524,DECO - JUMBO. 2000 LTS,Tanques plasticos,Jumbos,DEC-029,TPJU-003
+4181,IMPERCINDU ROJO CUÑETE 4 GL,Impermeabilizacion,Imper/color,,IMIM-006
+3498,"H. TUBO HP 2x1"" x 0.70 x 6mts",HIERRO Y HERRERIA,Tuberias/angulos/pletinas,HTU-013,HHTU-012
+54,AQH-TANQUE SOLO HIDRONEU 40GL HIERRO,Hidros y filtros en General,tanques hidri / hidrofiltro,AQH-006,HFTA-017
+662,DSA-DESMALEZADORA 52 CC,Maquinaria Industrial y Agricola,Maquinaria agricola,DSA-043,MIMA-011
+4204,"BOMBA PERIFERICA LEO 0.5 HP 110V, 60 HZ",Bombas de motor Electrico,bombas perifericas,APM37-B,BMBM-011
+519,DECO - CÓNICOS. 2000 LTS,Tanques plasticos,Conicos,DEC-025,TPCO-002
+4,"ABRAZADERA 1""",Ferretería General,abrazadera,ABR-001,FGAB-001
+17,ADAPTADOR ELÉCTRICO MÚLTIPLE (TROEN),Linea Electricidad,apagadores,ADA-004,LEAP-001
+14,"ADAPTADOR DE TANQUE 1""",Linea Plomeria,adaptadores de tanque,ADA-001,LPAD-001
+13,ACOPLE EN KIT 5PZA P/COMPRESOR,Herramientas Manuales,llaves ajustables,ACO-001,HMLL-001
+185,BUJE MOTOR LAVADO 12mm,Repuestos en General,(sin categoria),BUJ-001,RGXX-001
+25,AQ-TANQUE GALV SOLO HIDROESPUMA 60GLN,Hidros y filtros en General,tanques hidri / hidrofiltro,AQT-009,HFTA-001
+23,AMARRE P/ZINC,Linea Construccion,Clavos/alambre,AMA-001,LCCL-001
+144,"BISAGRA BEST VALUE DOBLE ACCION 3""",Linea Bricolaje,Bisagras,BIS-002,LBBI-001
+3593,P. EN ACEITE 1G ROJO RUBI (CEBRA),Linea Pinturas,esmaltes/fondos etc,PEN-008,LIES-001
+67,"ARCO - MANGUERA 12,5 MM x 150PSI (MTZ)",MANGUERA Y Conexiones RIEGO,MANGUERAS,ARC-001,MCMA-001

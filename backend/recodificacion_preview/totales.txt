@@ -1,0 +1,11 @@
+Total productos en catalogo: 2641
+Total procesados (reciben codigo nuevo): 2641
+  - cambiarian de codigo: 2641
+  - quedarian igual (codigo viejo == nuevo, coincidencia): 0
+  - de esos, sin departamento_id real (prefijo virtual SD, transitorio): 38
+Total con departamento_id apuntando a un depto inexistente (NO se tocan): 0
+Total con placeholder de categoria XX (incluye los SD): 477
+Colisiones de prefijo resueltas automaticamente: 52
+  - de departamento: 5
+  - de categoria: 47
+Colisiones SIN resolver (requieren decision manual): 0
