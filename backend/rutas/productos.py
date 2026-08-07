@@ -11,6 +11,7 @@ from rutas.usuarios import require_admin, require_admin_o_gestionador, require_e
 from rutas.auth import resolver_sede_activa_opcional, resolver_sede_activa, ajustar_existencia_sede
 import io
 import re
+import unicodedata
 import pandas as pd
 
 router = APIRouter(prefix="/productos", tags=["productos"])
@@ -914,6 +915,12 @@ def listar_productos(
     return {"total": total, "productos": productos, "sede_activa": sede_activa}
 
 
+def _normalizar_texto(s: str) -> str:
+    s = str(s or "").strip().lower()
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", s).strip()
+
+
 @router.post("/importar-masivo")
 async def importar_masivo(
     archivo: UploadFile = File(...),
@@ -935,13 +942,19 @@ async def importar_masivo(
 
     df.columns = [str(c).strip().lower() for c in df.columns]
 
+    ALIAS_COLUMNAS = {"costo": "costo_usd", "margen": "margen_pct"}
+    for alias, real in ALIAS_COLUMNAS.items():
+        if real not in df.columns and alias in df.columns:
+            df = df.rename(columns={alias: real})
+
     COLUMNAS = ["nombre", "categoria", "departamento", "proveedor",
                 "costo_usd", "margen_pct", "stock", "es_producto_clave", "descripcion"]
     for col in ["nombre"]:
         if col not in df.columns:
             raise HTTPException(status_code=400, detail=f"Columna obligatoria ausente: '{col}'")
 
-    departamentos = {d.nombre.lower(): d.id for d in db.query(Departamento).all()}
+    departamentos = {_normalizar_texto(d.nombre): d.id for d in db.query(Departamento).all()}
+    proveedores = {_normalizar_texto(pr.nombre): pr.id for pr in db.query(Proveedor).all()}
     nombres_existentes = {
         p.nombre.lower() for p in db.query(Producto.nombre).all()
     }
@@ -967,12 +980,17 @@ async def importar_masivo(
         depto_nombre = str(row.get("departamento", "")).strip()
         departamento_id = None
         if depto_nombre and depto_nombre.lower() != "nan":
-            departamento_id = departamentos.get(depto_nombre.lower())
+            departamento_id = departamentos.get(_normalizar_texto(depto_nombre))
             if departamento_id is None:
                 omitidos += 1
                 errores.append({"fila": fila, "nombre": nombre_prod,
                                 "motivo": f"Departamento '{depto_nombre}' no encontrado"})
                 continue
+
+        prov_nombre = str(row.get("proveedor", "")).strip()
+        proveedor_id = None
+        if prov_nombre and prov_nombre.lower() != "nan":
+            proveedor_id = proveedores.get(_normalizar_texto(prov_nombre))
 
         def _float(val, default=0.0):
             try:
@@ -993,7 +1011,10 @@ async def importar_masivo(
             return str(val).strip().lower() in ("1", "true", "si", "sí", "yes", "x")
 
         costo_usd   = _float(row.get("costo_usd",   0))
-        margen_pct  = _float(row.get("margen_pct",  30))
+        margen_raw  = _float(row.get("margen_pct",  30))
+        # El Excel puede traer el margen como fracción (0.2 = 20%) o como
+        # porcentaje entero (20 = 20%). Menor a 1 => ya es fracción.
+        margen      = margen_raw if margen_raw < 1 else margen_raw / 100.0
         stock       = _int  (row.get("stock",        0))
         es_clave    = _bool (row.get("es_producto_clave", False))
         descripcion = str(row.get("descripcion", "")).strip()
@@ -1006,8 +1027,9 @@ async def importar_masivo(
             descripcion           = descripcion,
             categoria             = categoria or None,
             departamento_id       = departamento_id,
+            proveedor_id          = proveedor_id,
             costo_usd             = costo_usd,
-            margen                = margen_pct / 100.0,
+            margen                = margen,
             stock                 = stock,
             es_producto_clave     = es_clave,
             activo                = True,

@@ -25,7 +25,8 @@
             <span class="col-tag">es_producto_clave</span>
             <span class="col-tag">descripcion</span>
           </div>
-          <p class="inst-nota">* El <strong>departamento</strong> debe coincidir exactamente con un departamento existente en el sistema. Los productos con departamento no encontrado se omiten.</p>
+          <p class="inst-nota">* El <strong>departamento</strong> debe coincidir con un departamento existente en el sistema (no distingue mayúsculas/minúsculas ni tildes). Los productos con departamento no encontrado se omiten.</p>
+          <p class="inst-nota">También se aceptan los encabezados <strong>Costo</strong> y <strong>Margen</strong> como alternativa a costo_usd/margen_pct. El margen puede venir como fracción (0.2) o como porcentaje (20) — ambos se interpretan como 20%.</p>
         </div>
 
         <!-- Área de carga -->
