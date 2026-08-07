@@ -28,10 +28,17 @@
                 @click="expandido = expandido === d.id ? null : d.id">
                 <span class="depto-icono">📦</span>
                 <span class="depto-nombre">{{ d.nombre }}</span>
+                <span v-if="d.es_consignacion" class="depto-badge depto-badge-consignacion">Consignación</span>
                 <span v-if="!d.activo" class="depto-badge depto-badge-inactivo">Inactivo</span>
                 <span class="depto-badge">
                   {{ d.categorias.length }} {{ d.categorias.length === 1 ? 'categoría' : 'categorías' }}
                 </span>
+                <button v-if="puedeTogglearActivo(d)" class="btn-toggle-activo"
+                  @click.stop="toggleActivo(d)"
+                  :disabled="cambiandoActivo === d.id"
+                  :title="d.activo ? 'Desactivar departamento' : 'Activar departamento'">
+                  {{ d.activo ? 'Desactivar' : 'Activar' }}
+                </button>
                 <span class="depto-toggle">{{ expandido === d.id ? '▲' : '▼' }}</span>
                 <div v-if="esAdmin" class="depto-acciones" @click.stop>
                   <button class="btn-edit-depto"
@@ -139,6 +146,13 @@
             <small>Si se desactiva, sus productos se ocultan de Ventas, Inventario y Reportes — el departamento se sigue pudiendo editar desde acá.</small>
           </span>
         </label>
+        <label class="mapa-check-opt">
+          <input type="checkbox" v-model="formDepto.es_consignacion" />
+          <span>
+            <strong>Departamento de consignación</strong>
+            <small>Si se marca, Gestionador y Vendedor también podrán activar/desactivar este departamento (no solo Admin).</small>
+          </span>
+        </label>
         <div class="mapa-modal-botones">
           <button class="btn-cancelar"
             @click="modalDepto = false">Cancelar</button>
@@ -231,7 +245,8 @@ export default {
       busqueda:       '',
       usuario:        JSON.parse(localStorage.getItem('usuario') || '{}'),
       modalDepto:     false,
-      formDepto:      { id: null, nombre: '', activo: true },
+      formDepto:      { id: null, nombre: '', activo: true, es_consignacion: false },
+      cambiandoActivo: null,
       modalCat:       false,
       formCat:        { id: null, nombre: '', departamento_id: null },
       guardandoDepto: false,
@@ -248,6 +263,7 @@ export default {
   },
   computed: {
     esAdmin() { return this.usuario.rol === 'admin' },
+    esGestionadorOVendedor() { return this.usuario.rol === 'gestionador' || this.usuario.rol === 'vendedor' },
     totalCategorias() {
       return this.departamentos.reduce((s, d) => s + d.categorias.length, 0)
     },
@@ -271,10 +287,22 @@ export default {
     },
     abrirModalDepto(d) {
       this.formDepto = d
-        ? { id: d.id, nombre: d.nombre, activo: d.activo }
-        : { id: null, nombre: '', activo: true }
+        ? { id: d.id, nombre: d.nombre, activo: d.activo, es_consignacion: !!d.es_consignacion }
+        : { id: null, nombre: '', activo: true, es_consignacion: false }
       this.modalDepto = true
       this.$nextTick(() => this.$refs.inputDepto?.focus())
+    },
+    puedeTogglearActivo(d) {
+      return this.esGestionadorOVendedor && !!d.es_consignacion
+    },
+    async toggleActivo(d) {
+      this.cambiandoActivo = d.id
+      try {
+        await axios.put(`/productos/departamentos/${d.id}/activo`, { activo: !d.activo })
+        await this.cargarDepartamentos()
+      } catch (e) {
+        alert(e?.response?.data?.detail || 'Error al cambiar estado')
+      } finally { this.cambiandoActivo = null }
     },
     abrirModalCat(deptoId, c) {
       this.formCat = c
@@ -344,15 +372,15 @@ export default {
     async guardarDepto() {
       this.guardandoDepto = true
       try {
+        const payload = {
+          nombre: this.formDepto.nombre,
+          activo: this.formDepto.activo,
+          es_consignacion: this.formDepto.es_consignacion,
+        }
         if (this.formDepto.id) {
-          await axios.put(
-            `/productos/departamentos/${this.formDepto.id}`,
-            { nombre: this.formDepto.nombre, activo: this.formDepto.activo }
-          )
+          await axios.put(`/productos/departamentos/${this.formDepto.id}`, payload)
         } else {
-          await axios.post('/productos/departamentos',
-            { nombre: this.formDepto.nombre, activo: this.formDepto.activo }
-          )
+          await axios.post('/productos/departamentos', payload)
         }
         this.modalDepto = false
         await this.cargarDepartamentos()
@@ -441,15 +469,21 @@ export default {
 .depto-card { border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; transition: box-shadow 0.2s; }
 .depto-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
 .depto-expandido { border-color: #FFCC00; box-shadow: 0 2px 12px rgba(255,204,0,0.15); }
-.depto-header { display: flex; align-items: center; gap: 0.6rem; padding: 0.85rem 1rem; cursor: pointer; background: #FAFAF7; user-select: none; }
+.depto-header { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.6rem; padding: 0.85rem 1rem; cursor: pointer; background: #FAFAF7; user-select: none; }
 .depto-expandido .depto-header { background: #1A1A1A; color: #FFCC00; }
 .depto-icono { font-size: 1.1rem; flex-shrink: 0; }
-.depto-nombre { flex: 1; font-weight: 700; font-size: 0.9rem; }
+.depto-nombre { flex: 1; min-width: 90px; font-weight: 700; font-size: 0.9rem; overflow-wrap: anywhere; }
 .depto-expandido .depto-nombre { color: #FFCC00; }
 .depto-badge { font-size: 0.72rem; font-weight: 700; background: #F1F5F9; color: #475569; padding: 0.15rem 0.5rem; border-radius: 10px; white-space: nowrap; }
 .depto-expandido .depto-badge { background: rgba(255,204,0,0.2); color: #FFCC00; }
 .depto-badge-inactivo { background: #FEE2E2; color: #B91C1C; }
 .depto-expandido .depto-badge-inactivo { background: #B91C1C; color: #FFFFFF; }
+.depto-badge-consignacion { background: #DBEAFE; color: #1D4ED8; }
+.depto-expandido .depto-badge-consignacion { background: rgba(255,204,0,0.2); color: #FFCC00; }
+.btn-toggle-activo { flex-shrink: 0; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: #475569; cursor: pointer; }
+.btn-toggle-activo:hover:not(:disabled) { background: #E2E8F0; }
+.btn-toggle-activo:disabled { opacity: 0.5; cursor: not-allowed; }
+.depto-expandido .btn-toggle-activo { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); color: #FFCC00; }
 .depto-card-inactiva { opacity: 0.6; }
 .depto-card-inactiva:hover { opacity: 0.85; }
 .depto-toggle { font-size: 0.72rem; color: var(--texto-muted); flex-shrink: 0; }

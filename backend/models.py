@@ -35,10 +35,11 @@ DECIMALES_BS  = 2
 class Departamento(Base):
     __tablename__ = "departamentos"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    nombre      = Column(String)
-    descripcion = Column(String, nullable=True)
-    activo      = Column(Boolean, default=True)
+    id              = Column(Integer, primary_key=True, index=True)
+    nombre          = Column(String)
+    descripcion     = Column(String, nullable=True)
+    activo          = Column(Boolean, default=True)
+    es_consignacion = Column(Boolean, default=False)
 
 
 class Categoria(Base):

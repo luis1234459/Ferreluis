@@ -7,7 +7,7 @@ from pricing import calcular_precios, resolver_policy
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
-from rutas.usuarios import require_admin, require_admin_o_gestionador, require_editor_foto
+from rutas.usuarios import require_admin, require_admin_o_gestionador, require_editor_foto, get_current_user
 from rutas.auth import resolver_sede_activa_opcional, resolver_sede_activa, ajustar_existencia_sede
 import io
 import re
@@ -58,12 +58,17 @@ class ProductoSchema(BaseModel):
 
 
 class DepartamentoSchema(BaseModel):
-    nombre:      str
-    descripcion: Optional[str] = None
-    activo:      bool          = True
+    nombre:          str
+    descripcion:     Optional[str] = None
+    activo:          bool          = True
+    es_consignacion: bool          = False
 
     class Config:
         from_attributes = True
+
+
+class DepartamentoActivoSchema(BaseModel):
+    activo: bool
 
 
 class CategoriaSchema(BaseModel):
@@ -318,10 +323,11 @@ def departamentos_con_categorias(incluir_inactivos: bool = False, db: Session = 
                 "subcategorias": [{"id": s.id, "nombre": s.nombre} for s in subcats],
             })
         result.append({
-            "id":         d.id,
-            "nombre":     d.nombre,
-            "activo":     d.activo,
-            "categorias": cats_out,
+            "id":              d.id,
+            "nombre":          d.nombre,
+            "activo":          d.activo,
+            "es_consignacion": d.es_consignacion,
+            "categorias":      cats_out,
         })
     return result
 
@@ -372,8 +378,13 @@ def listar_portadas_departamento(db: Session = Depends(get_db)):
 def crear_departamento(
     datos: DepartamentoSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_o_gestionador),
+    user: dict = Depends(require_admin_o_gestionador),
 ):
+    if datos.es_consignacion and user.get("rol") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Solo un administrador puede marcar un departamento como de consignación.",
+        )
     nuevo = Departamento(**datos.dict())
     db.add(nuevo)
     db.commit()
@@ -386,13 +397,46 @@ def actualizar_departamento(
     departamento_id: int,
     datos: DepartamentoSchema,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin_o_gestionador),
+    user: dict = Depends(require_admin_o_gestionador),
 ):
     dep = db.query(Departamento).filter(Departamento.id == departamento_id).first()
     if not dep:
         raise HTTPException(status_code=404, detail="Departamento no encontrado")
+    if datos.es_consignacion != dep.es_consignacion and user.get("rol") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Solo un administrador puede marcar o desmarcar un departamento como de consignación.",
+        )
     for key, value in datos.dict().items():
         setattr(dep, key, value)
+    db.commit()
+    db.refresh(dep)
+    return dep
+
+
+@router.put("/departamentos/{departamento_id}/activo")
+def cambiar_activo_departamento(
+    departamento_id: int,
+    datos: DepartamentoActivoSchema,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Toggle acotado de activo/inactivo, sin tocar nombre/descripcion/
+    es_consignacion. Admin puede activar/desactivar cualquier departamento;
+    Gestionador y Vendedor solo departamentos marcados es_consignacion=True
+    (validado acá, no solo ocultando el control en el frontend)."""
+    rol = user.get("rol")
+    if rol not in ("admin", "gestionador", "vendedor"):
+        raise HTTPException(status_code=403, detail="Acceso denegado.")
+    dep = db.query(Departamento).filter(Departamento.id == departamento_id).first()
+    if not dep:
+        raise HTTPException(status_code=404, detail="Departamento no encontrado")
+    if rol != "admin" and not dep.es_consignacion:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo se pueden activar/desactivar departamentos de consignación.",
+        )
+    dep.activo = datos.activo
     db.commit()
     db.refresh(dep)
     return dep
