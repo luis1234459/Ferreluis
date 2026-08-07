@@ -159,6 +159,11 @@
                 @click="filtrosAbiertos = !filtrosAbiertos"
                 title="Filtros"
               >⚙ Filtros</button>
+              <button
+                class="btn-filtros-toggle"
+                @click="abrirBuscarApartado"
+                title="Buscar un apartado activo para cerrarlo"
+              >🔍 Apartado</button>
             </div>
 
             <!-- Panel de filtros colapsable -->
@@ -1021,6 +1026,109 @@
     </div>
   </div>
 
+  <!-- Modal: Buscar apartado -->
+  <div v-if="modalBuscarApartado" class="overlay" @click.self="modalBuscarApartado = false">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <h2>🔍 Buscar apartado</h2>
+        <button class="btn-cerrar-modal" @click="modalBuscarApartado = false">✕</button>
+      </div>
+      <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem">
+        <input v-model="buscaApartado" @input="buscarApartados"
+          placeholder="Número (APT-0001) o nombre del cliente..."
+          class="input-apt" autocomplete="off" autofocus />
+        <div v-if="buscandoApartado" class="sin-datos" style="padding:0.5rem 0;">Buscando...</div>
+        <div v-else-if="buscaApartado.trim().length >= 2 && resultadosApartado.length === 0"
+          class="sin-datos" style="padding:0.5rem 0;">
+          Sin apartados activos que coincidan
+        </div>
+        <div v-else class="apt-busq-lista">
+          <div v-for="apt in resultadosApartado" :key="apt.id" class="apt-busq-item"
+            @click="seleccionarApartadoParaCerrar(apt)">
+            <div class="apt-busq-top">
+              <span class="apt-busq-numero">{{ apt.numero }}</span>
+              <span class="apt-busq-saldo">Saldo: {{ formatMonto(Math.max(apt.total_usd - apt.abonado_usd, 0), 'USD') }}</span>
+            </div>
+            <div class="apt-busq-cliente">{{ apt.cliente_nombre || 'Sin nombre' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cerrar apartado (con cobro del saldo) -->
+  <div v-if="modalCierreApartado" class="overlay" @click.self="modalCierreApartado = false">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <h2>Cerrar apartado — {{ apartadoCierre?.numero }}</h2>
+        <button class="btn-cerrar-modal" @click="modalCierreApartado = false">✕</button>
+      </div>
+      <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.85rem" v-if="apartadoCierre">
+        <div class="apt-cierre-resumen">
+          <div class="resumen-fila"><span>Cliente:</span><strong>{{ apartadoCierre.cliente_nombre || 'Sin nombre' }}</strong></div>
+          <div class="resumen-fila" v-if="apartadoCierre.cliente_telefono"><span>Teléfono:</span><strong>{{ apartadoCierre.cliente_telefono }}</strong></div>
+          <div class="apt-productos">
+            <div v-for="d in apartadoCierre.detalles" :key="d.id" class="apt-prod-row">
+              <span>{{ d.cantidad }}× {{ d.nombre_producto }}</span>
+              <span>${{ d.subtotal_usd.toFixed(2) }}</span>
+            </div>
+          </div>
+          <div class="resumen-fila"><span>Total:</span><strong>{{ formatMonto(apartadoCierre.total_usd, 'USD') }}</strong></div>
+          <div class="resumen-fila"><span>Abonado:</span><strong class="txt-verde">{{ formatMonto(apartadoCierre.abonado_usd, 'USD') }}</strong></div>
+          <div class="resumen-fila"><span>Saldo pendiente:</span><strong class="txt-rojo">{{ formatMonto(saldoPendienteUSDApt, 'USD') }}</strong></div>
+        </div>
+
+        <template v-if="saldoPendienteUSDApt > 0.01">
+          <div class="form-pago">
+            <div class="form-pago-row">
+              <select v-model="nuevoMetodoApt" @change="onCambioMetodoApt">
+                <option v-for="m in metodosDisponiblesApt" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <select v-if="cuentasDelMetodoApt.length > 1" v-model="nuevaCuentaIdApt" class="sel-cuenta">
+                <option :value="null">— Cuenta destino —</option>
+                <option v-for="c in cuentasDelMetodoApt" :key="c.id" :value="c.id">
+                  {{ c.nombre }}{{ c.identificador ? ' · ' + c.identificador : '' }}
+                </option>
+              </select>
+              <span v-else-if="cuentasDelMetodoApt.length === 1" class="cuenta-unica">{{ cuentasDelMetodoApt[0].nombre }}</span>
+              <div class="monto-wrap">
+                <span class="moneda-tag">{{ nuevoMonedaPagoApt === 'USD' ? '$' : 'Bs.' }}</span>
+                <input v-model.number="nuevoMontoApt" type="number" min="0.01" step="0.01" placeholder="0.00" />
+              </div>
+              <button class="btn-agregar-pago" @click="agregarPagoApartado" :disabled="!nuevoMontoApt || nuevoMontoApt <= 0">+ Agregar</button>
+            </div>
+            <input v-model="nuevaReferenciaApt" placeholder="Referencia (opcional)" class="input-referencia" />
+          </div>
+
+          <div class="lista-pagos" v-if="pagosApartado.length > 0">
+            <div v-for="(p, i) in pagosApartado" :key="i" class="pago-item">
+              <div class="pago-izq">
+                <span class="pago-metodo">{{ labelMetodo(p.metodo) }}</span>
+                <span class="pago-monto">{{ p.moneda_pago === 'USD' ? '$' : 'Bs.' }}{{ p.monto_original.toFixed(2) }}</span>
+                <span class="pago-ref" v-if="p.referencia">| {{ p.referencia }}</span>
+              </div>
+              <button class="btn-rm-pago" @click="quitarPagoApartado(i)">×</button>
+            </div>
+          </div>
+
+          <div class="resumen-cobro">
+            <div class="resumen-fila"><span>Cubierto:</span><strong>{{ formatMonto(cubiertoApartado, apartadoCierre.moneda) }}</strong></div>
+            <div class="resumen-fila" v-if="faltaApartado > 0.01"><span>Falta:</span><strong class="txt-rojo">{{ formatMonto(faltaApartado, apartadoCierre.moneda) }}</strong></div>
+          </div>
+        </template>
+
+        <p v-if="errorCierreApartado" style="color:#DC2626;font-size:0.85rem">{{ errorCierreApartado }}</p>
+      </div>
+      <div class="form-botones">
+        <button class="btn-cancelar" @click="modalCierreApartado = false">Cancelar</button>
+        <button class="btn-guardar" @click="cerrarApartadoConCobro"
+          :disabled="cerrandoApartado || (saldoPendienteUSDApt > 0.01 && !pagoApartadoCompleto)">
+          {{ cerrandoApartado ? 'Cerrando...' : '✓ Cerrar apartado' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Chuito flotante (vendedor/cajero) -->
   <div v-if="!modalAvisosVendedor && usuario.rol === 'vendedor'"
     class="chuito-flotante-v"
@@ -1297,6 +1405,21 @@ export default {
       errorApartar:  '',
       formApartar: { cliente_nombre: '', cliente_telefono: '', fecha_maxima: '', cuotas: null, monto_cuota: null, observacion: '' },
 
+      // Buscar y cerrar apartados (independiente del carrito/cobro de venta)
+      modalBuscarApartado: false,
+      buscaApartado:       '',
+      resultadosApartado:  [],
+      buscandoApartado:    false,
+      apartadoCierre:      null,
+      modalCierreApartado: false,
+      pagosApartado:       [],
+      nuevoMetodoApt:      'efectivo_usd',
+      nuevaCuentaIdApt:    null,
+      nuevoMontoApt:       '',
+      nuevaReferenciaApt:  '',
+      cerrandoApartado:    false,
+      errorCierreApartado: '',
+
       // Avisos pendientes del admin
       avisosVendedor:      [],
       avisoVendedorIdx:    0,
@@ -1461,6 +1584,35 @@ export default {
     saldoPendienteBs() {
       return Math.max(this.totalBs - this.pagadoBs, 0)
     },
+
+    // ── Cierre de apartados (independiente del cobro de venta nueva) ────────
+    metodosDisponiblesApt() {
+      return Object.entries(LABELS)
+        .filter(([value]) => value !== 'credito')
+        .map(([value, label]) => ({ value, label }))
+    },
+    cuentasDelMetodoApt() { return this.cuentasPorMetodo[this.nuevoMetodoApt] || [] },
+    nuevoMonedaPagoApt()  { return this._monedaDeMetodoApt(this.nuevoMetodoApt) },
+    saldoPendienteUSDApt() {
+      if (!this.apartadoCierre) return 0
+      return Math.max(Number((this.apartadoCierre.total_usd - this.apartadoCierre.abonado_usd).toFixed(2)), 0)
+    },
+    saldoEnMonedaApt() {
+      if (!this.apartadoCierre) return 0
+      const tasa = this.apartadoCierre.tasa_bcv || this.tasaBcv || 0
+      return this.apartadoCierre.moneda === 'USD'
+        ? this.saldoPendienteUSDApt
+        : Number((this.saldoPendienteUSDApt * tasa).toFixed(2))
+    },
+    cubiertoApartado() {
+      return Number(this.pagosApartado.reduce((s, p) => s + (p.monto_equiv_moneda_apt || 0), 0).toFixed(2))
+    },
+    faltaApartado() {
+      return Math.max(Number((this.saldoEnMonedaApt - this.cubiertoApartado).toFixed(2)), 0)
+    },
+    pagoApartadoCompleto() {
+      return this.pagosApartado.length > 0 && this.faltaApartado <= 0.01
+    },
   },
   watch: {
     modoCobro() {
@@ -1588,6 +1740,108 @@ export default {
       } catch (e) {
         this.errorApartar = e?.response?.data?.detail || 'Error al crear apartado'
       } finally { this.apartando = false }
+    },
+
+    // ── Buscar y cerrar apartados desde Ventas ───────────────────────────────
+    abrirBuscarApartado() {
+      this.buscaApartado      = ''
+      this.resultadosApartado = []
+      this.modalBuscarApartado = true
+    },
+    buscarApartados() {
+      clearTimeout(this._apartadoTimer)
+      const q = this.buscaApartado.trim()
+      if (q.length < 2) { this.resultadosApartado = []; return }
+      this._apartadoTimer = setTimeout(async () => {
+        this.buscandoApartado = true
+        try {
+          const r = await axios.get('/apartados/buscar-rapido', {
+            params: { q },
+            headers: {
+              'x-usuario-nombre': this.usuario.usuario || this.usuario.nombre || '',
+              'x-usuario-rol':    this.usuario.rol || '',
+            },
+          })
+          this.resultadosApartado = r.data
+        } catch { this.resultadosApartado = [] }
+        finally { this.buscandoApartado = false }
+      }, 300)
+    },
+    seleccionarApartadoParaCerrar(apt) {
+      this.apartadoCierre      = apt
+      this.pagosApartado       = []
+      this.errorCierreApartado = ''
+      this.nuevoMontoApt       = ''
+      this.nuevaReferenciaApt  = ''
+      this.nuevoMetodoApt      = 'efectivo_usd'
+      this.nuevaCuentaIdApt    = null
+      this.modalBuscarApartado = false
+      this.modalCierreApartado = true
+    },
+    _monedaDeMetodoApt(metodo) {
+      return ['efectivo_usd', 'zelle', 'binance'].includes(metodo) ? 'USD' : 'Bs'
+    },
+    _calcularEquivalenteApartado(monto, monedaPago) {
+      const monedaApt = this.apartadoCierre?.moneda || 'USD'
+      const tasa       = this.apartadoCierre?.tasa_bcv || this.tasaBcv || 0
+      if (monedaPago === monedaApt) return Number(monto.toFixed(2))
+      if (monedaPago === 'Bs' && monedaApt === 'USD') return tasa > 0 ? Number((monto / tasa).toFixed(4)) : null
+      if (monedaPago === 'USD' && monedaApt === 'Bs') return tasa > 0 ? Number((monto * tasa).toFixed(2)) : null
+      return null
+    },
+    onCambioMetodoApt() {
+      this.nuevoMontoApt = ''
+      const cuentas = this.cuentasPorMetodo[this.nuevoMetodoApt] || []
+      this.nuevaCuentaIdApt = cuentas.length === 1 ? cuentas[0].id : null
+    },
+    agregarPagoApartado() {
+      const monto = Number(this.nuevoMontoApt || 0)
+      if (monto <= 0) { this.errorCierreApartado = 'El monto debe ser mayor a cero'; return }
+
+      const monedaPago = this._monedaDeMetodoApt(this.nuevoMetodoApt)
+      const equivMonedaApt = this._calcularEquivalenteApartado(monto, monedaPago)
+      if (equivMonedaApt === null) {
+        this.errorCierreApartado = 'No se puede calcular el equivalente. Verifica la tasa.'; return
+      }
+
+      const cuentas = this.cuentasDelMetodoApt
+      if (cuentas.length > 1 && !this.nuevaCuentaIdApt) {
+        this.errorCierreApartado = `Debes seleccionar la cuenta destino para ${this.nuevoMetodoApt}`; return
+      }
+      const cuentaId     = this.nuevaCuentaIdApt || (cuentas.length === 1 ? cuentas[0].id : null)
+      const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre || null
+
+      this.errorCierreApartado = ''
+      this.pagosApartado.push({
+        metodo: this.nuevoMetodoApt, moneda_pago: monedaPago,
+        monto_original: monto, monto_equiv_moneda_apt: equivMonedaApt,
+        referencia: this.nuevaReferenciaApt, cuenta_destino_id: cuentaId, cuenta_nombre: cuentaNombre,
+      })
+      this.nuevoMontoApt = ''; this.nuevaReferenciaApt = ''
+    },
+    quitarPagoApartado(i) { this.pagosApartado.splice(i, 1) },
+    async cerrarApartadoConCobro() {
+      if (this.saldoPendienteUSDApt > 0.01 && !this.pagoApartadoCompleto) {
+        this.errorCierreApartado = 'El cobro no cubre el saldo pendiente'; return
+      }
+      this.cerrandoApartado = true; this.errorCierreApartado = ''
+      try {
+        const payload = this.saldoPendienteUSDApt > 0.01 ? {
+          pagos: this.pagosApartado.map(p => ({
+            metodo: p.metodo, monto: p.monto_original,
+            referencia: p.referencia || '', cuenta_destino_id: p.cuenta_destino_id || null,
+          })),
+        } : {}
+        const res = await axios.post(`/apartados/${this.apartadoCierre.id}/convertir-venta`, payload, {
+          headers: { 'x-usuario-nombre': this.usuario.usuario || '' },
+        })
+        this.modalCierreApartado = false
+        this.apartadoCierre      = null
+        this.pagosApartado       = []
+        alert(`Apartado cerrado — Venta #${res.data.venta_id} registrada`)
+      } catch (e) {
+        this.errorCierreApartado = e?.response?.data?.detail || 'Error al cerrar el apartado'
+      } finally { this.cerrandoApartado = false }
     },
 
     async confirmarAvisoVendedor() {
@@ -2790,6 +3044,18 @@ export default {
 .input-apt:focus { outline: none; border-color: #FFCC00; }
 .apt-resumen-carrito { background: #1A1A1A; border: 1px solid var(--borde); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; font-size: 0.85rem; color: #FFFFFF; }
 .apt-resumen-carrito strong { color: #FFCC00; }
+
+.apt-busq-lista { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
+.apt-busq-item { border: 1px solid var(--borde); border-radius: 8px; padding: 0.6rem 0.8rem; cursor: pointer; transition: background 0.15s; }
+.apt-busq-item:hover { background: var(--borde-suave); }
+.apt-busq-top { display: flex; justify-content: space-between; align-items: center; }
+.apt-busq-numero { font-weight: 800; font-size: 0.9rem; color: #1E40AF; }
+.apt-busq-saldo { font-size: 0.8rem; color: #DC2626; font-weight: 600; }
+.apt-busq-cliente { font-size: 0.85rem; color: var(--texto-sec); margin-top: 0.15rem; }
+
+.apt-cierre-resumen { display: flex; flex-direction: column; gap: 0.4rem; }
+.apt-productos { border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); padding: 0.5rem 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.apt-prod-row { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--texto-sec); }
 .btn-guardar-presupuesto {
   width: 100%;
   padding: 0.6rem;

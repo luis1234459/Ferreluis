@@ -1,17 +1,22 @@
 import json
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     Apartado, DetalleApartado, AbonoApartado,
     Producto, VarianteProducto, MovimientoBancario,
-    Venta, DetalleVenta,
+    Venta, DetalleVenta, PagoVenta,
+    METODOS_USD, METODOS_BS, TOLERANCIA,
 )
 from rutas.auth import resolver_sede_activa, ajustar_existencia_sede
+from rutas.ventas import _moneda_de_metodo, _calcular_equivalente
 
 router = APIRouter(tags=["apartados"])
+
+METODOS_CIERRE_APARTADO = (METODOS_USD | METODOS_BS) - {"credito"}
 
 
 def _numero(db: Session) -> str:
@@ -154,6 +159,37 @@ def listar_apartados(
     return [_serializar(a, db) for a in apts]
 
 
+# ── GET /apartados/buscar-rapido ─────────────────────────────────────────────
+
+@router.get("/buscar-rapido")
+def buscar_rapido(
+    q: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    x_usuario_nombre: Optional[str] = Header(None),
+    x_usuario_rol:    Optional[str] = Header(None),
+):
+    """
+    Autocomplete para cerrar apartados desde Ventas. Incluye "activo" y
+    también "pagado" (100% abonado por /abono) siempre que todavía no se
+    haya convertido a Venta — un "pagado" ya convertido no debe volver a
+    aparecer (evitaría reconvertirlo por accidente). Apartados "pagado" de
+    antes de este deploy requieren el backfill de
+    backend/backfill_apartados_convertidos.py para no reaparecer aquí.
+    """
+    like = f"%{q}%"
+    query = db.query(Apartado).filter(
+        or_(
+            Apartado.estado == "activo",
+            (Apartado.estado == "pagado") & (Apartado.convertido_a_venta == False),  # noqa: E712
+        ),
+        or_(Apartado.numero.ilike(like), Apartado.cliente_nombre.ilike(like)),
+    )
+    if x_usuario_rol not in ("admin", "gestionador"):
+        query = query.filter(Apartado.vendedor == (x_usuario_nombre or ""))
+    apts = query.order_by(Apartado.fecha_creacion.desc()).limit(8).all()
+    return [_serializar(a, db) for a in apts]
+
+
 # ── GET /apartados/{id} ──────────────────────────────────────────────────────
 
 @router.get("/{apt_id}")
@@ -252,6 +288,7 @@ def cancelar_apartado(apt_id: int, db: Session = Depends(get_db)):
 @router.post("/{apt_id}/convertir-venta")
 def convertir_a_venta(
     apt_id: int,
+    datos: dict = {},
     db: Session = Depends(get_db),
     x_usuario_nombre: Optional[str] = Header(None),
 ):
@@ -261,10 +298,71 @@ def convertir_a_venta(
     if apt.estado not in ("activo", "pagado"):
         raise HTTPException(status_code=400, detail=f"Estado inválido para convertir: '{apt.estado}'")
 
-    tasa = float(apt.tasa_bcv or 1)
+    if apt.convertido_a_venta:
+        raise HTTPException(status_code=400, detail="Este apartado ya fue convertido a una venta")
+
+    tasa      = float(apt.tasa_bcv or 1)
+    usuario   = x_usuario_nombre or apt.vendedor
+    saldo_usd = round(float(apt.total_usd or 0) - float(apt.abonado_usd or 0), 2)
+    pagos_in  = (datos or {}).get("pagos") or []
+
+    # ── Cobro del saldo pendiente (opcional, no rompe el flujo viejo) ────────
+    pagos_procesados = []
+    if pagos_in and saldo_usd > 0.01:
+        saldo_en_moneda    = saldo_usd if apt.moneda == "USD" else round(saldo_usd * tasa, 2)
+        cubierto_en_moneda = 0.0
+
+        for i, pago in enumerate(pagos_in):
+            metodo     = pago.get("metodo")
+            monto      = float(pago.get("monto", 0))
+            referencia = pago.get("referencia", "") or ""
+            if metodo not in METODOS_CIERRE_APARTADO:
+                raise HTTPException(status_code=400, detail=f"Pago #{i+1}: método inválido '{metodo}'")
+            if monto <= 0:
+                raise HTTPException(status_code=400, detail=f"Pago #{i+1} ({metodo}): monto debe ser > 0")
+
+            moneda_pago  = _moneda_de_metodo(metodo)
+            equiv_moneda = _calcular_equivalente(monto, moneda_pago, apt.moneda, tasa)
+            equiv_usd    = _calcular_equivalente(monto, moneda_pago, "USD", tasa)
+            cubierto_en_moneda = round(cubierto_en_moneda + equiv_moneda, 2)
+
+            pagos_procesados.append({
+                "metodo_pago":              metodo,
+                "moneda_pago":              moneda_pago,
+                "monto_original":           monto,
+                "monto_equivalente_moneda": equiv_moneda,
+                "monto_equivalente_usd":    equiv_usd,
+                "referencia":               referencia,
+                "cuenta_destino_id":        pago.get("cuenta_destino_id"),
+            })
+
+        falta = round(saldo_en_moneda - cubierto_en_moneda, 2)
+        if falta > TOLERANCIA:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Pago insuficiente para cerrar el apartado. "
+                    f"Saldo: {saldo_en_moneda:.2f} {apt.moneda} | "
+                    f"Cubierto: {cubierto_en_moneda:.2f} {apt.moneda} | "
+                    f"Falta: {falta:.2f} {apt.moneda}"
+                )
+            )
+
+        for p in pagos_procesados:
+            db.add(AbonoApartado(
+                apartado_id    = apt.id,
+                monto          = p["monto_original"],
+                moneda_pago    = p["moneda_pago"],
+                metodo_pago    = p["metodo_pago"],
+                registrado_por = usuario,
+                referencia     = p["referencia"],
+            ))
+            apt.abonado_usd = round(float(apt.abonado_usd or 0) + p["monto_equivalente_usd"], 2)
+
+    # ── Crear la Venta a partir del apartado (igual que siempre) ─────────────
     venta = Venta(
         fecha            = datetime.utcnow(),
-        usuario          = x_usuario_nombre or apt.vendedor,
+        usuario          = usuario,
         moneda_venta     = apt.moneda,
         tipo_precio_usado= "referencial",
         subtotal         = apt.total_usd,
@@ -273,6 +371,7 @@ def convertir_a_venta(
         tasa_bcv         = tasa,
         estado           = "pagado",
         sede_id          = apt.sede_id,
+        apartado_id      = apt.id,
     )
     db.add(venta)
     db.flush()
@@ -291,6 +390,27 @@ def convertir_a_venta(
             subtotal          = d.subtotal_usd if apt.moneda == "USD" else round(d.subtotal_usd * tasa, 2),
         ))
 
+    if pagos_procesados:
+        ahora = datetime.utcnow()
+        for p in pagos_procesados:
+            db.add(PagoVenta(
+                venta_id          = venta.id,
+                metodo_pago       = p["metodo_pago"],
+                moneda_pago       = p["moneda_pago"],
+                monto_original    = p["monto_original"],
+                tasa_cambio       = tasa,
+                monto_equivalente = p["monto_equivalente_moneda"],
+                moneda_venta      = apt.moneda,
+                referencia        = p["referencia"],
+                fecha_hora        = ahora,
+                usuario           = usuario,
+                cuenta_destino_id = p["cuenta_destino_id"],
+            ))
+        venta.total_abonado   = venta.total
+        venta.saldo_pendiente = 0
+        venta.exceso          = max(round(cubierto_en_moneda - saldo_en_moneda, 2), 0)
+
     apt.estado = "pagado"
+    apt.convertido_a_venta = True
     db.commit()
     return {"ok": True, "venta_id": venta.id}

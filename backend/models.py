@@ -241,6 +241,7 @@ class Venta(Base):
     observacion      = Column(String, nullable=True)
     despachado_por   = Column(String, nullable=True)  # 'vendedor' | 'despachador' | null
     sede_id          = Column(Integer, nullable=False, default=1)  # FK → Sede
+    apartado_id      = Column(Integer, nullable=True)  # FK → Apartado, si nació de un apartado convertido
 
 
 class PagoVenta(Base):
@@ -1039,6 +1040,7 @@ class Apartado(Base):
     moneda             = Column(String,   default="USD")
     tasa_bcv           = Column(Float,    nullable=True)
     sede_id            = Column(Integer,  nullable=False, default=1)  # FK → Sede
+    convertido_a_venta = Column(Boolean,  nullable=False, default=False)  # True una vez que ya generó su Venta — evita reconvertirlo
 
 
 class DetalleApartado(Base):

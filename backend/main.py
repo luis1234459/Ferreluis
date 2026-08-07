@@ -890,6 +890,28 @@ def inicializar_datos():
              "SELECT setval(pg_get_serial_sequence('pantallas','id'), (SELECT MAX(id) FROM pantallas))"],
         )
 
+        # ── ventas.apartado_id — liga la Venta al Apartado del que nació al
+        # convertirse (rutas/apartados.py: convertir_a_venta). Permite distinguir
+        # un apartado "pagado" que ya se convirtió de uno que solo está 100%
+        # abonado y todavía espera que lo recojan — sin este link ambos se ven
+        # igual (estado="pagado") y no hay forma de saber si ya tiene Venta.
+        migrar(
+            ["ALTER TABLE ventas ADD COLUMN apartado_id INTEGER"],
+            ["ALTER TABLE ventas ADD COLUMN IF NOT EXISTS apartado_id INTEGER REFERENCES apartados(id)"],
+        )
+
+        # ── apartados.convertido_a_venta — flag explícito (no depende de que
+        # exista un ventas.apartado_id, que solo empieza a llenarse desde
+        # ahora). Sin esto, un apartado "pagado" convertido ANTES de este
+        # deploy se vería igual que uno recién pagado-y-sin-convertir, y el
+        # buscador de Ventas lo dejaría reconvertir por accidente (venta
+        # duplicada). Requiere backfill manual una sola vez antes de activar
+        # la búsqueda ampliada en producción — ver backend/backfill_apartados_convertidos.py.
+        migrar(
+            ["ALTER TABLE apartados ADD COLUMN convertido_a_venta BOOLEAN NOT NULL DEFAULT 0"],
+            ["ALTER TABLE apartados ADD COLUMN IF NOT EXISTS convertido_a_venta BOOLEAN NOT NULL DEFAULT FALSE"],
+        )
+
         # ── Seed: "Consumidor Final" ──────────────────────────────────────────
         consumidor = db.query(models.Cliente).filter(
             models.Cliente.es_cliente_generico == True
